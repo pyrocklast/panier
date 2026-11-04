@@ -547,10 +547,11 @@ function setHist(btn, label, verb) {
   btn.title = label ? verb + " " + label : verb;
 }
 function paintStatus() {
-  const { online, waiting } = store.status();
+  const { online, full, waiting } = store.status();
   const el = $("#status");
   el.hidden = online;
-  el.textContent = waiting ? "Offline · " + waiting + (waiting === 1 ? " change" : " changes") + " to send" : "Offline";
+  const queued = waiting ? " · " + waiting + (waiting === 1 ? " change" : " changes") + " to send" : "";
+  el.textContent = (full ? "The list is full on the server" : "Offline") + queued;
 }
 function render() {
   for (const s of SECTIONS) shells[s.id].ul.replaceChildren(...shown(s.id).map(itemEl));

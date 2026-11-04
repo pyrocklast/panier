@@ -72,9 +72,7 @@ The icon sits in the card's top-right corner and the tick boxes take the list's 
 - **Merging.** Each field of each item (name, list, position, ticked) keeps the most recent write, so two phones can edit offline and end up identical. Undo only reverses fields that still hold what you set; if the other phone changed one since, its change stands.
 - **Server:** one Go program ([`main.go`](main.go), [`api.go`](api.go), [`store.go`](store.go)) using only the standard library. It serves the app, appends encrypted changes to one log file per list and announces new ones over Server-Sent Events. New lists need the setup code generated on the server's first run.
 
-What the server can see: when changes happen, roughly how big they are, and which addresses connect. What it cannot see: anything written in the list.
-
-Limits to know: anyone with the pairing link can open the list, and a phone cannot be removed from a list yet. To cut a phone off, start a new list. If every phone and every copy of the link is lost, the list cannot be recovered.
+[SECURITY.md](SECURITY.md) explains what Panier protects and what it doesn't, and how to report a problem.
 
 ## Running it
 
@@ -96,7 +94,7 @@ Publishing a release on GitHub (tag `v…`) builds ready-to-run programs for the
 3. Raspberry Pi install script and setup guide ✓
 4. Install on both phones and test in a shop
 
-Later: several lists; lists shared with different groups of people; folding a list by tapping its icon.
+Later: changing a list's key, to remove a phone; compacting the change log; exporting a list; several lists; lists shared with different groups of people; folding a list by tapping its icon.
 
 ## Licence
 

@@ -25,6 +25,10 @@ const (
 
 var changePattern = regexp.MustCompile(`^[A-Za-z0-9+/]+={0,2}$`)
 
+// setupFailDelay slows down wrong setup codes. The code is too long to guess anyway;
+// this keeps automated guessing from even trying quickly.
+var setupFailDelay = time.Second
+
 type server struct {
 	store     *store
 	setupCode string
@@ -80,6 +84,7 @@ func decodeToken(s string) ([]byte, bool) {
 func (sv *server) createList(w http.ResponseWriter, r *http.Request) {
 	code := r.Header.Get("X-Setup-Code")
 	if subtle.ConstantTimeCompare([]byte(normalizeCode(code)), []byte(sv.setupCode)) != 1 {
+		time.Sleep(setupFailDelay)
 		fail(w, http.StatusForbidden, "wrong setup code")
 		return
 	}
@@ -132,7 +137,15 @@ func (sv *server) withList(h func(http.ResponseWriter, *http.Request, *list)) ht
 }
 
 func (sv *server) getChanges(w http.ResponseWriter, r *http.Request, l *list) {
-	since, _ := strconv.Atoi(r.URL.Query().Get("since"))
+	since := 0
+	if s := r.URL.Query().Get("since"); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 0 {
+			fail(w, http.StatusBadRequest, "since must be a sequence number")
+			return
+		}
+		since = n
+	}
 	changes, latest := l.since(since, maxPerPage)
 	writeJSON(w, http.StatusOK, map[string]any{"changes": changes, "latest": latest})
 }
@@ -156,7 +169,14 @@ func (sv *server) postChanges(w http.ResponseWriter, r *http.Request, l *list) {
 		}
 	}
 	latest, err := l.add(req.Changes)
-	if err != nil {
+	switch {
+	case errors.Is(err, errFull):
+		fail(w, http.StatusInsufficientStorage, "this list is full")
+		return
+	case errors.Is(err, errBroken):
+		fail(w, http.StatusServiceUnavailable, "the server needs a restart")
+		return
+	case err != nil:
 		log.Printf("append: %v", err)
 		fail(w, http.StatusInternalServerError, "could not save")
 		return

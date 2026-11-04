@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"errors"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,12 +19,17 @@ import (
 //	auth  SHA-256 of the list's access token, in hex
 //	log   one encrypted change per line, in arrival order; the line number is its sequence number
 //
-// Lists are loaded on first use and kept in memory; a shopping list's log stays small.
+// Lists are loaded on first use and kept in memory; a shopping list's log stays small,
+// and maxLogBytes caps it in case a paired phone misbehaves.
 
 var (
 	errExists   = errors.New("list already exists")
 	errNotFound = errors.New("list not found")
+	errFull     = errors.New("list is full")
+	errBroken   = errors.New("list log needs a restart to recover")
 	idPattern   = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
+	maxLogBytes int64 = 32 << 20 // several years of use for two people
 )
 
 type store struct {
@@ -32,11 +38,21 @@ type store struct {
 	lists map[string]*list
 }
 
+// logFile is the part of *os.File the store uses; tests replace it to simulate disk errors.
+type logFile interface {
+	WriteString(string) (int, error)
+	Sync() error
+	Truncate(int64) error
+	Close() error
+}
+
 type list struct {
 	mu      sync.Mutex
 	auth    [sha256.Size]byte
 	changes []string
-	log     *os.File
+	log     logFile
+	size    int64 // bytes of complete lines in the log
+	broken  bool  // a failed write couldn't be undone; refuse writes until restart
 	subs    map[chan int]struct{}
 }
 
@@ -110,6 +126,7 @@ func (s *store) get(id string) (*list, error) {
 	if len(data) > 0 {
 		l.changes = strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
 	}
+	l.size = int64(len(data))
 	if l.log, err = os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0o600); err != nil {
 		return nil, err
 	}
@@ -130,21 +147,35 @@ func (l *list) allows(token []byte) bool {
 	return subtle.ConstantTimeCompare(sum[:], l.auth[:]) == 1
 }
 
-// add appends encrypted changes and returns the latest sequence number.
+// add appends encrypted changes and returns the latest sequence number. Either all
+// of them are saved or none: a failed write is cut back off the end of the log, so
+// sequence numbers on disk always match the ones already handed to phones.
 func (l *list) add(data []string) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.broken {
+		return 0, errBroken
+	}
 	var b strings.Builder
 	for _, d := range data {
 		b.WriteString(d)
 		b.WriteByte('\n')
 	}
-	if _, err := l.log.WriteString(b.String()); err != nil {
+	if l.size+int64(b.Len()) > maxLogBytes {
+		return 0, errFull
+	}
+	n, err := l.log.WriteString(b.String())
+	if err == nil {
+		err = l.log.Sync()
+	}
+	if err != nil {
+		if terr := l.log.Truncate(l.size); terr != nil {
+			l.broken = true
+			log.Printf("could not undo a failed write (%v); refusing writes to this list until restart", terr)
+		}
 		return 0, err
 	}
-	if err := l.log.Sync(); err != nil {
-		return 0, err
-	}
+	l.size += int64(n)
 	l.changes = append(l.changes, data...)
 	latest := len(l.changes)
 	for ch := range l.subs {
@@ -161,11 +192,8 @@ func (l *list) since(n, max int) ([]change, int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	latest := len(l.changes)
-	if n < 0 {
-		n = 0
-	}
 	out := []change{}
-	for i := n; i < latest && len(out) < max; i++ {
+	for i := max0(n); i < latest && len(out) < max; i++ {
 		out = append(out, change{Seq: i + 1, Data: l.changes[i]})
 	}
 	return out, latest
@@ -191,4 +219,11 @@ func (l *list) subscribe(limit int) (chan int, func(), bool) {
 		delete(l.subs, ch)
 		l.mu.Unlock()
 	}, true
+}
+
+func max0(n int) int {
+	if n < 0 {
+		return 0
+	}
+	return n
 }

@@ -142,10 +142,16 @@ async function derive(raw) {
   };
 }
 
+// Changes are padded with spaces to a multiple of 256 bytes before encryption, so the
+// server can't tell an item's name length from the size of what it stores.
+const PAD = 256;
 async function seal(obj) {
+  const plain = text.encode(JSON.stringify(obj));
+  const padded = new Uint8Array(Math.ceil((plain.length + 1) / PAD) * PAD).fill(0x20);
+  padded.set(plain);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const params = { name: "AES-GCM", iv, additionalData: text.encode(session.id) };
-  const ct = new Uint8Array(await crypto.subtle.encrypt(params, session.key, text.encode(JSON.stringify(obj))));
+  const ct = new Uint8Array(await crypto.subtle.encrypt(params, session.key, padded));
   const out = new Uint8Array(iv.length + ct.length);
   out.set(iv);
   out.set(ct, iv.length);
@@ -189,11 +195,11 @@ export async function join(key) {
 
 /* ---------- Sync ---------- */
 
-let state = "offline"; // "online" or "offline"
+let state = "offline"; // "online", "offline", or "full" when the server has no room left for this list
 let started = false, flushing = false, pulling = null, pullAgain = false, flushTimer = 0;
 let wake = null, abort = null;
 
-export const status = () => ({ online: state === "online", waiting: s.outbox.length });
+export const status = () => ({ online: state === "online", full: state === "full", waiting: s.outbox.length });
 function setState(next) {
   if (state !== next) { state = next; emit("status"); }
 }
@@ -203,7 +209,7 @@ async function api(path, opts = {}) {
     ...opts,
     headers: { ...opts.headers, Authorization: "Bearer " + session.auth },
   });
-  if (!res.ok) throw new Error("HTTP " + res.status);
+  if (!res.ok) throw new Error(res.status === 507 ? "full" : "HTTP " + res.status);
   return res;
 }
 
@@ -223,8 +229,8 @@ async function flush() {
     save();
     setState("online");
     emit("status");
-  } catch (_) {
-    setState("offline");
+  } catch (err) {
+    setState(err.message === "full" ? "full" : "offline");
   } finally {
     flushing = false;
   }
