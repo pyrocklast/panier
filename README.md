@@ -1,6 +1,6 @@
 # Panier
 
-A private shopping list for two people. Minimal, end-to-end encrypted, self-hosted.
+A private, collaborative shopping list. Minimal, end-to-end encrypted, self-hosted.
 
 **Status:** the app and its server work and are tested end to end, and the Raspberry Pi setup is written; next is testing on real phones. The interaction prototype the design came from is kept in [`prototype/index.html`](prototype/index.html).
 
