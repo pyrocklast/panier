@@ -1,0 +1,205 @@
+package main
+
+import (
+	"crypto/subtle"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"log"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const (
+	maxBody       = 256 << 10 // per request
+	maxChange     = 16 << 10  // per encrypted change
+	maxPerRequest = 200
+	maxPerPage    = 1000
+	maxListeners  = 16 // live connections per list
+)
+
+var changePattern = regexp.MustCompile(`^[A-Za-z0-9+/]+={0,2}$`)
+
+type server struct {
+	store     *store
+	setupCode string
+	web       fs.FS
+}
+
+func (sv *server) routes() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/lists", sv.createList)
+	mux.HandleFunc("GET /api/lists/{id}/changes", sv.withList(sv.getChanges))
+	mux.HandleFunc("POST /api/lists/{id}/changes", sv.withList(sv.postChanges))
+	mux.HandleFunc("GET /api/lists/{id}/events", sv.withList(sv.events))
+	mux.Handle("/api/", http.NotFoundHandler())
+	mux.Handle("/", http.FileServerFS(sv.web))
+	return securityHeaders(mux)
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "+
+			"font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			h.Set("Cache-Control", "no-store")
+		} else {
+			h.Set("Cache-Control", "no-cache")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func fail(w http.ResponseWriter, code int, msg string) {
+	http.Error(w, msg, code)
+}
+
+func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(v)
+}
+
+func decodeToken(s string) ([]byte, bool) {
+	b, err := base64.RawURLEncoding.DecodeString(s)
+	return b, err == nil && len(b) == 32
+}
+
+// createList registers a new list. It needs the server's setup code, so only the
+// person who installed the server can create lists; the id and token come from the
+// list key, which never leaves the phones.
+func (sv *server) createList(w http.ResponseWriter, r *http.Request) {
+	code := r.Header.Get("X-Setup-Code")
+	if subtle.ConstantTimeCompare([]byte(normalizeCode(code)), []byte(sv.setupCode)) != 1 {
+		fail(w, http.StatusForbidden, "wrong setup code")
+		return
+	}
+	var req struct {
+		ID   string `json:"id"`
+		Auth string `json:"auth"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&req); err != nil {
+		fail(w, http.StatusBadRequest, "bad request")
+		return
+	}
+	token, ok := decodeToken(req.Auth)
+	if !idPattern.MatchString(req.ID) || !ok {
+		fail(w, http.StatusBadRequest, "bad id or token")
+		return
+	}
+	switch err := sv.store.create(req.ID, token); {
+	case errors.Is(err, errExists):
+		fail(w, http.StatusConflict, "list already exists")
+	case err != nil:
+		log.Printf("create list: %v", err)
+		fail(w, http.StatusInternalServerError, "could not create list")
+	default:
+		w.WriteHeader(http.StatusCreated)
+	}
+}
+
+func (sv *server) withList(h func(http.ResponseWriter, *http.Request, *list)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token, ok := decodeToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+		if !ok {
+			fail(w, http.StatusUnauthorized, "missing token")
+			return
+		}
+		l, err := sv.store.get(r.PathValue("id"))
+		if errors.Is(err, errNotFound) {
+			fail(w, http.StatusNotFound, "no such list")
+			return
+		} else if err != nil {
+			log.Printf("open list: %v", err)
+			fail(w, http.StatusInternalServerError, "could not open list")
+			return
+		}
+		if !l.allows(token) {
+			fail(w, http.StatusUnauthorized, "wrong token")
+			return
+		}
+		h(w, r, l)
+	}
+}
+
+func (sv *server) getChanges(w http.ResponseWriter, r *http.Request, l *list) {
+	since, _ := strconv.Atoi(r.URL.Query().Get("since"))
+	changes, latest := l.since(since, maxPerPage)
+	writeJSON(w, http.StatusOK, map[string]any{"changes": changes, "latest": latest})
+}
+
+func (sv *server) postChanges(w http.ResponseWriter, r *http.Request, l *list) {
+	var req struct {
+		Changes []string `json:"changes"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody)).Decode(&req); err != nil {
+		fail(w, http.StatusBadRequest, "bad request")
+		return
+	}
+	if len(req.Changes) == 0 || len(req.Changes) > maxPerRequest {
+		fail(w, http.StatusBadRequest, "send between 1 and 200 changes")
+		return
+	}
+	for _, c := range req.Changes {
+		if len(c) > maxChange || !changePattern.MatchString(c) {
+			fail(w, http.StatusBadRequest, "changes must be base64")
+			return
+		}
+	}
+	latest, err := l.add(req.Changes)
+	if err != nil {
+		log.Printf("append: %v", err)
+		fail(w, http.StatusInternalServerError, "could not save")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"latest": latest})
+}
+
+// events streams the latest sequence number whenever it changes, as Server-Sent Events.
+// The app reads it with fetch, so the token travels in a header rather than the URL.
+func (sv *server) events(w http.ResponseWriter, r *http.Request, l *list) {
+	ch, stop, ok := l.subscribe(maxListeners)
+	if !ok {
+		fail(w, http.StatusTooManyRequests, "too many connections")
+		return
+	}
+	defer stop()
+	rc := http.NewResponseController(w)
+	h := w.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("X-Accel-Buffering", "no")
+	send := func(s string) bool {
+		if _, err := fmt.Fprint(w, s); err != nil {
+			return false
+		}
+		return rc.Flush() == nil
+	}
+	if !send(fmt.Sprintf("data: %d\n\n", l.latest())) {
+		return
+	}
+	ping := time.NewTicker(25 * time.Second)
+	defer ping.Stop()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case n := <-ch:
+			if !send(fmt.Sprintf("data: %d\n\n", n)) {
+				return
+			}
+		case <-ping.C:
+			if !send(": ping\n\n") {
+				return
+			}
+		}
+	}
+}

@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); } body { margin: 0; } [hidden] { display: none !important; }</style>
+<title>Panier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: one calm column with a card per kind of list (icon in the corner), ticked items after them, undo and redo floating at the bottom within thumb reach. */
+:root {
+  --bg: #f4f5f3;
+  --surface: #ffffff;
+  --press: #eef0ee;
+  --ink: #1d2421;
+  --muted: #646e69;
+  --line: #e4e7e4;
+  --ess: #3a8a62;
+  --look: #c27b1a;
+  --long: #6a6fc4;
+  --danger: #c0392b;
+  --shadow: 0 1px 2px rgb(20 30 25 / 0.05), 0 0 0 1px rgb(20 30 25 / 0.05);
+  --float: 0 14px 34px -10px rgb(20 30 25 / 0.28), 0 0 0 1px rgb(20 30 25 / 0.06);
+  --ff: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111513; --surface: #1a1f1d; --press: #242a27; --ink: #e6ebe8; --muted: #98a39d; --line: #272e2b;
+    --ess: #6ec99c; --look: #e9ae58; --long: #a7abf2; --danger: #ff8a80;
+    --shadow: 0 0 0 1px #242b28; --float: 0 14px 34px -10px rgb(0 0 0 / 0.6), 0 0 0 1px #2f3733;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111513; --surface: #1a1f1d; --press: #242a27; --ink: #e6ebe8; --muted: #98a39d; --line: #272e2b;
+  --ess: #6ec99c; --look: #e9ae58; --long: #a7abf2; --danger: #ff8a80;
+  --shadow: 0 0 0 1px #242b28; --float: 0 14px 34px -10px rgb(0 0 0 / 0.6), 0 0 0 1px #2f3733;
+  color-scheme: dark;
+}
+
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.4 var(--ff); -webkit-tap-highlight-color: transparent; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.wrap {
+  max-width: 34rem; margin-inline: auto; box-sizing: border-box;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+.kind { width: 20px; height: 20px; flex: none; display: grid; place-items: center; color: var(--sec); }
+
+main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16px; }
+#list { display: flex; flex-direction: column; gap: 16px; }
+.sec, .basket-list { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+.sec { position: relative; }
+.sec > .kind { position: absolute; top: 16px; right: 16px; z-index: 1; pointer-events: none; }
+.sec .items > .item:first-child .text, .sec .items:empty ~ .add, .sec .items:empty + .sug .sugopt:first-child { padding-right: 48px; }
+
+/* Items */
+.items { list-style: none; margin: 0; padding: 0; }
+.item {
+  display: grid; grid-template-columns: 54px minmax(0, 1fr); list-style: none;
+  background-color: var(--surface); transition: background-color 0.2s;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.item + .item, .items:not(:empty) ~ .add, .sug:not([hidden]) + .add {
+  background-image: linear-gradient(var(--line), var(--line));
+  background-size: calc(100% - 54px) 1px; background-position: right top; background-repeat: no-repeat;
+}
+.item.pressing { background-color: var(--press); transition: background-color 0.3s 0.12s; }
+.item.lifted, .item.hint { position: relative; z-index: 2; background-color: var(--surface); box-shadow: var(--float); transform: scale(1.02); transition: transform 0.15s, box-shadow 0.15s; }
+.item.hint { animation: hint 1.8s ease-in-out; }
+@keyframes hint { 0%, 100% { transform: none; box-shadow: none; } 20%, 80% { transform: scale(1.02); box-shadow: var(--float); } }
+.boxcell { position: relative; display: grid; place-items: center; cursor: pointer; }
+.boxcell > .box, .boxcell > .grip { grid-area: 1 / 1; }
+.grip { display: grid; place-items: center; color: var(--sec); opacity: 0; transition: opacity 0.15s; }
+.item.lifted .box, .item.hint .box, .ghost .box { opacity: 0; }
+.item.lifted .grip, .item.hint .grip, .ghost .grip { opacity: 1; }
+.ghost .grip { transition: color 0.15s; }
+.chk { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.box {
+  width: 21px; height: 21px; box-sizing: border-box; border-radius: 5px; border: 2px solid var(--sec);
+  display: grid; place-items: center; color: transparent; transition: background-color 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.chk:checked + .box { background: var(--muted); border-color: var(--muted); color: var(--surface); }
+.chk:focus-visible + .box { outline: 2px solid var(--ink); outline-offset: 3px; }
+.text {
+  min-width: 0; padding: 14px 16px 14px 0; font-size: 1.0625rem; overflow-wrap: anywhere; cursor: text;
+  border-radius: 4px; outline: none;
+}
+.text:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.text.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 var(--sec); border-radius: 0; }
+.item.done .text { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.item.done .text.editing { color: var(--ink); text-decoration: none; }
+.item.editing { grid-template-columns: 54px minmax(0, 1fr) 48px; }
+.sec .items > .item.editing:first-child .text, .item.editing .text { padding-right: 4px; }
+.sec:has(.items > .item.editing:first-child) > .kind { visibility: hidden; }
+.bin { display: grid; place-items: center; align-self: stretch; padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; }
+.bin:focus-visible { outline-offset: -6px; border-radius: 10px; }
+
+/* Add row */
+.add { display: flex; align-items: center; min-height: 52px; padding-right: 16px; background-color: var(--surface); }
+.add:focus-within { background-color: color-mix(in oklab, var(--sec) 6%, var(--surface)); }
+.add-plus { width: 54px; align-self: stretch; flex: none; display: grid; place-items: center; color: var(--sec); cursor: text; }
+.add-input {
+  flex: 1; min-width: 0; height: 52px; padding: 0; border: 0; outline: none; background: none;
+  color: var(--ink); font: inherit; font-size: 1.0625rem;
+}
+.add-input::placeholder { color: var(--muted); }
+
+/* Suggestions */
+.sug { list-style: none; margin: 0; padding: 4px 0; box-shadow: inset 0 1px 0 var(--line); }
+.items:empty + .sug { box-shadow: none; }
+.sugopt { display: flex; align-items: center; min-height: 46px; padding-right: 16px; color: var(--muted); cursor: pointer; }
+.sugopt > svg { width: 54px; flex: none; }
+.sugopt[aria-selected="true"] { background: var(--press); }
+@media (hover: hover) { .sugopt:hover, .ib:hover { background: var(--press); } .bin:hover { color: var(--danger); } }
+.sugopt .t { color: var(--ink); overflow-wrap: anywhere; }
+.sugopt mark { background: none; color: inherit; font-weight: 700; }
+
+/* Basket */
+.basket { display: flex; flex-direction: column; gap: 8px; }
+.basket-head { margin: 0; view-transition-name: baskethead; }
+#basket-toggle {
+  display: flex; align-items: center; gap: 8px; padding: 6px 4px; border: 0; background: none;
+  color: var(--muted); font-size: 0.9375rem; font-weight: 700; cursor: pointer;
+}
+#basket-count { font-weight: 400; font-variant-numeric: tabular-nums; }
+.tickmark { width: 18px; height: 18px; border-radius: 5px; background: var(--muted); color: var(--bg); display: grid; place-items: center; }
+#basket-toggle .chev { transition: transform 0.15s; }
+#basket-toggle[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+
+.foot { margin: 8px 0 0; text-align: center; }
+.linkbtn { border: 0; background: none; padding: 8px; color: var(--muted); font-size: 0.8125rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+/* Undo and redo */
+.dock {
+  position: fixed; z-index: 30; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--surface); box-shadow: var(--float);
+}
+:root:has(.add-input:focus, .text.editing) .dock { visibility: hidden; }
+.ib { width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; display: grid; place-items: center; cursor: pointer; }
+.ib[aria-disabled="true"] { opacity: 0.3; cursor: default; background: none; }
+
+/* Drag */
+.ghost {
+  position: fixed; z-index: 20; margin: 0; pointer-events: none; background-image: none !important;
+  border-radius: 12px; box-shadow: var(--float);
+}
+.item.placeholder { background-color: color-mix(in oklab, var(--sec) 10%, var(--surface)); }
+.item.placeholder > * { visibility: hidden; }
+:root.dragging, :root.dragging * { cursor: grabbing !important; }
+.item.flash { animation: flash 1.4s ease-out; }
+@keyframes flash { 0%, 35% { background-color: color-mix(in oklab, var(--sec) 20%, var(--surface)); } 100% { background-color: var(--surface); } }
+
+/* Motion */
+::view-transition-old(root) { display: none; }
+::view-transition-new(root) { animation: none; }
+::view-transition-group(*) { animation-duration: 0.22s; animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1); }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*) { animation: none; }
+  .item.flash, .item.hint { animation: none; }
+  .item, .box, #basket-toggle .chev { transition: none; }
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div id="list"></div>
+  <section class="basket" id="basket" aria-labelledby="basket-toggle">
+    <h2 class="basket-head">
+      <button type="button" id="basket-toggle" aria-expanded="true" aria-controls="basket-list" data-fk="basket">
+        <span class="tickmark" aria-hidden="true"><svg viewBox="0 0 16 16" width="12" height="12"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="sr">Ticked items</span><span id="basket-count"></span>
+        <svg class="chev" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </h2>
+    <ul class="items basket-list" id="basket-list"></ul>
+  </section>
+  <p class="foot"><button type="button" class="linkbtn" id="reset" data-fk="reset">Reset example items</button></p>
+</main>
+
+<div class="dock" id="dock" hidden>
+  <button type="button" class="ib" id="undo" aria-label="Undo" aria-disabled="true" data-fk="undo">
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M7 4.5L3.5 8 7 11.5M4 8h8a4.5 4.5 0 0 1 0 9h-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button type="button" class="ib" id="redo" aria-label="Redo" aria-disabled="true" data-fk="redo">
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M13 4.5L16.5 8 13 11.5M16 8H8a4.5 4.5 0 0 0 0 9h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</div>
+<div class="sr" id="live" aria-live="polite"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const SECTIONS = [
+    { id: "ess", name: "Essentials", icon: "home" },
+    { id: "look", name: "Look out for", icon: "eye" },
+    { id: "long", name: "Long term", icon: "bookmark" },
+  ];
+  const SEC = Object.fromEntries(SECTIONS.map(s => [s.id, s]));
+  const KEY = "panier-prototype-v1";
+  const SETTLE_MS = 1500;
+  const TRIP_MS = 12 * 3600 * 1000;
+  const LONG_PRESS_MS = 450;
+  const HINT_KEY = "panier-dragged-once";
+  const $ = s => document.querySelector(s);
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const PLAIN = (() => { try { const d = document.createElement("div"); d.contentEditable = "plaintext-only"; return d.contentEditable === "plaintext-only"; } catch (_) { return false; } })();
+
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const fold = s => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const keyOf = s => fold(s).replace(/\s+/g, " ").trim();
+  const clean = s => s.replace(/\s+/g, " ").trim().slice(0, 80);
+  const q = s => "“" + s + "”";
+
+  function examples() {
+    const t = Date.now();
+    let p = 0;
+    const mk = (text, section, minutesAgo) => ({
+      id: uid(), text, section, pos: ++p,
+      checked: minutesAgo != null, checkedAt: minutesAgo != null ? t - minutesAgo * 60000 : 0,
+    });
+    return [
+      mk("Milk", "ess"), mk("Bread", "ess"), mk("Eggs, free range", "ess"), mk("Coffee beans", "ess"), mk("Washing-up liquid", "ess"),
+      mk("Ripe avocados", "look"), mk("Olive oil, if on offer", "look"),
+      mk("Bike lights", "long"), mk("New colander", "long"),
+      mk("Butter", "ess", 4), mk("Crème fraîche", "ess", 25), mk("Bananas", "ess", 70), mk("Oat milk", "ess", 140),
+      mk("Tomatoes", "ess", 300), mk("Comté", "look", 900), mk("Toothpaste", "ess", 2000), mk("AA batteries", "long", 4000),
+    ];
+  }
+
+  const state = { items: examples() };
+  const ui = { basketOpen: true, sugSec: null, sug: [], sugIndex: -1 };
+  const hist = { undo: [], redo: [] };
+  const settling = new Set();
+  let settleTimer = null, flashId = null, drag = null, editingId = null;
+  let suppressClick = false, lifted = false;
+
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (d && Array.isArray(d.items)) state.items = d.items;
+    if (d && typeof d.basketOpen === "boolean") ui.basketOpen = d.basketOpen;
+  } catch (_) {}
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ items: state.items, basketOpen: ui.basketOpen })); } catch (_) {}
+  }
+
+  /* DOM helpers */
+  function h(tag, attrs, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k === "class") e.className = v;
+      else if (k === "style") e.style.cssText = v;
+      else if (k === "dataset") Object.assign(e.dataset, v);
+      else if (k.startsWith("on") && typeof v === "function") e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of kids.flat()) {
+      if (c == null || c === false) continue;
+      e.append(c instanceof Node ? c : String(c));
+    }
+    return e;
+  }
+  const ICONS = {
+    grip: '<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><g fill="currentColor"><circle cx="5.5" cy="3.5" r="1.4"/><circle cx="10.5" cy="3.5" r="1.4"/><circle cx="5.5" cy="8" r="1.4"/><circle cx="10.5" cy="8" r="1.4"/><circle cx="5.5" cy="12.5" r="1.4"/><circle cx="10.5" cy="12.5" r="1.4"/></g></svg>',
+    check: '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    plus: '<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    home: '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9.5L10 3.8l6.5 5.7M5.5 8v8.5h9V8M8.5 16.5v-4h3v4"/></g></svg>',
+    eye: '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10s3-5.5 8-5.5 8 5.5 8 5.5-3 5.5-8 5.5S2 10 2 10z"/><circle cx="10" cy="10" r="2.3"/></g></svg>',
+    bookmark: '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h8v13l-4-3.2-4 3.2z"/></g></svg>',
+    bin: '<svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true"><path d="M4 6h12M8 6V4.5h4V6M5.8 6l.8 10h6.8l.8-10M8.6 9v4.5M11.4 9v4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    back: '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M6 3.5L2.5 7 6 10.5M3 7h7a3.5 3.5 0 0 1 0 7H8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  };
+  function icon(name) {
+    const t = document.createElement("template");
+    t.innerHTML = ICONS[name];
+    return t.content.firstChild;
+  }
+  const find = id => state.items.find(i => i.id === id);
+  const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} };
+  const onScreen = i => !i.checked || settling.has(i.id) || i.checkedAt >= Date.now() - TRIP_MS;
+  const inList = i => !i.checked || settling.has(i.id);
+  const shown = sec => state.items.filter(i => i.section === sec && inList(i)).sort((a, b) => a.pos - b.pos);
+  const maxPos = sec => shown(sec).reduce((m, i) => Math.max(m, i.pos), 0);
+  function between(a, b) {
+    if (a == null && b == null) return 1;
+    if (a == null) return b - 1;
+    if (b == null) return a + 1;
+    return (a + b) / 2;
+  }
+  function announce(msg) {
+    const l = $("#live");
+    l.textContent = "";
+    requestAnimationFrame(() => { l.textContent = msg; });
+  }
+
+  /* Every change to the list goes through commit, which records it for undo */
+  const activeFk = () => { const a = document.activeElement; return a && a.dataset ? a.dataset.fk : null; };
+  function commit(label, mutate, opts = {}) {
+    const fk = opts.focusKey || activeFk();
+    const before = JSON.stringify(state.items);
+    mutate();
+    if (label && JSON.stringify(state.items) !== before) {
+      hist.undo.push({ items: before, label });
+      if (hist.undo.length > 100) hist.undo.shift();
+      hist.redo.length = 0;
+    }
+    save();
+    paint(fk, opts.animate);
+  }
+  function paint(fk, animate) {
+    const run = () => {
+      render();
+      if (fk) {
+        const t = document.querySelector('[data-fk="' + fk + '"]');
+        if (t && t !== document.activeElement) t.focus({ preventScroll: true });
+      }
+    };
+    if (animate !== false && document.startViewTransition && !reduceMotion.matches && !drag) document.startViewTransition(run);
+    else run();
+  }
+  function step(from, to, verb) {
+    const s = from.pop();
+    if (!s) return;
+    to.push({ items: JSON.stringify(state.items), label: s.label });
+    state.items = JSON.parse(s.items);
+    for (const id of [...settling]) { const it = find(id); if (!it || !it.checked) settling.delete(id); }
+    save();
+    announce(verb + " " + s.label);
+    paint(activeFk());
+    scheduleSettle();
+  }
+  const undo = () => step(hist.undo, hist.redo, "Undid");
+  const redo = () => step(hist.redo, hist.undo, "Redid");
+
+  /* Ticked items stay put briefly, then all move to the basket together */
+  function scheduleSettle() {
+    clearTimeout(settleTimer);
+    if (!settling.size) return;
+    settleTimer = setTimeout(() => {
+      if (editingId || drag) return scheduleSettle();
+      settling.clear();
+      paint(activeFk());
+    }, SETTLE_MS);
+  }
+
+  /* Actions */
+  function toggle(id, checked) {
+    const it = find(id);
+    const fromList = !it.checked;
+    const wasSettling = settling.has(id);
+    commit((checked ? "checking " : "unchecking ") + q(it.text), () => {
+      if (checked) {
+        it.checked = true; it.checkedAt = Date.now();
+        if (fromList) settling.add(id);
+        buzz(12);
+        announce(it.text + " ticked");
+      } else {
+        if (wasSettling) settling.delete(id);
+        else it.pos = maxPos(it.section) + 1;
+        it.checked = false; it.checkedAt = 0;
+        announce(it.text + " back on the list");
+      }
+    }, { animate: !(fromList || wasSettling) });
+    scheduleSettle();
+  }
+  function clearAdd(sec) {
+    const sh = shells[sec];
+    sh.input.value = "";
+    closeSug();
+  }
+  function revive(id, sec) {
+    clearAdd(sec);
+    const it = find(id);
+    commit("putting back " + q(it.text), () => {
+      settling.delete(id);
+      it.section = sec; it.pos = maxPos(sec) + 1; it.checked = false; it.checkedAt = 0;
+      flashId = it.id;
+      announce(it.text + " is back on the list");
+    });
+  }
+  function submitAdd(sec) {
+    const sh = shells[sec];
+    const pick = ui.sugSec === sec && ui.sugIndex >= 0 && ui.sug[ui.sugIndex];
+    if (pick) return revive(pick.id, sec);
+    const text = clean(sh.input.value);
+    if (!text) return;
+    const ex = state.items.find(i => keyOf(i.text) === keyOf(text));
+    if (ex && ex.checked) return revive(ex.id, sec);
+    clearAdd(sec);
+    if (ex) {
+      flashId = ex.id;
+      announce(ex.text + " is already on the list");
+      paint(null, false);
+      return;
+    }
+    commit("adding " + q(text), () => {
+      const it = { id: uid(), text, section: sec, pos: maxPos(sec) + 1, checked: false, checkedAt: 0 };
+      state.items.push(it);
+      flashId = it.id;
+      announce("Added " + text);
+    });
+  }
+  function del(id) {
+    const it = find(id);
+    commit("deleting " + q(it.text), () => {
+      settling.delete(id);
+      state.items.splice(state.items.indexOf(it), 1);
+      announce("Deleted " + it.text);
+    });
+  }
+  function nudge(id, dir) {
+    const it = find(id);
+    const list = shown(it.section);
+    const other = list[list.indexOf(it) + dir];
+    if (other) {
+      commit("moving " + q(it.text), () => { [it.pos, other.pos] = [other.pos, it.pos]; }, { focusKey: "chk-" + id });
+      return;
+    }
+    const next = SECTIONS[SECTIONS.findIndex(s => s.id === it.section) + dir];
+    if (!next) return;
+    commit("moving " + q(it.text), () => {
+      const l = shown(next.id);
+      it.pos = dir > 0 ? (l.length ? l[0].pos - 1 : 1) : maxPos(next.id) + 1;
+      it.section = next.id;
+      announce(it.text + " moved to " + next.name);
+    }, { focusKey: "chk-" + id });
+  }
+
+  /* Tap the words to edit them in place */
+  function caretAt(span, x, y) {
+    try {
+      if (document.caretPositionFromPoint) {
+        const p = document.caretPositionFromPoint(x, y);
+        if (p && span.contains(p.offsetNode)) {
+          const r = document.createRange();
+          r.setStart(p.offsetNode, p.offset);
+          r.collapse(true);
+          return r;
+        }
+      } else if (document.caretRangeFromPoint) {
+        const r = document.caretRangeFromPoint(x, y);
+        if (r && span.contains(r.startContainer)) return r;
+      }
+    } catch (_) {}
+    return null;
+  }
+  function startEdit(span, id, x, y) {
+    if (editingId || drag) return;
+    const orig = find(id).text;
+    editingId = id;
+    span.contentEditable = PLAIN ? "plaintext-only" : "true";
+    span.classList.add("editing");
+    span.setAttribute("role", "textbox");
+    const at = x != null ? caretAt(span, x, y) : null;
+    span.focus();
+    try {
+      let r = at;
+      if (!r) { r = document.createRange(); r.selectNodeContents(span); r.collapse(false); }
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    } catch (_) {}
+    let cancelled = false, done = false;
+    const li = span.closest(".item");
+    const bin = h("button", {
+      type: "button", class: "bin", "aria-label": "Delete " + orig,
+      onpointerdown: e => e.preventDefault(), onmousedown: e => e.preventDefault(),
+      onclick: () => { cancelled = true; finish(); del(id); },
+    }, icon("bin"));
+    li.classList.add("editing");
+    li.append(bin);
+    const onKey = e => {
+      if (e.key === "Enter") { e.preventDefault(); span.blur(); }
+      else if (e.key === "Escape") { e.preventDefault(); cancelled = true; span.blur(); }
+    };
+    const onBefore = e => {
+      if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") { e.preventDefault(); span.blur(); }
+    };
+    const onPaste = e => {
+      if (PLAIN) return;
+      e.preventDefault();
+      document.execCommand("insertText", false, (e.clipboardData && e.clipboardData.getData("text/plain")) || "");
+    };
+    const onSpanBlur = e => { if (e.relatedTarget !== bin) finish(); };
+    const onBinBlur = e => { if (e.relatedTarget !== span) finish(); };
+    function finish() {
+      if (done) return;
+      done = true;
+      span.removeEventListener("keydown", onKey);
+      span.removeEventListener("beforeinput", onBefore);
+      span.removeEventListener("paste", onPaste);
+      span.removeEventListener("blur", onSpanBlur);
+      bin.removeEventListener("blur", onBinBlur);
+      span.contentEditable = "false";
+      span.classList.remove("editing");
+      span.setAttribute("role", "button");
+      li.classList.remove("editing");
+      bin.remove();
+      editingId = null;
+      const text = clean(span.textContent);
+      if (cancelled || !text || text === orig) { span.textContent = orig; return; }
+      const dup = state.items.find(i => i.id !== id && keyOf(i.text) === keyOf(text));
+      if (dup && onScreen(dup)) {
+        span.textContent = orig;
+        flashId = dup.id;
+        announce(dup.text + " is already on the list");
+        paint(activeFk(), false);
+        return;
+      }
+      commit("renaming " + q(orig), () => {
+        if (dup) state.items.splice(state.items.indexOf(dup), 1);
+        find(id).text = text;
+        announce("Renamed to " + text);
+      }, { animate: false });
+    }
+    span.addEventListener("keydown", onKey);
+    span.addEventListener("beforeinput", onBefore);
+    span.addEventListener("paste", onPaste);
+    span.addEventListener("blur", onSpanBlur);
+    bin.addEventListener("blur", onBinBlur);
+  }
+
+  /* Suggestions from everything bought before: three letters, accents ignored */
+  function suggestions(text) {
+    const n = keyOf(text);
+    if (n.length < 3) return [];
+    const scored = [];
+    for (const it of state.items) {
+      if (!it.checked) continue;
+      const t = keyOf(it.text);
+      const at = t.indexOf(n);
+      if (at < 0) continue;
+      const wordStart = at === 0 || /[\s(,'-]/.test(t[at - 1]);
+      scored.push({ it, score: at === 0 ? 0 : wordStart ? 1 : 2 });
+    }
+    scored.sort((a, b) => a.score - b.score || b.it.checkedAt - a.it.checkedAt);
+    return scored.slice(0, 5).map(x => x.it);
+  }
+  function highlight(text, query) {
+    const nfc = text.normalize("NFC");
+    const f = fold(nfc), nq = fold(query).trim();
+    const at = nq ? f.indexOf(nq) : -1;
+    if (f.length !== nfc.length || at < 0) return text;
+    const frag = document.createDocumentFragment();
+    frag.append(nfc.slice(0, at), h("mark", {}, nfc.slice(at, at + nq.length)), nfc.slice(at + nq.length));
+    return frag;
+  }
+  function paintSug(sec, list) {
+    const sh = shells[sec], query = sh.input.value;
+    sh.sug.replaceChildren(...list.map((it, i) => h("li", {
+      role: "option", id: "sug-" + sec + "-" + i, class: "sugopt",
+      "aria-selected": String(ui.sugSec === sec && i === ui.sugIndex),
+      onpointerdown: e => e.preventDefault(),
+      onclick: () => revive(it.id, sec),
+    }, icon("back"), h("span", { class: "t" }, highlight(it.text, query)))));
+    sh.sug.hidden = !list.length;
+    sh.input.setAttribute("aria-expanded", String(list.length > 0));
+    if (list.length && ui.sugIndex >= 0) sh.input.setAttribute("aria-activedescendant", "sug-" + sec + "-" + ui.sugIndex);
+    else sh.input.removeAttribute("aria-activedescendant");
+  }
+  function updateSug(sec) {
+    if (ui.sugSec && ui.sugSec !== sec) paintSug(ui.sugSec, []);
+    const list = suggestions(shells[sec].input.value);
+    ui.sugSec = list.length ? sec : null;
+    ui.sug = list;
+    ui.sugIndex = -1;
+    paintSug(sec, list);
+  }
+  function closeSug() {
+    if (ui.sugSec) paintSug(ui.sugSec, []);
+    ui.sugSec = null; ui.sug = []; ui.sugIndex = -1;
+  }
+
+  /* Section cards are built once, so a focused add field keeps its keyboard open */
+  const shells = {};
+  for (const s of SECTIONS) {
+    const ul = h("ul", { class: "items", "data-sec": s.id });
+    const input = h("input", {
+      type: "text", class: "add-input", id: "add-" + s.id, placeholder: "Add item", "aria-label": "Add item to " + s.name,
+      maxlength: "80", enterkeyhint: "enter", autocomplete: "off", autocapitalize: "sentences", spellcheck: "false",
+      role: "combobox", "aria-autocomplete": "list", "aria-expanded": "false", "aria-controls": "sug-" + s.id,
+      dataset: { fk: "add-" + s.id },
+    });
+    const form = h("form", { class: "add", autocomplete: "off", style: "view-transition-name:add-" + s.id,
+      onsubmit: e => { e.preventDefault(); submitAdd(s.id); } },
+      h("label", { class: "add-plus", for: "add-" + s.id, "aria-hidden": "true" }, icon("plus")), input);
+    const sug = h("ul", { class: "sug", id: "sug-" + s.id, role: "listbox", "aria-label": "Bought before", hidden: true });
+    $("#list").append(h("section", { class: "sec", "data-sec": s.id, "aria-labelledby": "h-" + s.id, style: "--sec:var(--" + s.id + ")" },
+      h("h2", { class: "sr", id: "h-" + s.id }, s.name),
+      h("span", { class: "kind", "aria-hidden": "true" }, icon(s.icon)),
+      ul, sug, form));
+    input.addEventListener("input", () => updateSug(s.id));
+    input.addEventListener("focus", () => updateSug(s.id));
+    input.addEventListener("blur", () => { if (ui.sugSec === s.id) closeSug(); });
+    input.addEventListener("keydown", e => {
+      if (e.key === "Escape") { closeSug(); return; }
+      if (ui.sugSec !== s.id || !ui.sug.length) return;
+      if (e.key === "ArrowDown") { e.preventDefault(); ui.sugIndex = (ui.sugIndex + 1) % ui.sug.length; paintSug(s.id, ui.sug); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); ui.sugIndex = ui.sugIndex <= 0 ? ui.sug.length - 1 : ui.sugIndex - 1; paintSug(s.id, ui.sug); }
+    });
+    shells[s.id] = { ul, input, form, sug };
+  }
+
+  /* Items */
+  function itemEl(it) {
+    const li = h("li", {
+      class: "item" + (it.checked ? " done" : ""), "data-id": it.id,
+      style: "--sec:var(--" + it.section + ");view-transition-name:v" + it.id,
+    });
+    const chk = h("input", { type: "checkbox", class: "chk", id: "chk-" + it.id, "aria-label": it.text, dataset: { fk: "chk-" + it.id } });
+    chk.checked = !!it.checked;
+    chk.addEventListener("change", () => toggle(it.id, chk.checked));
+    chk.addEventListener("keydown", e => {
+      if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown") && inList(it)) { e.preventDefault(); nudge(it.id, e.key === "ArrowUp" ? -1 : 1); }
+      else if (e.key === "Delete") { e.preventDefault(); del(it.id); }
+    });
+    const cell = h("label", { class: "boxcell", for: "chk-" + it.id }, chk, h("span", { class: "box", "aria-hidden": "true" }, icon("check")), h("span", { class: "grip", "aria-hidden": "true" }, icon("grip")));
+    cell.addEventListener("click", e => { if (suppressClick) { e.preventDefault(); suppressClick = false; } });
+    const text = h("span", { class: "text", id: "txt-" + it.id, role: "button", tabindex: "0", "aria-label": "Edit " + it.text, dataset: { fk: "txt-" + it.id } }, it.text);
+    text.addEventListener("click", e => {
+      if (suppressClick) { suppressClick = false; return; }
+      if (editingId !== it.id) startEdit(text, it.id, e.clientX, e.clientY);
+    });
+    text.addEventListener("keydown", e => {
+      if (editingId === it.id) return;
+      if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); startEdit(text, it.id); }
+      else if (e.key === "Delete") { e.preventDefault(); del(it.id); }
+    });
+    li.append(cell, text);
+    bindPress(li, it.id);
+    return li;
+  }
+
+  /* Press and hold, then move, to drag */
+  function bindPress(li, id) {
+    let timer = null, p = null;
+    const off = () => {
+      clearTimeout(timer); timer = null; p = null; lifted = false;
+      li.classList.remove("pressing", "lifted");
+      removeEventListener("pointermove", move);
+      removeEventListener("pointerup", up);
+      removeEventListener("pointercancel", off);
+    };
+    const lift = () => {
+      clearTimeout(timer); timer = null;
+      if (!p || p.lifted) return;
+      if (!(li.parentElement && li.parentElement.dataset.sec)) { suppressClick = true; off(); return; }
+      p.lifted = true; lifted = true; suppressClick = true;
+      li.classList.remove("pressing");
+      li.classList.add("lifted");
+      buzz(8);
+    };
+    const move = e => {
+      if (!p) return;
+      const d = Math.hypot(e.clientX - p.x, e.clientY - p.y);
+      const draggable = !!(li.parentElement && li.parentElement.dataset.sec);
+      if ((p.lifted || p.mouse) && d > 6 && draggable) {
+        const offY = p.y - li.getBoundingClientRect().top;
+        off();
+        suppressClick = true;
+        startDrag(li, id, offY, e.clientY);
+      } else if (!p.lifted && !p.mouse && d > 8) off();
+    };
+    const up = () => off();
+    li.addEventListener("pointerdown", e => {
+      if (e.button > 0 || editingId || drag) return;
+      suppressClick = false;
+      p = { x: e.clientX, y: e.clientY, mouse: e.pointerType === "mouse", lifted: false };
+      li.classList.add("pressing");
+      timer = setTimeout(lift, LONG_PRESS_MS);
+      addEventListener("pointermove", move);
+      addEventListener("pointerup", up);
+      addEventListener("pointercancel", off);
+    });
+    li.addEventListener("contextmenu", e => {
+      if (e.pointerType === "mouse") return;
+      e.preventDefault();
+      if (p && !p.mouse && !editingId) lift();
+    });
+  }
+  document.addEventListener("touchmove", e => { if (lifted || drag) e.preventDefault(); }, { passive: false });
+
+  /* Render */
+  function setHist(btn, stack, verb) {
+    const last = stack[stack.length - 1];
+    btn.setAttribute("aria-disabled", String(!last));
+    btn.setAttribute("aria-label", last ? verb + " " + last.label : verb);
+    btn.title = last ? verb + " " + last.label : verb;
+  }
+  function render() {
+    for (const s of SECTIONS) shells[s.id].ul.replaceChildren(...shown(s.id).map(itemEl));
+    const since = Date.now() - TRIP_MS;
+    const basket = state.items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= since).sort((a, b) => b.checkedAt - a.checkedAt);
+    $("#basket").hidden = basket.length === 0;
+    $("#basket-count").textContent = String(basket.length);
+    $("#basket-toggle").setAttribute("aria-expanded", String(ui.basketOpen));
+    const bl = $("#basket-list");
+    bl.replaceChildren(...basket.map(itemEl));
+    bl.hidden = !ui.basketOpen;
+    $("#dock").hidden = !hist.undo.length && !hist.redo.length;
+    setHist($("#undo"), hist.undo, "Undo");
+    setHist($("#redo"), hist.redo, "Redo");
+
+    if (flashId) {
+      const li = document.querySelector('.item[data-id="' + flashId + '"]');
+      flashId = null;
+      if (li) {
+        li.classList.add("flash");
+        const r = li.getBoundingClientRect();
+        if (r.top < 0 || r.bottom > innerHeight - 80) {
+          window.scrollBy({ top: r.top - innerHeight / 3, behavior: reduceMotion.matches ? "auto" : "smooth" });
+        }
+      }
+    }
+  }
+
+  /* Drag to reorder, also across sections */
+  function startDrag(li, id, offY, y) {
+    const r = li.getBoundingClientRect();
+    const ghost = li.cloneNode(true);
+    ghost.classList.remove("lifted", "pressing", "flash", "hint");
+    ghost.classList.add("ghost");
+    ghost.style.viewTransitionName = "none";
+    ghost.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
+    Object.assign(ghost.style, { left: r.left + "px", top: (y - offY) + "px", width: r.width + "px" });
+    document.body.append(ghost);
+    li.classList.add("placeholder");
+    document.documentElement.classList.add("dragging");
+    drag = { id, li, ghost, offY, y, raf: 0 };
+    addEventListener("pointermove", onDragMove);
+    addEventListener("pointerup", endDrag);
+    addEventListener("pointercancel", endDrag);
+    drag.raf = requestAnimationFrame(dragTick);
+    place(y);
+  }
+  function onDragMove(e) {
+    if (!drag) return;
+    drag.y = e.clientY;
+    drag.ghost.style.top = (e.clientY - drag.offY) + "px";
+    place(e.clientY);
+  }
+  function dragTick() {
+    if (!drag) return;
+    const y = drag.y, H = innerHeight;
+    let dy = 0;
+    if (y < 64) dy = -Math.ceil((64 - y) / 6);
+    else if (y > H - 64) dy = Math.ceil((y - (H - 64)) / 6);
+    if (dy) { window.scrollBy(0, dy); place(y); }
+    drag.raf = requestAnimationFrame(dragTick);
+  }
+  function place(y) {
+    const secs = [...document.querySelectorAll("#list .sec")];
+    let target = secs[secs.length - 1];
+    for (const s of secs) { if (y < s.getBoundingClientRect().bottom) { target = s; break; } }
+    const ul = target.querySelector("ul.items");
+    let before = null;
+    for (const n of ul.children) {
+      if (n === drag.li) continue;
+      const r = n.getBoundingClientRect();
+      if (y < r.top + r.height / 2) { before = n; break; }
+    }
+    if (drag.li.parentElement === ul && drag.li.nextElementSibling === before) return;
+    ul.insertBefore(drag.li, before);
+    drag.li.style.setProperty("--sec", "var(--" + ul.dataset.sec + ")");
+    drag.ghost.style.setProperty("--sec", "var(--" + ul.dataset.sec + ")");
+  }
+  function endDrag() {
+    if (!drag) return;
+    const { li, ghost, id } = drag;
+    cancelAnimationFrame(drag.raf);
+    removeEventListener("pointermove", onDragMove);
+    removeEventListener("pointerup", endDrag);
+    removeEventListener("pointercancel", endDrag);
+    ghost.remove();
+    document.documentElement.classList.remove("dragging");
+    drag = null;
+    try { localStorage.setItem(HINT_KEY, "1"); } catch (_) {}
+    const ul = li.parentElement, sec = ul.dataset.sec;
+    const sibs = [...ul.children], i = sibs.indexOf(li);
+    const prev = sibs[i - 1] && find(sibs[i - 1].dataset.id);
+    const next = sibs[i + 1] && find(sibs[i + 1].dataset.id);
+    const it = find(id);
+    commit("moving " + q(it.text), () => {
+      if (it.section !== sec) announce(it.text + " moved to " + SEC[sec].name);
+      it.section = sec;
+      it.pos = between(prev && prev.pos, next && next.pos);
+    }, { animate: false });
+    scheduleSettle();
+  }
+
+  /* Wiring */
+  $("#undo").addEventListener("click", undo);
+  $("#redo").addEventListener("click", redo);
+  document.addEventListener("keydown", e => {
+    const a = document.activeElement;
+    if (!(e.ctrlKey || e.metaKey) || (a && (a.type === "text" || a.isContentEditable))) return;
+    const k = e.key.toLowerCase();
+    if (k === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+    else if ((k === "z" && e.shiftKey) || k === "y") { e.preventDefault(); redo(); }
+  });
+  $("#basket-toggle").addEventListener("click", () => { ui.basketOpen = !ui.basketOpen; save(); paint(null, false); });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && !editingId && !drag) paint(activeFk(), false);
+  });
+  $("#reset").addEventListener("click", () => {
+    commit("the reset", () => { settling.clear(); state.items = examples(); });
+    try { localStorage.removeItem(HINT_KEY); } catch (_) {}
+    dragHint();
+  });
+
+  /* Until someone has dragged once, the first item lifts briefly to show it can move */
+  function dragHint() {
+    try { if (localStorage.getItem(HINT_KEY)) return; } catch (_) {}
+    setTimeout(() => {
+      const li = document.querySelector("#list .items .item");
+      if (!li || drag || editingId) return;
+      li.classList.add("hint");
+      setTimeout(() => li.classList.remove("hint"), 1800);
+    }, 800);
+  }
+
+  render();
+  dragHint();
+})();
+</script>
+</body>
+</html>

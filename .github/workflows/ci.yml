@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test ./...
+
+  release:
+    if: github.event_name == 'release'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build for the Raspberry Pi and PCs
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          mkdir dist
+          build() { CGO_ENABLED=0 GOOS=linux GOARCH=$1 GOARM=$2 go build -trimpath -ldflags "-s -w -X main.version=$TAG" -o "dist/panier-linux-$3" .; }
+          build arm64 "" arm64   # Raspberry Pi 3, 4, 5 with a 64-bit system
+          build arm 7 armv7      # Raspberry Pi 2, 3, 4 with a 32-bit system
+          build arm 6 armv6      # Raspberry Pi Zero and 1
+          build amd64 "" amd64
+          cd dist && sha256sum panier-* > SHA256SUMS
+      - name: Attach the files to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/* --clobber

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f4f5f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111513" media="(prefers-color-scheme: dark)">
+<title>Panier</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="app.css">
+<script src="vendor/qrcode.js" defer></script>
+<script type="module" src="app.js"></script>
+</head>
+<body>
+
+<main class="wrap" id="app" hidden>
+  <div id="list"></div>
+  <section class="basket" id="basket" aria-labelledby="basket-toggle" hidden>
+    <h2 class="basket-head">
+      <button type="button" id="basket-toggle" aria-expanded="true" aria-controls="basket-list" data-fk="basket">
+        <span class="tickmark" aria-hidden="true"><svg viewBox="0 0 16 16" width="12" height="12"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="sr">Ticked items</span><span id="basket-count"></span>
+        <svg class="chev" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </h2>
+    <ul class="items basket-list" id="basket-list"></ul>
+  </section>
+  <footer class="foot">
+    <p class="status" id="status" role="status" hidden></p>
+    <button type="button" class="linkbtn" id="pair-open">Add a phone</button>
+  </footer>
+</main>
+
+<main class="wrap welcome" id="welcome" hidden>
+  <h1>Panier</h1>
+  <p id="welcome-msg">Open the link from a phone that already has the list.</p>
+  <form class="setup" id="setup-form" autocomplete="off">
+    <label for="setup-code">Or start a new list with your server's setup code</label>
+    <div class="setup-row">
+      <input id="setup-code" type="text" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX">
+      <button type="submit" class="btn primary">Start</button>
+    </div>
+  </form>
+</main>
+
+<div class="dock" id="dock" hidden>
+  <button type="button" class="ib" id="undo" aria-label="Undo" aria-disabled="true" data-fk="undo">
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M7 4.5L3.5 8 7 11.5M4 8h8a4.5 4.5 0 0 1 0 9h-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button type="button" class="ib" id="redo" aria-label="Redo" aria-disabled="true" data-fk="redo">
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M13 4.5L16.5 8 13 11.5M16 8H8a4.5 4.5 0 0 0 0 9h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</div>
+
+<dialog class="sheet" id="pair" aria-labelledby="pair-title" tabindex="-1" autofocus>
+  <h2 id="pair-title">Add a phone</h2>
+  <p>Scan this code with the other phone, or send it the link.</p>
+  <div class="qr" id="qr"></div>
+  <div class="actions">
+    <button type="button" class="btn primary" id="share-link">Share link</button>
+    <button type="button" class="btn" id="copy-link">Copy link</button>
+  </div>
+  <p class="note">This link is the key to your list: anyone who has it can open it. Keep a copy in your password manager to recover the list if you lose your phones.</p>
+  <button type="button" class="ib close" id="pair-close" aria-label="Close">
+    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+  </button>
+</dialog>
+
+<div class="sr" id="live" aria-live="polite"></div>
+</body>
+</html>
