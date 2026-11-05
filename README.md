@@ -144,7 +144,9 @@ Independent of each other.
 One new screen.
 
 - **Appearance:** light, dark, or the same as the phone.
-- **Data:** rolling backups, exporting the list, and how much storage it uses.
+- **Data:**
+  - Keep the list on the phone: after you create or join a list, Panier asks the browser to make its storage persistent, so it isn't cleared when the phone runs low on space. Firefox asks you once; Chrome decides for itself. The screen shows the result, and a reminder to keep the pairing link saved if storage could still be cleared.
+  - Rolling backups, exporting the list, and how much storage it uses.
 - **About:** version, server, and what the server can and can't see.
 
 ### 4. Bigger features
