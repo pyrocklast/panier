@@ -10,11 +10,15 @@ Allow about 20 minutes.
 
 1. Create a free account at [cloudflare.com](https://dash.cloudflare.com/sign-up).
 2. Open **Workers & Pages**. The first time, Cloudflare asks you to choose a `workers.dev` subdomain. Your app's address will be `https://panier.<subdomain>.workers.dev`, so choose something that doesn't identify you if that matters to you.
-3. Create an access token for GitHub:
-   1. Open **My Profile → API Tokens → Create Token**.
-   2. Use the **Edit Cloudflare Workers** template.
-   3. Under **Account Resources**, choose your account. Under **Zone Resources**, choose **All zones**.
-   4. **Continue to summary → Create Token**, and copy the token. Cloudflare shows it only once.
+3. Create an access token for GitHub. It lets GitHub deploy Panier and nothing outside Workers; treat it like a password.
+   1. Click the profile icon at the top right, then **My Profile → API Tokens → Create Token**.
+   2. Next to **Edit Cloudflare Workers**, click **Use template**.
+   3. Click the pencil next to the token name and call it something like `Panier deploy`.
+   4. Leave **Permissions** as the template set them.
+   5. **Account Resources:** *Include* → your account.
+   6. **Zone Resources:** *Include* → *All zones from an account* → your account. With no domain on Cloudflare this does nothing yet; it's ready for when you add one.
+   7. Leave **Client IP Address Filtering** empty, since GitHub deploys from changing addresses, and **TTL** empty, so deploys don't stop working when the token expires.
+   8. **Continue to summary → Create Token.** Copy the token straight into the GitHub secret in step 3 below. Cloudflare shows it only once; if you lose it, **Roll** it on the API Tokens page for a new one, or **Delete** it to cut off access.
 4. Copy your **Account ID**. It's on the **Workers & Pages** overview page, and on your account's home page.
 
 ## 2. A setup code
