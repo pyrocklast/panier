@@ -1,8 +1,8 @@
 # Panier
 
-A private, collaborative shopping list. Minimal, end-to-end encrypted, self-hosted.
+A private, collaborative shopping list. Minimal, end-to-end encrypted, on Cloudflare's free plan or your own server.
 
-**Status:** the app and its server work and are tested end to end, and the Raspberry Pi setup is written; next is testing on real phones. The interaction prototype the design came from is kept in [`prototype/index.html`](prototype/index.html).
+**Status:** the app works and is tested end to end on both servers, and has run on real phones; next is daily use. The interaction prototype the design came from is kept in [`prototype/index.html`](prototype/index.html).
 
 ## How it behaves
 
@@ -70,28 +70,37 @@ The icon sits in the card's top-right corner and the tick boxes take the list's 
 - **One secret per list.** The first phone creates a random 256-bit key. From it, each phone derives (HKDF-SHA-256) the list's id, an access token and an AES-GCM encryption key. The pairing link carries the key after `#`, so it never reaches the server.
 - **End-to-end encryption.** Every change is encrypted on the phone before it is sent. The server stores the encrypted changes and a SHA-256 hash of the access token; it never sees item names.
 - **Merging.** Each field of each item (name, list, position, ticked) keeps the most recent write, so two phones can edit offline and end up identical. Undo only reverses fields that still hold what you set; if the other phone changed one since, its change stands.
-- **Server:** one Go program ([`main.go`](main.go), [`api.go`](api.go), [`store.go`](store.go)) using only the standard library. It serves the app, appends encrypted changes to one log file per list and announces new ones over Server-Sent Events. New lists need the setup code generated on the server's first run.
+- **Server:** two interchangeable servers implement the same small API, and the app works with either. Both store the encrypted changes for each list in arrival order and announce new ones over a WebSocket. New lists need a setup code.
+  - **Cloudflare Workers** ([`worker/index.js`](worker/index.js)): one Durable Object, with its own SQLite database, per list. It sleeps between changes.
+  - **Go** ([`main.go`](main.go), [`api.go`](api.go), [`store.go`](store.go), [`live.go`](live.go)): one program using only the standard library, with one log file per list, for running on your own machine.
 
 [SECURITY.md](SECURITY.md) explains what Panier protects and what it doesn't, and how to report a problem.
 
 ## Running it
 
-You need Go 1.22 or later.
+- **On Cloudflare (free, nothing to keep running):** follow [docs/cloudflare.md](docs/cloudflare.md). GitHub deploys each change to `main` once the tests pass.
+- **On your own server, such as a Raspberry Pi:** follow [docs/raspberry-pi.md](docs/raspberry-pi.md); [`deploy/install.sh`](deploy/install.sh) does the work on the server. Publishing a release on GitHub (tag `v…`) builds ready-to-run programs for the Raspberry Pi (`arm64`, `armv7`, `armv6`) and `amd64`; the install script downloads the latest one.
+
+To try it on a computer, with Go 1.22 or later:
 
 ```sh
 go run . -data ./data              # serves http://127.0.0.1:8080
 go run . -data ./data -setup-code  # prints the setup code
 ```
 
-Open `http://127.0.0.1:8080/#setup=<code>` to start a list. Phones need HTTPS, so on a real server it goes behind a reverse proxy such as Caddy. To set it up on a Raspberry Pi, follow [docs/raspberry-pi.md](docs/raspberry-pi.md); [`deploy/install.sh`](deploy/install.sh) does the work on the Pi.
+Then open `http://127.0.0.1:8080/#setup=<code>`. Phones need HTTPS, or `localhost`: with USB debugging, `adb reverse tcp:8080 tcp:8080` lets an Android phone open `http://localhost:8080`.
 
-Publishing a release on GitHub (tag `v…`) builds ready-to-run programs for the Raspberry Pi (`arm64`, `armv7`, `armv6`) and `amd64` and attaches them to it; the install script downloads the latest one.
+[`test/api.test.mjs`](test/api.test.mjs) holds the API tests both servers must pass:
+
+```sh
+BASE=http://127.0.0.1:8080 SETUP=<code> node --test test/api.test.mjs
+```
 
 ## Roadmap
 
 1. Interaction prototype ✓
 2. Server, encryption, pairing and sync ✓
-3. Raspberry Pi install script and setup guide ✓
+3. Hosting: Cloudflare Workers, or your own server ✓
 4. Install on both phones and test in a shop
 
 Later: changing a list's key, to remove a phone; compacting the change log; exporting a list; several lists; lists shared with different groups of people; folding a list by tapping its icon.

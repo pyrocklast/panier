@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -38,9 +37,9 @@ type server struct {
 func (sv *server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/lists", sv.createList)
-	mux.HandleFunc("GET /api/lists/{id}/changes", sv.withList(sv.getChanges))
-	mux.HandleFunc("POST /api/lists/{id}/changes", sv.withList(sv.postChanges))
-	mux.HandleFunc("GET /api/lists/{id}/events", sv.withList(sv.events))
+	mux.HandleFunc("GET /api/lists/{id}/changes", sv.withList(sv.getChanges, false))
+	mux.HandleFunc("POST /api/lists/{id}/changes", sv.withList(sv.postChanges, false))
+	mux.HandleFunc("GET /api/lists/{id}/live", sv.withList(sv.live, true))
 	mux.Handle("/api/", http.NotFoundHandler())
 	mux.Handle("/", http.FileServerFS(sv.web))
 	return securityHeaders(mux)
@@ -112,9 +111,15 @@ func (sv *server) createList(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (sv *server) withList(h func(http.ResponseWriter, *http.Request, *list)) http.HandlerFunc {
+// withList checks the access token: in the Authorization header, or for live updates,
+// as a WebSocket subprotocol.
+func (sv *server) withList(h func(http.ResponseWriter, *http.Request, *list), live bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		token, ok := decodeToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+		raw := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if live {
+			raw = protocolToken(r)
+		}
+		token, ok := decodeToken(raw)
 		if !ok {
 			fail(w, http.StatusUnauthorized, "missing token")
 			return
@@ -182,44 +187,4 @@ func (sv *server) postChanges(w http.ResponseWriter, r *http.Request, l *list) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]int{"latest": latest})
-}
-
-// events streams the latest sequence number whenever it changes, as Server-Sent Events.
-// The app reads it with fetch, so the token travels in a header rather than the URL.
-func (sv *server) events(w http.ResponseWriter, r *http.Request, l *list) {
-	ch, stop, ok := l.subscribe(maxListeners)
-	if !ok {
-		fail(w, http.StatusTooManyRequests, "too many connections")
-		return
-	}
-	defer stop()
-	rc := http.NewResponseController(w)
-	h := w.Header()
-	h.Set("Content-Type", "text/event-stream")
-	h.Set("X-Accel-Buffering", "no")
-	send := func(s string) bool {
-		if _, err := fmt.Fprint(w, s); err != nil {
-			return false
-		}
-		return rc.Flush() == nil
-	}
-	if !send(fmt.Sprintf("data: %d\n\n", l.latest())) {
-		return
-	}
-	ping := time.NewTicker(25 * time.Second)
-	defer ping.Stop()
-	for {
-		select {
-		case <-r.Context().Done():
-			return
-		case n := <-ch:
-			if !send(fmt.Sprintf("data: %d\n\n", n)) {
-				return
-			}
-		case <-ping.C:
-			if !send(": ping\n\n") {
-				return
-			}
-		}
-	}
 }

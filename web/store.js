@@ -197,7 +197,7 @@ export async function join(key) {
 
 let state = "offline"; // "online", "offline", or "full" when the server has no room left for this list
 let started = false, flushing = false, pulling = null, pullAgain = false, flushTimer = 0;
-let wake = null, abort = null;
+let wake = null, socket = null, reconnectNow = false;
 
 export const status = () => ({ online: state === "online", full: state === "full", waiting: s.outbox.length });
 function setState(next) {
@@ -268,35 +268,44 @@ function pull() {
 
 const nap = ms => new Promise(r => { wake = r; setTimeout(r, ms); });
 
+// connect opens the live-update WebSocket and resolves when it closes. The access
+// token travels as a subprotocol, since browsers can't set headers on WebSockets.
+function connect(current, onOpen) {
+  return new Promise(resolve => {
+    let ws, pinger = 0;
+    try {
+      const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/lists/" + current.id + "/live";
+      ws = new WebSocket(url, ["panier", current.auth]);
+    } catch (_) {
+      return resolve();
+    }
+    socket = ws;
+    ws.onopen = () => {
+      onOpen();
+      pinger = setInterval(() => { try { ws.send("ping"); } catch (_) {} }, 30000);
+    };
+    ws.onmessage = e => { if (/^\d+$/.test(e.data) && +e.data > s.seq) pull(); };
+    ws.onclose = () => {
+      clearInterval(pinger);
+      if (socket === ws) socket = null;
+      resolve();
+    };
+  });
+}
+
 // listen keeps a live connection open and pulls whenever the server reports news.
 async function listen() {
   let delay = 1000;
   while (session) {
     const current = session;
-    abort = new AbortController();
-    try {
-      const res = await api("/events", { signal: abort.signal });
+    await connect(current, () => {
       delay = 1000;
       setState("online");
       flush();
-      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-      let buf = "";
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += value;
-        let i;
-        while ((i = buf.indexOf("\n\n")) >= 0) {
-          const m = /^data: (\d+)$/m.exec(buf.slice(0, i));
-          buf = buf.slice(i + 2);
-          if (m && +m[1] > s.seq) pull();
-        }
-      }
-    } catch (_) {
-      if (session === current && !abort.signal.aborted) setState("offline");
-    }
+    });
     if (session !== current) return;
-    if (abort.signal.aborted) continue; // resumed on purpose: reconnect straight away
+    if (reconnectNow) { reconnectNow = false; continue; } // resumed on purpose
+    if (state !== "full") setState("offline");
     await nap(delay);
     delay = Math.min(delay * 2, 30000);
   }
@@ -312,13 +321,14 @@ export async function start() {
 function stop() {
   started = false;
   session = null;
-  if (abort) abort.abort();
+  if (socket) socket.close();
 }
 
-// Phones drop connections in the background; catch up as soon as the app is back.
+// Phones drop connections in the background, sometimes without noticing; reconnect
+// and catch up as soon as the app is back.
 function resume() {
   if (!session) return;
-  if (abort) abort.abort();
+  if (socket && socket.readyState === WebSocket.OPEN) { reconnectNow = true; socket.close(); }
   if (wake) wake();
   pull();
   flush();

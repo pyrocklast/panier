@@ -3,11 +3,12 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -142,33 +143,110 @@ func TestReloadDropsPartialLine(t *testing.T) {
 	}
 }
 
-func TestEventsAnnounceNewChanges(t *testing.T) {
+// wsDial opens a live-update WebSocket by hand, as a browser would.
+func wsDial(t *testing.T, ts *httptest.Server, protocols string) (net.Conn, *bufio.Reader, string) {
+	t.Helper()
+	conn, err := net.Dial("tcp", strings.TrimPrefix(ts.URL, "http://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	fmt.Fprintf(conn, "GET /api/lists/%s/live HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"+
+		"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Protocol: %s\r\n\r\n", testID, protocols)
+	r := bufio.NewReader(conn)
+	res, err := http.ReadResponse(r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusSwitchingProtocols {
+		return conn, r, res.Status
+	}
+	if got := res.Header.Get("Sec-WebSocket-Accept"); got != "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=" {
+		t.Fatalf("accept key: %q", got)
+	}
+	if got := res.Header.Get("Sec-WebSocket-Protocol"); got != "panier" {
+		t.Fatalf("protocol: %q", got)
+	}
+	return conn, r, res.Status
+}
+
+// serverFrame reads one unmasked frame sent by the server.
+func serverFrame(t *testing.T, conn net.Conn, r *bufio.Reader) (byte, string) {
+	t.Helper()
+	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	var h [2]byte
+	if _, err := io.ReadFull(r, h[:]); err != nil {
+		t.Fatal(err)
+	}
+	p := make([]byte, h[1]&0x7f)
+	io.ReadFull(r, p)
+	return h[0] & 0x0f, string(p)
+}
+
+// clientFrame sends one masked frame, as browsers do.
+func clientFrame(conn net.Conn, op byte, payload string) {
+	mask := []byte{1, 2, 3, 4}
+	b := []byte{0x80 | op, 0x80 | byte(len(payload))}
+	b = append(b, mask...)
+	for i := 0; i < len(payload); i++ {
+		b = append(b, payload[i]^mask[i%4])
+	}
+	conn.Write(b)
+}
+
+func TestLiveUpdates(t *testing.T) {
 	ts := newTestServer(t, t.TempDir())
 	create(t, ts)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, "GET", ts.URL+"/api/lists/"+testID+"/events", nil)
-	req.Header.Set("Authorization", "Bearer "+testToken)
+
+	if _, _, status := wsDial(t, ts, "panier"); !strings.HasPrefix(status, "401") {
+		t.Fatalf("no token: %s", status)
+	}
+	other := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{8}, 32))
+	if _, _, status := wsDial(t, ts, "panier, "+other); !strings.HasPrefix(status, "401") {
+		t.Fatalf("wrong token: %s", status)
+	}
+	res := do(t, "GET", ts.URL+"/api/lists/"+testID+"/live", testToken, "", nil)
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("token in a header instead of a subprotocol: got %d", res.StatusCode)
+	}
+
+	conn, r, status := wsDial(t, ts, "panier, "+testToken)
+	if !strings.HasPrefix(status, "101") {
+		t.Fatalf("handshake: %s", status)
+	}
+	if op, msg := serverFrame(t, conn, r); op != opText || msg != "0" {
+		t.Fatalf("first message: %d %q", op, msg)
+	}
+	postChanges(t, ts, []string{"QUJD"})
+	if _, msg := serverFrame(t, conn, r); msg != "1" {
+		t.Fatalf("after a change: %q", msg)
+	}
+	clientFrame(conn, opText, "ping")
+	if _, msg := serverFrame(t, conn, r); msg != "pong" {
+		t.Fatalf("keepalive: %q", msg)
+	}
+	clientFrame(conn, opPing, "hi")
+	if op, msg := serverFrame(t, conn, r); op != opPong || msg != "hi" {
+		t.Fatalf("protocol ping: %d %q", op, msg)
+	}
+	clientFrame(conn, opClose, "")
+	if op, _ := serverFrame(t, conn, r); op != opClose {
+		t.Fatalf("close: got opcode %d", op)
+	}
+}
+
+func TestLiveNeedsWebSocket(t *testing.T) {
+	ts := newTestServer(t, t.TempDir())
+	create(t, ts)
+	req, _ := http.NewRequest("GET", ts.URL+"/api/lists/"+testID+"/live", nil)
+	req.Header.Set("Sec-WebSocket-Protocol", "panier, "+testToken)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
-	lines := bufio.NewScanner(res.Body)
-	next := func() string {
-		for lines.Scan() {
-			if s := lines.Text(); strings.HasPrefix(s, "data: ") {
-				return strings.TrimPrefix(s, "data: ")
-			}
-		}
-		return ""
-	}
-	if got := next(); got != "0" {
-		t.Fatalf("first event: got %q", got)
-	}
-	do(t, "POST", ts.URL+"/api/lists/"+testID+"/changes", testToken, "", map[string][]string{"changes": {"QUJD"}})
-	if got := next(); got != "1" {
-		t.Fatalf("after post: got %q", got)
+	res.Body.Close()
+	if res.StatusCode != http.StatusUpgradeRequired {
+		t.Fatalf("plain request: got %d", res.StatusCode)
 	}
 }
 

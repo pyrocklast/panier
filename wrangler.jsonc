@@ -1,0 +1,19 @@
+// Panier on Cloudflare Workers. See docs/cloudflare.md.
+// The domain and setup code are not in this file: the deploy step passes them in.
+{
+  "name": "panier",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "web",
+    "run_worker_first": ["/api/*"]
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "LISTS", "class_name": "List" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["List"] }],
+  // Served on your workers.dev address; a custom domain can be added at deploy time.
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": false }
+}
