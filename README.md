@@ -108,6 +108,21 @@ BASE=http://127.0.0.1:8080 SETUP=<code> node --test test/api.test.mjs
 3. Hosting: Cloudflare Workers, or your own server ✓
 4. Install on both phones and test in a shop
 
+Next, fixes:
+
+- Ticked items should slide into the ticked group again. The page-wide animation was turned off because browsers ignore taps while it plays; it needs to animate the items themselves instead.
+- On Android in dark mode, the navigation bar stays white.
+- Clearing an item's text and leaving it should delete the item, not restore the old text.
+- The *Add a section* field should use the same type as section names.
+- *Add a phone* should read as adding a person, such as *Add someone to this list*.
+- Enter in the middle of an item's text should split it in two, with the cursor at the start of the second.
+
+Next, changes:
+
+- French translation
+- Choosing a section's colour from a palette
+- Removing the section icons
+
 Later:
 
 - Rolling backups
