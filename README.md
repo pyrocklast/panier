@@ -103,35 +103,47 @@ BASE=http://127.0.0.1:8080 SETUP=<code> node --test test/api.test.mjs
 
 ## Roadmap
 
-1. Interaction prototype ✓
-2. Server, encryption, pairing and sync ✓
-3. Hosting: Cloudflare Workers, or your own server ✓
-4. Install on both phones and test in a shop
+In order of priority. Done so far: the interaction prototype; the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; running on two phones.
 
-Next, fixes:
+### 1. Fixes
 
-- Ticked items should slide into the ticked group again. The page-wide animation was turned off because browsers ignore taps while it plays; it needs to animate the items themselves instead.
-- On Android in dark mode, the navigation bar stays white.
-- Clearing an item's text and leaving it should delete the item, not restore the old text.
-- The *Add a section* field should use the same type as section names.
-- *Add a phone* should read as adding a person, such as *Add someone to this list*.
-- Enter in the middle of an item's text should split it in two, with the cursor at the start of the second.
+Small, and felt every day.
 
-Next, changes:
+1. **Clearer status.** Make being offline or a failed sync obvious and plain, such as a red dot with *Offline*, and say what happens next: changes are kept and sent when the connection returns.
+2. Clearing an item's text and leaving it deletes the item, instead of restoring the old text.
+3. Enter in the middle of an item's text splits it in two, with the cursor at the start of the second.
+4. Ticked items slide into the ticked group again. The page-wide animation was turned off because browsers ignore taps while it plays; the items themselves need animating instead.
+5. On Android in dark mode, the navigation bar stays white.
+6. The *Add a section* field uses the same type as section names.
+7. *Add a phone* reads as adding a person, such as *Add someone to this list*.
 
-- French translation
-- Choosing a section's colour from a palette
-- Removing the section icons
+### 2. Look and language
 
-Later:
+Small, and independent of each other.
 
-- Rolling backups
-- More people, and several lists each shared with different people
-- Recurring lists or sections, such as a weekly shop
-- Thematic sub-sections within a section: fruit and vegetables, cleaning, clothes, baby things
-- Changing a list's key, to remove a phone
-- Compacting the change log, and exporting a list
-- Folding a section
+- Remove the section icons.
+- Choose a section's colour from a palette.
+- A new app icon: simple and monochrome, in the style of Arcticons, with a monochrome version for Android's themed icons.
+- French translation, following the phone's language.
+
+### 3. Settings
+
+One new screen.
+
+- **Appearance:** light, dark, or the same as the phone.
+- **Data:** rolling backups, exporting the list, and how much storage it uses.
+- **About:** version, server, and what the server can and can't see.
+
+### 4. Bigger features
+
+These change how lists are stored and shared.
+
+- More people, and several lists, each shared with different people.
+- Removing a person or phone from a list, by changing the list's key.
+- Recurring lists or sections, such as a weekly shop.
+- Thematic sub-sections within a section: fruit and vegetables, cleaning, clothes, baby things.
+- Folding a section.
+- Compacting the change log.
 
 ## Licence
 
