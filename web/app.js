@@ -131,15 +131,20 @@ function act(label, ops, opts = {}) {
   if (!store.change(label, ops)) return;
   items = store.items();
   if (opts.leaving) whenTapEnds(() => paint(null, false));
-  else paint(fk, opts.animate);
+  else paint(fk, opts.animate, !!opts.focusKey);
 }
-function paint(fk, animate) {
+// paint redraws, keeping the cursor where it was: on the redrawn copy of the focused
+// element, or on fk when the action asked to move it. If you've moved the cursor
+// yourself in the meantime, it stays where you put it.
+function paint(fk, animate, move = false) {
+  const was = document.activeElement;
   const run = () => {
     render();
-    if (fk) {
-      const t = document.querySelector('[data-fk="' + fk + '"]');
-      if (t && t !== document.activeElement) t.focus({ preventScroll: true });
-    }
+    if (!fk) return;
+    const t = document.querySelector('[data-fk="' + fk + '"]');
+    const now = document.activeElement;
+    const untouched = now === was || !now || now === document.body;
+    if (t && t !== now && untouched && (move || !was || !was.isConnected)) t.focus({ preventScroll: true });
   };
   if (animate !== false && document.startViewTransition && !reduceMotion.matches && !drag) {
     document.startViewTransition(run).ready.catch(() => {}); // a newer change can cut an animation short
@@ -272,7 +277,8 @@ function addSection(raw) {
   const color = PALETTE.find(c => !usedColors.has(c)) || PALETTE[sectionInfo.size % PALETTE.length];
   const pos = sections.reduce((m, s) => Math.max(m, s.pos), 0) + 1;
   announce("Added section " + name);
-  act("adding section " + q(name), [[key, "name", name], [key, "pos", pos], [key, "color", color], [key, "deleted", false]], { focusKey: "add-" + id });
+  // No animation: the cursor moves to the new section's field at once, so nothing typed straight after lands in the wrong field.
+  act("adding section " + q(name), [[key, "name", name], [key, "pos", pos], [key, "color", color], [key, "deleted", false]], { focusKey: "add-" + id, animate: false });
 }
 function renameSection(id, name) {
   const info = sectionInfo.get(id);
@@ -701,13 +707,52 @@ function setHist(btn, label, verb) {
   btn.setAttribute("aria-label", label ? verb + " " + label : verb);
   btn.title = label ? verb + " " + label : verb;
 }
-function paintStatus() {
+// The status pill appears only when something is wrong, after a moment, so a quick
+// reconnect doesn't flash it. Tapping it says what happens next.
+let statusTimer = 0, statusShown = "";
+function statusInfo() {
   const { online, full, waiting } = store.status();
-  const el = $("#status");
-  el.hidden = online;
-  const queued = waiting ? " · " + waiting + (waiting === 1 ? " change" : " changes") + " to send" : "";
-  el.textContent = (full ? "The list is full on the server" : "Offline") + queued;
+  if (online && !full) return null;
+  const kept = waiting
+    ? (waiting === 1 ? "1 change is" : waiting + " changes are") + " saved on this phone"
+    : "Changes you make are saved on this phone";
+  if (full) return { text: "List full", detail: "The server has no room left for this list. " + kept + "." };
+  if (!navigator.onLine) return { text: "Offline", detail: "No connection. " + kept + " and sent when you're back online." };
+  return { text: "Can't reach the server", detail: "The server isn't answering. " + kept + " and sent as soon as it answers." };
 }
+function paintStatus() {
+  const info = $("#app").hidden ? null : statusInfo();
+  const el = $("#status");
+  if (!info) {
+    clearTimeout(statusTimer); statusTimer = 0;
+    if (statusShown) announce("Back online");
+    statusShown = "";
+    el.hidden = true;
+    $("#status-detail").hidden = true;
+    $("#status-pill").setAttribute("aria-expanded", "false");
+    return;
+  }
+  const show = () => {
+    statusTimer = 0;
+    const now = statusInfo();
+    if (!now) return;
+    if (statusShown !== now.text) announce(now.text + ". " + now.detail);
+    statusShown = now.text;
+    $("#status-text").textContent = now.text;
+    $("#status-detail").textContent = now.detail;
+    el.hidden = false;
+  };
+  if (statusShown) show();
+  else if (!statusTimer) statusTimer = setTimeout(show, 2000);
+}
+$("#status-pill").addEventListener("click", () => {
+  const d = $("#status-detail"), open = d.hidden;
+  d.hidden = !open;
+  $("#status-pill").setAttribute("aria-expanded", String(open));
+});
+addEventListener("online", paintStatus);
+addEventListener("offline", paintStatus);
+
 function render() {
   computeSections();
   syncShells();
@@ -868,4 +913,23 @@ async function init() {
 }
 init();
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+/* ---------- Updates ---------- */
+
+// A new version installs in the background. When it takes over, the app reloads into it,
+// waiting first for anything in progress: editing, typing, dragging or the pairing sheet.
+function busy() {
+  return !!(editingId || drag || lifted || pointerIsDown || $("#pair").open ||
+    $("#add-sec").value.trim() || Object.values(shells).some(sh => sh.input.value.trim()));
+}
+function reloadWhenIdle() {
+  if (busy()) setTimeout(reloadWhenIdle, 1000);
+  else location.reload();
+}
+if ("serviceWorker" in navigator) {
+  const updating = !!navigator.serviceWorker.controller; // false on the very first visit
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (updating) reloadWhenIdle(); });
+  navigator.serviceWorker.register("sw.js").then(reg => {
+    // Phones keep apps open for days; look for a new version whenever Panier comes back.
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); });
+  }).catch(() => {});
+}

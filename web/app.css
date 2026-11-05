@@ -147,15 +147,30 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 #basket-toggle[aria-expanded="false"] .chev { transform: rotate(-90deg); }
 
 .foot { margin: 8px 0 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.status { margin: 0; color: var(--muted); font-size: 0.875rem; }
+
 .linkbtn { border: 0; background: none; padding: 8px; color: var(--muted); font-size: 0.8125rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+/* Connection status: shown only when something is wrong, bottom left, opposite undo */
+.status {
+  position: fixed; z-index: 30; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: min(320px, calc(100vw - 32px));
+}
+.status-pill {
+  display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 18px 0 16px; border: 0; border-radius: 999px;
+  background: var(--surface); box-shadow: var(--float); font-size: 0.9375rem; font-weight: 700; cursor: pointer;
+}
+.status-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--danger); }
+.status-detail {
+  margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--surface); box-shadow: var(--float);
+  font-size: 0.875rem; line-height: 1.45;
+}
 
 /* Undo and redo */
 .dock {
   position: fixed; z-index: 30; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--surface); box-shadow: var(--float);
 }
-:root:has(.add-input:focus, .text.editing) .dock { visibility: hidden; }
+:root:has(.add-input:focus, .text.editing, .sec-name.editing) :is(.dock, .status) { visibility: hidden; }
 .ib { width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; display: grid; place-items: center; cursor: pointer; }
 .ib[aria-disabled="true"] { opacity: 0.3; cursor: default; background: none; }
 

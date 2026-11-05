@@ -36,8 +36,7 @@
     <ul class="items basket-list" id="basket-list"></ul>
   </section>
   <footer class="foot">
-    <p class="status" id="status" role="status" hidden></p>
-    <button type="button" class="linkbtn" id="pair-open">Add a phone</button>
+    <button type="button" class="linkbtn" id="pair-open">Add someone to this list</button>
   </footer>
 </main>
 
@@ -53,6 +52,13 @@
   </form>
 </main>
 
+<div class="status" id="status" hidden>
+  <p class="status-detail" id="status-detail" hidden></p>
+  <button type="button" class="status-pill" id="status-pill" aria-expanded="false" aria-controls="status-detail">
+    <span class="status-dot" aria-hidden="true"></span><span id="status-text"></span>
+  </button>
+</div>
+
 <div class="dock" id="dock" hidden>
   <button type="button" class="ib" id="undo" aria-label="Undo" aria-disabled="true" data-fk="undo">
     <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M7 4.5L3.5 8 7 11.5M4 8h8a4.5 4.5 0 0 1 0 9h-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -63,8 +69,8 @@
 </div>
 
 <dialog class="sheet" id="pair" aria-labelledby="pair-title" tabindex="-1" autofocus>
-  <h2 id="pair-title">Add a phone</h2>
-  <p>Scan this code with the other phone, or send it the link.</p>
+  <h2 id="pair-title">Add someone to this list</h2>
+  <p>They scan this code with their phone, or open the link you send them.</p>
   <div class="qr" id="qr"></div>
   <div class="actions">
     <button type="button" class="btn primary" id="share-link">Share link</button>

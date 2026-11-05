@@ -13,6 +13,7 @@ permissions:
 
 env:
   WRANGLER: wrangler@4.151.2
+  PLAYWRIGHT: playwright@1.63.0
   WRANGLER_SEND_METRICS: "false"
 
 jobs:
@@ -29,20 +30,32 @@ jobs:
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race ./...
-      - name: API tests against the Go server
+      - name: Install Playwright and Chromium for the browser tests
+        run: |
+          npm install --no-save --no-audit --no-fund "$PLAYWRIGHT"
+          npx playwright install --with-deps chromium
+      - name: Start the Go server
         run: |
           go build -o panier .
-          code=$(./panier -data "$RUNNER_TEMP/data" -setup-code)
-          ./panier -data "$RUNNER_TEMP/data" &
+          echo "GO_SETUP=$(./panier -data "$RUNNER_TEMP/data" -setup-code)" >> "$GITHUB_ENV"
+          ./panier -data "$RUNNER_TEMP/data" > "$RUNNER_TEMP/go.log" 2>&1 &
           for i in $(seq 30); do curl -sf -o /dev/null http://127.0.0.1:8080/ && break; sleep 1; done
-          BASE=http://127.0.0.1:8080 SETUP="$code" node --test test/api.test.mjs
-      - name: API tests against the Cloudflare Worker
+      - name: Start the Cloudflare Worker locally
         run: |
           npx --yes "$WRANGLER" dev --ip 127.0.0.1 --port 8787 --persist-to "$RUNNER_TEMP/worker" \
             --var SETUP_CODE:TEST-CODE-1234 --var MAX_LOG_BYTES:1048576 > "$RUNNER_TEMP/wrangler.log" 2>&1 &
           for i in $(seq 120); do curl -sf -o /dev/null http://127.0.0.1:8787/ && break; sleep 1; done
-          BASE=http://127.0.0.1:8787 SETUP=TEST-CODE-1234 FULL=1 node --test test/api.test.mjs \
-            || { cat "$RUNNER_TEMP/wrangler.log"; exit 1; }
+      - name: API tests, both servers
+        run: |
+          BASE=http://127.0.0.1:8080 SETUP="$GO_SETUP" node --test test/api.test.mjs
+          BASE=http://127.0.0.1:8787 SETUP=TEST-CODE-1234 FULL=1 node --test test/api.test.mjs
+      - name: Browser tests, both servers
+        run: |
+          BASE=http://127.0.0.1:8080 SETUP="$GO_SETUP" STORE="$RUNNER_TEMP/data" node --test test/browser.test.mjs
+          BASE=http://127.0.0.1:8787 SETUP=TEST-CODE-1234 STORE="$RUNNER_TEMP/worker" node --test test/browser.test.mjs
+      - name: Server logs
+        if: failure()
+        run: cat "$RUNNER_TEMP/go.log" "$RUNNER_TEMP/wrangler.log"
 
   # Deploys to Cloudflare after the tests pass, once the repository's secrets are set
   # (see docs/cloudflare.md). Without them, this job does nothing.
@@ -69,6 +82,9 @@ jobs:
             echo "Set the PANIER_SETUP_CODE secret to a code of at least 12 characters (see docs/cloudflare.md)."
             exit 1
           fi
+          # Phones notice a new release by the version in the service worker.
+          sed -i "s/^const VERSION = \"dev\";/const VERSION = \"${GITHUB_SHA::7}\";/" web/sw.js
+          grep -q "^const VERSION = \"${GITHUB_SHA::7}\";" web/sw.js
           jq -n --arg c "$SETUP_CODE" '{SETUP_CODE: $c}' > "$RUNNER_TEMP/secrets.json"
           trap 'rm -f "$RUNNER_TEMP/secrets.json"' EXIT
           # The logs of a public repository are public: hide the workers.dev address and any email.
@@ -90,6 +106,8 @@ jobs:
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
+          sed -i "s/^const VERSION = \"dev\";/const VERSION = \"$TAG\";/" web/sw.js
+          grep -q "^const VERSION = \"$TAG\";" web/sw.js
           mkdir dist
           build() { CGO_ENABLED=0 GOOS=linux GOARCH=$1 GOARM=$2 go build -trimpath -ldflags "-s -w -X main.version=$TAG" -o "dist/panier-linux-$3" .; }
           build arm64 "" arm64   # Raspberry Pi 3, 4, 5 with a 64-bit system

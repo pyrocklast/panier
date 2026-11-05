@@ -2,7 +2,7 @@
 
 A private, collaborative shopping list. Minimal, end-to-end encrypted, on Cloudflare's free plan or your own server.
 
-**Status:** the app works and is tested end to end on both servers, and has run on real phones; next is daily use. The interaction prototype the design came from is kept in [`prototype/index.html`](prototype/index.html).
+**Status:** in daily use on two phones, and tested end to end on both servers before every deploy.
 
 ## How it behaves
 
@@ -95,49 +95,46 @@ go run . -data ./data -setup-code  # prints the setup code
 
 Then open `http://127.0.0.1:8080/#setup=<code>`. Phones need HTTPS, or `localhost`: with USB debugging, `adb reverse tcp:8080 tcp:8080` lets an Android phone open `http://localhost:8080`.
 
-[`test/api.test.mjs`](test/api.test.mjs) holds the API tests both servers must pass:
+Both servers must pass the same tests, which GitHub runs before every deploy: [`test/api.test.mjs`](test/api.test.mjs) for the API, and [`test/browser.test.mjs`](test/browser.test.mjs), two simulated phones using the app (needs Playwright with Chromium).
 
 ```sh
 BASE=http://127.0.0.1:8080 SETUP=<code> node --test test/api.test.mjs
+BASE=http://127.0.0.1:8080 SETUP=<code> STORE=./data node --test test/browser.test.mjs
 ```
 
 ## Roadmap
 
-In order of priority. Done so far: the interaction prototype; the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; running on two phones.
+In order. Each batch is built, tested on both servers, deployed, and tried on the phones before the next.
 
-### 0. Groundwork
-
-Before the fixes, so they can't break what already works.
-
-- Move the two-phone browser tests into the repository, so GitHub runs them before every deploy.
-- Remove the outdated interaction prototype; it stays in the history. Keep the Go server and its Raspberry Pi guide for anyone who hosts Panier themselves.
+Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; dark navigation bar on Android; *Add someone to this list*.
 
 ### 1. Fixes
 
-Small, and felt every day.
+**Typing and editing**
 
-1. **Clearer status.** Make being offline or a failed sync obvious and plain, such as a red dot with *Offline*, and say what happens next: changes are kept and sent when the connection returns.
-2. Clearing an item's text and leaving it deletes the item, instead of restoring the old text.
-3. Enter in the middle of an item's text splits it in two, with the cursor at the start of the second.
-4. When dragging an item to tick it, the drop zone appears inside the ticked group, under its heading, rather than above it. The heading shows during the drag even when nothing is ticked yet.
-5. Drag a ticked item back into a section to untick it.
-6. Ticked items slide into the ticked group again. The page-wide animation was turned off because browsers ignore taps while it plays; the items themselves need animating instead.
-7. On Android in dark mode, the navigation bar stays white.
-8. The *Add a section* field uses the same type as section names.
-9. *Add a phone* reads as adding a person, such as *Add someone to this list*.
-10. A small × on each suggestion removes that item from the suggestions for good, for typos such as *Mlik*.
-11. A new version applies on the next launch, not the one after. The app switches as soon as it's downloaded, unless you're in the middle of an edit.
+- Clearing an item's text and leaving it deletes the item, instead of restoring the old text.
+- Enter in the middle of an item's text splits it in two, with the cursor at the start of the second.
+- The *Add a section* field uses the same type as section names.
+- A small × on each suggestion removes that item from the suggestions for good, for typos such as *Mlik*.
+
+**Dragging**
+
+- When dragging an item to tick it, the drop zone appears inside the ticked group, under its heading, rather than above it. The heading shows during the drag even when nothing is ticked yet.
+- Drag a ticked item back into a section to untick it.
+- Ticked items slide into the ticked group again. The page-wide animation was turned off because browsers ignore taps while it plays; the items themselves need animating instead.
 
 ### 2. Small changes
 
-Independent of each other.
+**Section look**
+
+- Remove the section icons.
+- Choose a section's colour from a palette.
+
+**Then**
 
 - Reorder sections by dragging them.
 - **Quantities, without a new field.** A number at the start of an item, such as *2 milk*, *2× milk* or *500 g flour*, is shown slightly apart from the name, and ignored when spotting duplicates and making suggestions, so *2 milk* still finds *Milk*.
-- Remove the section icons.
-- Choose a section's colour from a palette.
 - A new app icon: simple and monochrome, in the style of Arcticons, with a monochrome version for Android's themed icons.
-- French translation, following the phone's language.
 
 ### 3. Settings
 
@@ -146,19 +143,26 @@ One new screen.
 - **Appearance:** light, dark, or the same as the phone.
 - **Data:**
   - Keep the list on the phone: after you create or join a list, Panier asks the browser to make its storage persistent, so it isn't cleared when the phone runs low on space. Firefox asks you once; Chrome decides for itself. The screen shows the result, and a reminder to keep the pairing link saved if storage could still be cleared.
-  - Rolling backups, exporting the list, and how much storage it uses.
+  - How much storage the list uses, and exporting it.
 - **About:** version, server, and what the server can and can't see.
 
-### 4. Bigger features
+### 4. French
 
-These change how lists are stored and shared.
+A French translation, following the phone's language. It comes after Settings so it covers the final wording of every screen at once.
 
+### 5. Bigger features
+
+These change how lists are stored and shared, so each starts with a short design note and sketches of the screens, agreed before building.
+
+- Rolling backups, kept on the server and encrypted like everything else.
 - More people, and several lists, each shared with different people.
 - Removing a person or phone from a list, by changing the list's key.
 - Recurring lists or sections, such as a weekly shop.
 - Thematic sub-sections within a section: fruit and vegetables, cleaning, clothes, baby things.
 - Folding a section.
 - Compacting the change log.
+
+Waiting on browsers: Chrome colours an installed app's system bars from one manifest colour, so they're dark in light mode too. Once Chrome supports separate dark-mode colours (`color_scheme_dark`, already in the manifest), light mode can have light bars again.
 
 ## Licence
 
