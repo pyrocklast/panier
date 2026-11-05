@@ -95,7 +95,7 @@ go run . -data ./data -setup-code  # prints the setup code
 
 Then open `http://127.0.0.1:8080/#setup=<code>`. Phones need HTTPS, or `localhost`: with USB debugging, `adb reverse tcp:8080 tcp:8080` lets an Android phone open `http://localhost:8080`.
 
-Both servers must pass the same tests, which GitHub runs before every deploy: [`test/api.test.mjs`](test/api.test.mjs) for the API, and [`test/browser.test.mjs`](test/browser.test.mjs), two simulated phones using the app (needs Playwright with Chromium).
+Both servers must pass the same tests, which GitHub runs before every deploy: [`test/api.test.mjs`](test/api.test.mjs) for the API, [`test/browser.test.mjs`](test/browser.test.mjs) with two simulated phones using the app, and [`test/update.test.mjs`](test/update.test.mjs), which swaps two builds while the app is open, as a deploy does. The browser tests need Playwright with Chromium.
 
 ```sh
 BASE=http://127.0.0.1:8080 SETUP=<code> node --test test/api.test.mjs
@@ -106,7 +106,7 @@ BASE=http://127.0.0.1:8080 SETUP=<code> STORE=./data node --test test/browser.te
 
 In order. Each batch is built, tested on both servers, deployed, and tried on the phones before the next.
 
-Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; dark navigation bar on Android; *Add someone to this list*.
+Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*.
 
 ### 1. Fixes
 
@@ -119,6 +119,7 @@ Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Wor
 
 **Dragging**
 
+- ✓ An item dropped back where it started no longer stays hidden.
 - When dragging an item to tick it, the drop zone appears inside the ticked group, under its heading, rather than above it. The heading shows during the drag even when nothing is ticked yet.
 - Drag a ticked item back into a section to untick it.
 - Ticked items slide into the ticked group again. The page-wide animation was turned off because browsers ignore taps while it plays; the items themselves need animating instead.
@@ -162,7 +163,7 @@ These change how lists are stored and shared, so each starts with a short design
 - Folding a section.
 - Compacting the change log.
 
-Waiting on browsers: Chrome colours an installed app's system bars from one manifest colour, so they're dark in light mode too. Once Chrome supports separate dark-mode colours (`color_scheme_dark`, already in the manifest), light mode can have light bars again.
+Waiting on browsers: the Android navigation bar's colour is the browser's to choose. Chrome takes it from one manifest colour, now dark, so it's dark in light mode too until Chrome supports separate dark-mode colours (`color_scheme_dark`, already in the manifest). Firefox appears to use its own theme; to check on a phone.
 
 ## Licence
 

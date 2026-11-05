@@ -267,6 +267,25 @@ test("dragging an item onto the drop zone ticks it", async () => {
   await t.close();
 });
 
+test("an item dropped back where it started shows again", async () => {
+  const t = await pair();
+  const { a } = t;
+  for (const w of ["Milk", "Bread", "Eggs"]) await add(a, "ess", w);
+  await blur(a);
+  await sleep(300);
+  const box = await item(a, "Bread").boundingBox();
+  await dragTo(a, item(a, "Bread"), box.y + 80, { hold: true }); // away, past Eggs
+  const start = box.y + box.height / 2 - 12; // inside its original slot
+  for (let i = 1; i <= 10; i++) { await a.mouse.move(box.x + 60, box.y + 80 + ((start - box.y - 80) * i) / 10); await sleep(20); }
+  await sleep(150);
+  await a.mouse.up();
+  await sleep(300);
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk", "Bread", "Eggs"]);
+  assert.equal(await a.locator(".item.placeholder").count(), 0, "no item is left as an empty slot");
+  assert.ok(await item(a, "Bread").locator(".text").isVisible());
+  await t.close();
+});
+
 test("unticking an item from a deleted section puts it in the first section", async () => {
   const t = await pair();
   const { a } = t;
@@ -345,38 +364,4 @@ test("text left in the field when the app closes is added next time", async () =
   await online(A, a);
   assert.ok(await eventually(async () => (await texts(b, "Long term")).join() === "Coffee filters", 10000));
   await t.close();
-});
-
-test("a new version takes over in the same launch, once you've stopped typing", async () => {
-  const errors = [];
-  const { ctx, page } = await phone(errors);
-  // Install a stand-in old version first; the real one then arrives as the update.
-  await ctx.route("**/sw.js", async route => {
-    const res = await route.fetch();
-    const body = (await res.text()).replace(/^const VERSION = ".*";/m, 'const VERSION = "older";');
-    await route.fulfill({ response: res, body });
-  });
-  await page.goto(BASE + "/#setup=" + SETUP);
-  await page.locator("#pair").waitFor();
-  await page.click("#pair-close");
-  assert.ok(await eventually(async () => (await page.evaluate(() => caches.keys())).includes("panier-older")));
-  await page.reload();
-  await page.locator("#app").waitFor();
-  await ctx.unroute("**/sw.js");
-
-  await page.evaluate(() => { window.marker = true; });
-  await page.fill("#add-ess", "Half-typ");
-  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-  assert.ok(await eventually(async () => !(await page.evaluate(() => caches.keys())).includes("panier-older")), "the new version installs");
-  await sleep(1500);
-  assert.equal(await page.evaluate(() => window.marker), true, "no reload while typing");
-  await page.press("#add-ess", "Enter");
-  await blur(page);
-  assert.ok(await eventually(() => page.evaluate(() => window.marker === undefined), 5000), "reloads into the new version");
-  await page.locator("#app").waitFor();
-  assert.ok((await texts(page, "Essentials")).includes("Half-typ"), "the list is intact");
-  await ctx.close();
-  // While a test intercepts requests, Chrome's local-network checks refuse WebSockets to
-  // 127.0.0.1; that's the test setup, not the app.
-  assert.deepEqual(errors.filter(e => !e.includes("LOCAL_NETWORK_ACCESS")), []);
 });

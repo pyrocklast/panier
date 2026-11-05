@@ -53,6 +53,15 @@ jobs:
         run: |
           BASE=http://127.0.0.1:8080 SETUP="$GO_SETUP" STORE="$RUNNER_TEMP/data" node --test test/browser.test.mjs
           BASE=http://127.0.0.1:8787 SETUP=TEST-CODE-1234 STORE="$RUNNER_TEMP/worker" node --test test/browser.test.mjs
+      - name: Update test, with two builds of the Go server
+        run: |
+          cp web/sw.js "$RUNNER_TEMP/sw.js"
+          for v in old new; do
+            sed -i "s/^const VERSION = \".*\";/const VERSION = \"$v\";/" web/sw.js
+            go build -o "$RUNNER_TEMP/panier-$v" .
+          done
+          cp "$RUNNER_TEMP/sw.js" web/sw.js
+          PANIER_OLD="$RUNNER_TEMP/panier-old" PANIER_NEW="$RUNNER_TEMP/panier-new" node --test test/update.test.mjs
       - name: Server logs
         if: failure()
         run: cat "$RUNNER_TEMP/go.log" "$RUNNER_TEMP/wrangler.log"

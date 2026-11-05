@@ -692,7 +692,9 @@ function endDrag() {
   if (it.section !== sec) announce(it.text + " moved to " + nameOf(sec));
   const fk = activeFk();
   if (!store.change("moving " + q(it.text), [[id, "section", sec], [id, "pos", between(prev && prev.pos, next && next.pos)]])) {
+    // Dropped where it started: nothing to save, but the item must come back into view.
     if (renderPending) refreshFromStore();
+    else paint(fk, false);
     return;
   }
   items = store.items();
@@ -926,8 +928,13 @@ function reloadWhenIdle() {
   else location.reload();
 }
 if ("serviceWorker" in navigator) {
-  const updating = !!navigator.serviceWorker.controller; // false on the very first visit
-  navigator.serviceWorker.addEventListener("controllerchange", () => { if (updating) reloadWhenIdle(); });
+  // The first takeover on a first visit only installs the version this page already runs;
+  // every takeover after that is a new version.
+  let controlled = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (controlled) reloadWhenIdle();
+    controlled = true;
+  });
   navigator.serviceWorker.register("sw.js").then(reg => {
     // Phones keep apps open for days; look for a new version whenever Panier comes back.
     document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); });

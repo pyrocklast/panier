@@ -57,7 +57,7 @@ async function readBody(req, max) {
     if (done) break;
     size += value.length;
     if (size > max) {
-      reader.cancel();
+      await reader.cancel();
       throw new Error("too large");
     }
     chunks.push(value);
@@ -92,6 +92,7 @@ export default {
     const m = url.pathname.match(/^\/api\/lists\/([^/]+)\/(changes|live)$/);
     if (!m) return text(404, "not found");
     if (!ID.test(m[1])) return text(404, "no such list");
+    if (Number(req.headers.get("Content-Length")) > MAX_BODY) return text(400, "request too large");
     return env.LISTS.get(env.LISTS.idFromName(m[1])).fetch(req);
   },
 };
