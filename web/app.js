@@ -149,7 +149,7 @@ function leftPaint() {
 // With animate, things glide from where they were (see Motion); snap is where they
 // were, when the caller has already taken it.
 function paint(fk, animate, move = false, snap = null) {
-  for (const a of [...flights]) a.finish(); // anything still gliding lands first
+  landAll(); // anything still flying lands first
   const was = document.activeElement;
   if (animate !== false && !reduceMotion.matches && !drag) snap = snap || snapshot();
   render();
@@ -751,6 +751,8 @@ function bindPress(li, id) {
 document.addEventListener("touchmove", e => { if (lifted || drag) e.preventDefault(); }, { passive: false });
 
 function startDrag(li, id, offY, y) {
+  landAll();
+  li.style.opacity = "";
   const r = li.getBoundingClientRect();
   const ghost = li.cloneNode(true);
   ghost.classList.remove("lifted", "pressing", "flash", "hint");
@@ -863,54 +865,68 @@ function endDrag() {
 
 /* ---------- Motion ---------- */
 
-// After a change, things glide to their new places: each part of the page (a section
-// card, the ticked group) from where it was, each item within its part, and an item that
-// changes part, such as one being ticked, flies across. New items fade in, removed ones
-// fade out. Each element animates on its own, so taps keep working throughout, unlike
-// with the browser's page-wide transitions.
-const MOTION = { duration: 260, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" };
-const PARTS = "#list > .sec, #add-sec-form, .basket-head, #basket-list, .foot";
-const flights = new Set();
+// After a change, things glide to their new places. Section cards and the ticked list
+// grow or shrink to their new height, and what follows moves along with them; inside
+// each, items and the Add item row slide to their new spot; an item that changes place,
+// such as one being ticked, lifts, flies across and lands, taking longer the further it
+// goes. New items fade in, removed ones fade out. Each element animates on its own, so
+// taps keep working throughout, unlike with the browser's page-wide transitions.
+const EASE = "cubic-bezier(0.4, 0, 0.2, 1)"; // gentle start, gentle landing
+const MOTION = { duration: 400, easing: EASE };
+const PARTS = "#list > .sec, #basket-list";
+const ITEMS = "#list .item[data-id], #basket-list .item[data-id]";
+const ADDS = "#list > .sec > .add";
+const flights = new Map(); // each flying item's animation, and how it lands
+function landAll() {
+  for (const [a, land] of [...flights]) { a.cancel(); land(); }
+}
+const rectsOf = sel => new Map([...document.querySelectorAll(sel)].map(el => [el, el.getBoundingClientRect()]));
 function snapshot() {
-  for (const a of [...flights]) a.finish(); // one change at a time: the last lands at once
-  const parts = new Map([...document.querySelectorAll(PARTS)].map(p => [p, p.getBoundingClientRect()]));
+  landAll(); // one change at a time: anything still flying lands at once
   const its = new Map();
-  for (const li of document.querySelectorAll("#list .item[data-id], #basket-list .item[data-id]")) {
-    its.set(li.dataset.id, { li, rect: li.getBoundingClientRect(), part: li.closest(PARTS) });
-  }
-  return { parts, items: its };
+  for (const li of document.querySelectorAll(ITEMS)) its.set(li.dataset.id, { li, rect: li.getBoundingClientRect(), part: li.closest(PARTS) });
+  return { parts: rectsOf(PARTS), adds: rectsOf(ADDS), items: its };
 }
 function glide(snap) {
   const seen = r => r && r.height > 0;
   // Measure everything before moving anything.
-  const parts = new Map([...document.querySelectorAll(PARTS)].map(p => [p, p.getBoundingClientRect()]));
-  const now = [...document.querySelectorAll("#list .item[data-id], #basket-list .item[data-id]")]
-    .map(li => ({ li, rect: li.getBoundingClientRect(), part: li.closest(PARTS) }));
+  const parts = rectsOf(PARTS), adds = rectsOf(ADDS);
+  const now = [...document.querySelectorAll(ITEMS)].map(li => ({ li, rect: li.getBoundingClientRect(), part: li.closest(PARTS) }));
   const head = $(".basket-head").getBoundingClientRect();
-  const slides = [], flies = [], fades = [];
+  // How far something moved within its card, leaving out the card's own movement.
+  const inside = (wasRect, nowRect, part) => (wasRect.top - snap.parts.get(part).top) - (nowRect.top - parts.get(part).top);
+  const run = (el, frames, opts = MOTION) => {
+    for (const x of el.getAnimations()) if (x.id === "glide") x.cancel(); // a newer change takes over from here
+    el.animate(frames, { ...opts, id: "glide" });
+  };
+  const slide = (el, dy) => { if (Math.abs(dy) > 0.5) run(el, [{ transform: `translateY(${dy}px)` }, { transform: "none" }]); };
   for (const [p, r] of parts) {
     const was = snap.parts.get(p);
-    if (seen(was) && seen(r)) slides.push([p, was.top - r.top]);
+    if (was && seen(r) && Math.abs(was.height - r.height) > 0.5) run(p, [{ height: was.height + "px" }, { height: r.height + "px" }]);
+  }
+  for (const [f, r] of adds) {
+    const was = snap.adds.get(f), part = f.closest(PARTS);
+    if (seen(was) && snap.parts.has(part)) slide(f, inside(was, r, part));
   }
   const kept = new Set();
   for (const n of now) {
     const o = snap.items.get(n.li.dataset.id);
     kept.add(n.li.dataset.id);
-    if (!o || !seen(o.rect)) { if (seen(n.rect)) fades.push(n.li); }
-    else if (!seen(n.rect)) flies.push([o, head, null]); // into the folded ticked group
-    else if (o.part === n.part) slides.push([n.li, (o.rect.top - snap.parts.get(o.part).top) - (n.rect.top - parts.get(n.part).top)]);
-    else flies.push([o, n.rect, n.li]);
+    if (!o || !seen(o.rect)) { if (seen(n.rect)) n.li.animate([{ opacity: 0 }, { opacity: 1 }], MOTION); }
+    else if (!seen(n.rect)) fly(o, head, null); // into the folded ticked group
+    else if (o.part === n.part) slide(n.li, inside(o.rect, n.rect, n.part));
+    else fly(o, n.rect, n.li);
   }
-  for (const [id, o] of snap.items) if (!kept.has(id) && seen(o.rect)) flies.push([o, o.rect, null]); // deleted
-  for (const [el, dy] of slides) if (Math.abs(dy) > 0.5) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], MOTION);
-  for (const li of fades) li.animate([{ opacity: 0 }, { opacity: 1 }], MOTION);
-  for (const [o, to, target] of flies) fly(o, to, target);
+  for (const [id, o] of snap.items) if (!kept.has(id) && seen(o.rect)) fly(o, o.rect, null); // deleted
 }
 // The item's old element (or the drag ghost) travels from its old place to the new one,
-// over everything; the real item shows when it lands. With no target, it fades away.
+// over everything, and the real item shows when it lands. With no target, it fades away.
 function fly(o, to, target) {
   const el = o.li;
-  if (!el.classList.contains("ghost")) {
+  const dx = to.left - o.rect.left, dy = to.top - o.rect.top;
+  const ms = target ? Math.round(Math.min(700, 420 + Math.hypot(dx, dy) * 0.35)) : 320;
+  if (el.classList.contains("ghost")) el.classList.add("landing"); // let go after a drag
+  else {
     el.classList.remove("placeholder", "away", "lifted", "pressing", "flash", "hint");
     el.classList.add("flying");
     el.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
@@ -918,12 +934,17 @@ function fly(o, to, target) {
     Object.assign(el.style, { left: o.rect.left + "px", top: o.rect.top + "px", width: o.rect.width + "px" });
     document.body.append(el);
   }
+  el.style.animationDuration = ms + "ms"; // the lift and landing, in app.css
   if (target) target.style.opacity = "0";
-  const move = `translate(${to.left - o.rect.left}px, ${to.top - o.rect.top}px)`;
-  const a = el.animate([{ transform: "none" }, target ? { transform: move } : { transform: move + " scale(0.9)", opacity: 0 }], MOTION);
-  flights.add(a);
-  const land = () => { flights.delete(a); el.remove(); if (target) target.style.opacity = ""; };
-  a.finished.then(land, land);
+  const move = `translate(${dx}px, ${dy}px)`;
+  const a = el.animate([{ transform: "none" }, target ? { transform: move } : { transform: move + " scale(0.94)", opacity: 0 }], { duration: ms, easing: EASE });
+  const land = () => {
+    if (!flights.delete(a)) return;
+    el.remove();
+    if (target) target.style.opacity = "";
+  };
+  flights.set(a, land);
+  a.finished.then(land, () => {});
 }
 
 /* ---------- Render ---------- */

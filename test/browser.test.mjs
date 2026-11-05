@@ -586,10 +586,9 @@ test("a ticked item dragged into a section goes back on the list there", async (
   await sleep(150);
   assert.equal(await a.locator(".ghost.done").count(), 1, "back over the ticked group, it shows ticked");
   await a.mouse.up();
-  await sleep(400);
+  assert.ok(await eventually(async () => (await a.locator(".item.placeholder, .ghost, .flying").count()) === 0), "nothing is left behind once it lands");
   assert.deepEqual(await ticked(a), ["Bread"], "dropped there, it stays ticked");
   assert.deepEqual(await texts(a, "Essentials"), ["Milk", "Eggs"]);
-  assert.equal(await a.locator(".item.placeholder, .ghost, .flying").count(), 0, "nothing is left behind");
   await t.close();
 });
 
