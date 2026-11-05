@@ -1,12 +1,15 @@
 import * as store from "./store.js";
 
-// The three sections every list starts with. They can be renamed or deleted like any other.
+// The three sections every list starts with. They can be renamed, recoloured or deleted like any other.
 const DEFAULTS = [
-  { id: "ess", name: "Essentials", icon: "home", color: "ess", pos: 1 },
-  { id: "look", name: "Look out for", icon: "eye", color: "look", pos: 2 },
-  { id: "long", name: "Long term", icon: "bookmark", color: "long", pos: 3 },
+  { id: "ess", name: "Essentials", color: "ess", pos: 1 },
+  { id: "look", name: "Look out for", color: "look", pos: 2 },
+  { id: "long", name: "Long term", color: "long", pos: 3 },
 ];
-const PALETTE = ["teal", "rose", "blue", "olive", "plum"]; // for new sections
+// Section colours, in palette order; each is a colour in app.css, light and dark.
+const COLORS = [["ess", "Green"], ["teal", "Teal"], ["blue", "Blue"], ["long", "Indigo"], ["plum", "Plum"], ["rose", "Rose"], ["look", "Amber"], ["olive", "Olive"]];
+const PALETTE = ["teal", "rose", "blue", "olive", "plum", "ess", "look", "long"]; // new sections take the first unused
+const colorOk = (c, fallback) => (COLORS.some(([id]) => id === c) ? c : fallback);
 const MAX_ITEM = 120; // four lines on a phone
 const MAX_SECTION = 40;
 const SETTLE_MS = 1500;
@@ -57,9 +60,6 @@ const ICONS = {
   grip: SVG(18, '<g fill="currentColor"><circle cx="7" cy="4.5" r="1.6"/><circle cx="13" cy="4.5" r="1.6"/><circle cx="7" cy="10" r="1.6"/><circle cx="13" cy="10" r="1.6"/><circle cx="7" cy="15.5" r="1.6"/><circle cx="13" cy="15.5" r="1.6"/></g>'),
   check: SVG(13, '<path d="M4.5 10.5l3.7 3.7 7.3-8.7" ' + STROKE + ' stroke-width="2.7"/>'),
   plus: SVG(18, '<path d="M10 4v12M4 10h12" ' + STROKE + ' stroke-width="2.2"/>'),
-  home: SVG(18, '<path d="M3.5 9.5L10 3.8l6.5 5.7M5.5 8v8.5h9V8M8.5 16.5v-4h3v4" ' + STROKE + ' stroke-width="1.7"/>'),
-  eye: SVG(18, '<path d="M2 10s3-5.5 8-5.5 8 5.5 8 5.5-3 5.5-8 5.5S2 10 2 10z" ' + STROKE + ' stroke-width="1.7"/><circle cx="10" cy="10" r="2.3" ' + STROKE + ' stroke-width="1.7"/>'),
-  bookmark: SVG(18, '<path d="M6 3.5h8v13l-4-3.2-4 3.2z" ' + STROKE + ' stroke-width="1.7"/>'),
   bin: SVG(19, '<path d="M4 6h12M8 6V4.5h4V6M5.8 6l.8 10h6.8l.8-10M8.6 9v4.5M11.4 9v4.5" ' + STROKE + ' stroke-width="1.6"/>'),
   back: SVG(16, '<path d="M7.5 4.4L3.1 8.75l4.4 4.35M3.75 8.75h8.75a4.4 4.4 0 0 1 0 8.75H10" ' + STROKE + ' stroke-width="2.1"/>'),
   cross: SVG(16, '<path d="M5.5 5.5l9 9M14.5 5.5l-9 9" ' + STROKE + ' stroke-width="1.8"/>'),
@@ -98,14 +98,14 @@ function computeSections() {
   const all = new Map();
   for (const d of DEFAULTS) {
     const st = stored.get(d.id) || {};
-    all.set(d.id, { ...d, name: st.name ?? d.name, pos: st.pos ?? d.pos, deleted: !!st.deleted });
+    all.set(d.id, { ...d, name: st.name ?? d.name, color: colorOk(st.color, d.color), pos: st.pos ?? d.pos, deleted: !!st.deleted });
   }
   for (const st of stored.values()) {
-    if (!all.has(st.id)) all.set(st.id, { id: st.id, name: st.name || "Untitled", icon: null, color: st.color || PALETTE[0], pos: st.pos ?? 100, deleted: st.deleted });
+    if (!all.has(st.id)) all.set(st.id, { id: st.id, name: st.name || "Untitled", color: colorOk(st.color, PALETTE[0]), pos: st.pos ?? 100, deleted: st.deleted });
   }
   const used = new Set(items.filter(inList).map(i => i.section));
   for (const [id, sh] of Object.entries(shells)) if (sh.input.value.trim()) used.add(id);
-  for (const id of used) if (!all.has(id)) all.set(id, { id, name: "Untitled", icon: null, color: PALETTE[0], pos: 100, deleted: false });
+  for (const id of used) if (!all.has(id)) all.set(id, { id, name: "Untitled", color: PALETTE[0], pos: 100, deleted: false });
   sectionInfo = all;
   sections = [...all.values()].filter(s => !s.deleted || used.has(s.id)).sort((a, b) => a.pos - b.pos || (a.id < b.id ? -1 : 1));
 }
@@ -347,7 +347,7 @@ function aroundCursor(span) {
 // end of the row while editing. With onSplit, Enter in the middle of the text splits it
 // there; with onJoin, Backspace at its very start joins it to what's above, when canJoin
 // allows; with onEmpty, leaving the text empty calls it instead of restoring the old text.
-function editInPlace(span, { key, row, orig, max, x, y, caret, onSave, onDelete, deleteLabel, onSplit, canJoin, onJoin, onEmpty }) {
+function editInPlace(span, { key, row, orig, max, x, y, caret, onSave, onDelete, deleteLabel, onSplit, canJoin, onJoin, onEmpty, below }) {
   if (editingId || drag) return;
   editingId = key;
   span.contentEditable = PLAIN ? "plaintext-only" : "true";
@@ -373,6 +373,9 @@ function editInPlace(span, { key, row, orig, max, x, y, caret, onSave, onDelete,
   }, icon("bin"));
   row.classList.add("editing");
   if (bin) row.append(bin);
+  if (below) row.after(below); // more tools while editing, such as a section's colours
+  const tools = [bin, below].filter(Boolean);
+  const inTools = el => !!el && tools.some(t => t.contains(el));
   const enter = () => {
     const c = onSplit && aroundCursor(span);
     const a = c && clean(c.head, max), b = c && clean(c.tail, max);
@@ -408,11 +411,11 @@ function editInPlace(span, { key, row, orig, max, x, y, caret, onSave, onDelete,
   };
   let away = false; // the whole app lost focus: a notification, another app
   const onSpanBlur = e => {
-    if (bin && e.relatedTarget === bin) return;
+    if (inTools(e.relatedTarget)) return;
     away = !document.hasFocus();
     finish();
   };
-  const onBinBlur = e => { if (e.relatedTarget !== span) finish(); };
+  const onToolsOut = e => { if (e.relatedTarget !== span && !inTools(e.relatedTarget)) finish(); };
   function finish(then) {
     if (done) return;
     done = true;
@@ -420,7 +423,7 @@ function editInPlace(span, { key, row, orig, max, x, y, caret, onSave, onDelete,
     span.removeEventListener("beforeinput", onBefore);
     span.removeEventListener("paste", onPaste);
     span.removeEventListener("blur", onSpanBlur);
-    if (bin) { bin.removeEventListener("blur", onBinBlur); bin.remove(); }
+    for (const t of tools) { t.removeEventListener("focusout", onToolsOut); t.remove(); }
     span.contentEditable = "false";
     span.classList.remove("editing");
     span.setAttribute("role", "button");
@@ -440,7 +443,7 @@ function editInPlace(span, { key, row, orig, max, x, y, caret, onSave, onDelete,
   span.addEventListener("beforeinput", onBefore);
   span.addEventListener("paste", onPaste);
   span.addEventListener("blur", onSpanBlur);
-  if (bin) bin.addEventListener("blur", onBinBlur);
+  for (const t of tools) t.addEventListener("focusout", onToolsOut);
 }
 
 function editItem(span, id, x, y, caret) {
@@ -522,13 +525,30 @@ function joinItem(id, text) {
   if (span) editItem(span, prev.id, null, null, prev.text.length + glue.length);
 }
 
+// While a section's name is being edited, its colours show under it: a tap recolours
+// the section at once, and the name stays in editing.
 function editSection(span, id, x, y) {
   const orig = nameOf(id);
+  const keep = e => e.preventDefault();
+  const palette = h("div", { class: "palette", role: "group", "aria-label": "Colour of " + orig },
+    COLORS.map(([c, label]) => h("button", {
+      type: "button", class: "swatch", style: "--c:var(--" + c + ")", "aria-label": label,
+      "aria-pressed": String(colorOf(id) === c), onpointerdown: keep, onmousedown: keep,
+      onclick: e => {
+        for (const b of palette.children) b.setAttribute("aria-pressed", String(b === e.currentTarget));
+        recolour(id, c, label);
+      },
+    })));
   editInPlace(span, {
-    key: "#" + id, row: span.closest(".sec-head"), orig, max: MAX_SECTION, x, y,
+    key: "#" + id, row: span.closest(".sec-head"), orig, max: MAX_SECTION, x, y, below: palette,
     onDelete: canDelete(id) ? () => deleteSection(id) : null, deleteLabel: "Delete section " + orig,
     onSave: name => renameSection(id, name),
   });
+}
+function recolour(id, color, label) {
+  const fallback = (DEFAULTS.find(d => d.id === id) || {}).color;
+  announce(nameOf(id) + " is now " + label.toLowerCase());
+  act("changing the colour of " + q(nameOf(id)), [["#" + id, "color", color, fallback]], { animate: false });
 }
 
 /* ---------- Suggestions from everything bought before ---------- */
@@ -622,8 +642,7 @@ function buildShell(id) {
     if (editingId === "#" + id) return;
     if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editSection(name, id); }
   });
-  const kind = h("span", { class: "kind", "aria-hidden": "true" });
-  const head = h("h2", { class: "sec-head" }, name, kind);
+  const head = h("h2", { class: "sec-head" }, name);
   const el = h("section", { class: "sec", "data-sec": id, "aria-labelledby": "h-" + id }, head, ul, sug, form);
   input.addEventListener("input", () => {
     form.classList.toggle("typing", !!input.value.trim());
@@ -651,7 +670,7 @@ function buildShell(id) {
     e.preventDefault();
     paintSug(id, ui.sug);
   });
-  const sh = { el, ul, input, form, sug, name, kind, icon: undefined };
+  const sh = { el, ul, input, form, sug, name };
   return sh;
 }
 function syncShells() {
@@ -665,7 +684,6 @@ function syncShells() {
     if (editingId !== "#" + s.id && sh.name.textContent !== s.name) sh.name.textContent = s.name;
     sh.name.setAttribute("aria-label", s.name + ", rename");
     sh.input.setAttribute("aria-label", "Add item to " + s.name);
-    if (sh.icon !== s.icon) { sh.icon = s.icon; sh.kind.replaceChildren(s.icon ? icon(s.icon) : ""); }
     if (list.children[i] !== sh.el) list.insertBefore(sh.el, list.children[i] || null);
   });
 }
@@ -937,7 +955,7 @@ function fly(o, to, target) {
   el.style.animationDuration = ms + "ms"; // the lift and landing, in app.css
   if (target) target.style.opacity = "0";
   const move = `translate(${dx}px, ${dy}px)`;
-  const a = el.animate([{ transform: "none" }, target ? { transform: move } : { transform: move + " scale(0.94)", opacity: 0 }], { duration: ms, easing: EASE });
+  const a = el.animate([{ transform: "none" }, target ? { transform: move } : { transform: move + " scale(0.94)", opacity: 0 }], { duration: ms, easing: EASE, id: "fly" });
   const land = () => {
     if (!flights.delete(a)) return;
     el.remove();

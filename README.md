@@ -10,13 +10,14 @@ A private, collaborative shopping list. Minimal, end-to-end encrypted, on Cloudf
 
 Each section is a card with its name at the top. A list starts with three:
 
-| Section | Icon | For |
+| Section | Colour | For |
 | --- | --- | --- |
-| Essentials | house | everyday things the home runs on |
-| Look out for | eye | things to buy if you come across them |
-| Long term | bookmark | things to get eventually |
+| Essentials | green | everyday things the home runs on |
+| Look out for | amber | things to buy if you come across them |
+| Long term | indigo | things to get eventually |
 
 - Tap a section's name to rename it. Both phones see the new name.
+- While you rename a section, its colours show under the name: eight, the same in light and dark themes. A tap recolours the section at once, and undo puts the old colour back.
 - *Add a section*, below the cards, adds one at the end with its own colour. Its name is typed like a section name, and the cursor then moves to its *Add item* field.
 - While you rename a section that has nothing left to get, a bin appears to delete it. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 - Tick boxes take their section's colour.
@@ -112,16 +113,9 @@ BASE=http://127.0.0.1:8080 SETUP=<code> STORE=./data node --test test/browser.te
 
 In order. Each batch is built, tested on both servers, deployed, and tried on the phones before the next.
 
-Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*; splitting an item with Enter and joining it back with Backspace, deleting it by clearing its text, removing suggestions; a tap that leaves a field always lands, on touch screens too; the drop zone inside the ticked group, dragging ticked items back, and items gliding into place again.
+Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*; splitting an item with Enter and joining it back with Backspace, deleting it by clearing its text, removing suggestions; a tap that leaves a field always lands, on touch screens too; the drop zone inside the ticked group, dragging ticked items back, and items gliding into place again; sections without icons, with a colour chosen from a palette.
 
 ### 1. Small changes
-
-**Section look**
-
-- Remove the section icons.
-- Choose a section's colour from a palette.
-
-**Then**
 
 - Reorder sections by dragging them.
 - **Quantities, without a new field.** A number at the start of an item, such as *2 milk*, *2× milk* or *500 g flour*, is shown slightly apart from the name, and ignored when spotting duplicates and making suggestions, so *2 milk* still finds *Milk*.

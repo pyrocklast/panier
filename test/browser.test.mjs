@@ -87,13 +87,18 @@ async function renameSection(pg, from, to) {
   await pg.keyboard.press("Enter");
 }
 
+// Waits until nothing is gliding (see Motion in app.js), so positions measured next are final.
+const still = pg => pg.waitForFunction(() => !document.getAnimations().some(a => (a.id === "glide" || a.id === "fly") && a.playState === "running"));
+
 // Drags an item with the mouse to a point; returns before releasing if hold is set.
 async function dragTo(pg, from, toY, { hold = false } = {}) {
+  await still(pg);
   const box = await from.boundingBox();
   const x = box.x + 60, y = box.y + box.height / 2;
   await pg.mouse.move(x, y);
   await pg.mouse.down();
   await pg.mouse.move(x, y + 10);
+  await still(pg);
   const target = typeof toY === "function" ? await toY() : toY;
   for (let i = 1; i <= 20; i++) {
     await pg.mouse.move(x, y + ((target - y) * i) / 20);
@@ -279,7 +284,7 @@ test("an item dropped back where it started shows again", async () => {
   const { a } = t;
   for (const w of ["Milk", "Bread", "Eggs"]) await add(a, "ess", w);
   await blur(a);
-  await sleep(300);
+  await still(a);
   const box = await item(a, "Bread").boundingBox();
   await dragTo(a, item(a, "Bread"), box.y + 80, { hold: true }); // away, past Eggs
   const start = box.y + box.height / 2 - 12; // inside its original slot
@@ -580,6 +585,7 @@ test("a ticked item dragged into a section goes back on the list there", async (
 
   await a.click("#undo");
   assert.ok(await eventually(async () => (await ticked(a)).join() === "Bread"), "undo ticks it again");
+  await still(a);
   const home = await bread().boundingBox();
   await dragTo(a, bread(), belowMilk, { hold: true });
   for (let i = 1; i <= 10; i++) { await a.mouse.move(home.x + 60, home.y + home.height / 2); await sleep(20); }
@@ -597,6 +603,7 @@ test("ticked items slide into the ticked group, and taps land meanwhile", async 
   const { a } = t;
   for (const w of ["Milk", "Bread", "Eggs"]) await add(a, "ess", w);
   await blur(a);
+  await still(a);
   await item(a, "Eggs").locator(".boxcell").click();
   const milk = await item(a, "Milk").locator(".boxcell").boundingBox();
   assert.ok(await eventually(async () => (await a.locator(".flying").count()) === 1, 3000), "Eggs flies to the ticked group");
@@ -604,5 +611,33 @@ test("ticked items slide into the ticked group, and taps land meanwhile", async 
   assert.equal(await item(a, "Milk").locator(".chk").isChecked(), true, "a tap during the motion ticks Milk");
   assert.ok(await eventually(async () => (await a.locator(".flying").count()) === 0 && (await ticked(a)).join() === "Eggs"));
   assert.ok(await eventually(async () => (await ticked(a)).join() === "Milk,Eggs", 4000));
+  await t.close();
+});
+
+test("a section's colour is chosen from a palette while renaming it", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await add(a, "ess", "Milk");
+  await blur(a);
+  const ess = '.sec[data-sec="ess"]';
+  const colour = (pg, sel) => pg.evaluate(s => document.querySelector(s).style.getPropertyValue("--sec"), sel);
+  assert.equal(await a.locator(".sec-head svg").count(), 0, "sections have no icons");
+  assert.equal(await a.locator(ess + " .palette").count(), 0, "the colours show only while renaming");
+
+  await section(a, "Essentials").locator(".sec-name").click();
+  assert.equal(await a.locator(ess + " .swatch").count(), 8);
+  assert.equal(await a.getAttribute(ess + ' .swatch[aria-pressed="true"]', "aria-label"), "Green");
+  await a.locator(ess + ' .swatch[aria-label="Plum"]').click();
+  assert.equal(await colour(a, ess), "var(--plum)");
+  assert.equal(await colour(a, ess + " .item"), "var(--plum)", "its tick boxes follow");
+  assert.equal(await a.evaluate(() => document.activeElement.classList.contains("editing")), true, "the name is still being edited");
+  assert.equal(await a.getAttribute(ess + ' .swatch[aria-pressed="true"]', "aria-label"), "Plum");
+  await a.keyboard.press("Escape");
+  assert.equal(await a.locator(ess + " .palette").count(), 0);
+  assert.ok(await eventually(async () => (await colour(b, ess)) === "var(--plum)"), "the other phone sees the colour");
+
+  await a.click("#undo");
+  assert.equal(await colour(a, ess), "var(--ess)", "undo restores the colour");
+  assert.ok(await eventually(async () => (await colour(b, ess)) === "var(--ess)"));
   await t.close();
 });
