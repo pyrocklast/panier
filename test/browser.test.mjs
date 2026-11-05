@@ -46,7 +46,8 @@ async function phone(errors, options = {}) {
 function watch(page, errors) {
   page.on("pageerror", e => errors.push(String(e)));
   page.on("console", m => {
-    if (m.type() === "error" && !/ERR_INTERNET_DISCONNECTED|Failed to load resource/.test(m.text())) errors.push(m.text());
+    // Being offline is expected in some tests: Chromium and Firefox each log it in their own words.
+    if (m.type() === "error" && !/ERR_INTERNET_DISCONNECTED|Failed to load resource|can.t establish a connection to the server/.test(m.text())) errors.push(m.text());
   });
 }
 
