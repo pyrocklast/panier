@@ -1,26 +1,32 @@
 import * as store from "./store.js";
 
-const SECTIONS = [
-  { id: "ess", name: "Essentials", icon: "home" },
-  { id: "look", name: "Look out for", icon: "eye" },
-  { id: "long", name: "Long term", icon: "bookmark" },
+// The three sections every list starts with. They can be renamed or deleted like any other.
+const DEFAULTS = [
+  { id: "ess", name: "Essentials", icon: "home", color: "ess", pos: 1 },
+  { id: "look", name: "Look out for", icon: "eye", color: "look", pos: 2 },
+  { id: "long", name: "Long term", icon: "bookmark", color: "long", pos: 3 },
 ];
-const SEC = Object.fromEntries(SECTIONS.map(s => [s.id, s]));
+const PALETTE = ["teal", "rose", "blue", "olive", "plum"]; // for new sections
+const MAX_ITEM = 120; // four lines on a phone
+const MAX_SECTION = 40;
 const SETTLE_MS = 1500;
 const TRIP_MS = 12 * 3600 * 1000;
 const LONG_PRESS_MS = 450;
 const HINT_KEY = "panier-dragged-once";
+const DRAFTS_KEY = "panier-drafts"; // text typed into "Add item" fields, kept until added
 const $ = s => document.querySelector(s);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const PLAIN = (() => { try { const d = document.createElement("div"); d.contentEditable = "plaintext-only"; return d.contentEditable === "plaintext-only"; } catch (_) { return false; } })();
 
 const fold = s => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const keyOf = s => fold(s).replace(/\s+/g, " ").trim();
-const clean = s => s.replace(/\s+/g, " ").trim().slice(0, 80);
+const clean = (s, max = MAX_ITEM) => s.replace(/\s+/g, " ").trim().slice(0, max);
 const q = s => "“" + s + "”";
 const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} };
 
 let items = [];
+let sections = []; // the sections on screen, in order
+let sectionInfo = new Map(); // every section ever seen, for names and colours
 const settling = new Set();
 let settleTimer = null, flashId = null, drag = null, editingId = null, renderPending = false;
 let suppressClick = false, lifted = false;
@@ -64,6 +70,9 @@ function icon(name) {
 }
 
 const find = id => items.find(i => i.id === id);
+const nameOf = id => (sectionInfo.get(id) || { name: "this section" }).name;
+const colorOf = id => (sectionInfo.has(id) ? sectionInfo.get(id).color : "muted");
+const isShown = id => sections.some(s => s.id === id);
 const inList = i => !i.checked || settling.has(i.id);
 const shown = sec => items.filter(i => i.section === sec && inList(i)).sort((a, b) => a.pos - b.pos || (a.id < b.id ? -1 : 1));
 const maxPos = sec => shown(sec).reduce((m, i) => Math.max(m, i.pos), 0);
@@ -81,14 +90,48 @@ function announce(msg) {
 }
 const activeFk = () => { const a = document.activeElement; return a && a.dataset ? a.dataset.fk : null; };
 
+// Works out which sections to show. A section stays on screen while it has items to
+// get, or text being typed into it, even if the other phone deleted it meanwhile.
+function computeSections() {
+  const stored = new Map(store.sections().map(s => [s.id, s]));
+  const all = new Map();
+  for (const d of DEFAULTS) {
+    const st = stored.get(d.id) || {};
+    all.set(d.id, { ...d, name: st.name ?? d.name, pos: st.pos ?? d.pos, deleted: !!st.deleted });
+  }
+  for (const st of stored.values()) {
+    if (!all.has(st.id)) all.set(st.id, { id: st.id, name: st.name || "Untitled", icon: null, color: st.color || PALETTE[0], pos: st.pos ?? 100, deleted: st.deleted });
+  }
+  const used = new Set(items.filter(inList).map(i => i.section));
+  for (const [id, sh] of Object.entries(shells)) if (sh.input.value.trim()) used.add(id);
+  for (const id of used) if (!all.has(id)) all.set(id, { id, name: "Untitled", icon: null, color: PALETTE[0], pos: 100, deleted: false });
+  sectionInfo = all;
+  sections = [...all.values()].filter(s => !s.deleted || used.has(s.id)).sort((a, b) => a.pos - b.pos || (a.id < b.id ? -1 : 1));
+}
+
 /* ---------- Changes ---------- */
+
+// Browsers send every tap to the page itself while an animation plays, so animations
+// only follow your own actions, never the other phone's. A change made in the middle of
+// a tap (leaving a field by tapping elsewhere) redraws once the tap is over, so the
+// thing you tapped is still there to receive it.
+let pointerIsDown = false, afterTap = null;
+addEventListener("pointerdown", () => { pointerIsDown = true; }, true);
+const tapEnded = () => {
+  pointerIsDown = false;
+  if (afterTap) { const f = afterTap; afterTap = null; setTimeout(f, 0); }
+};
+addEventListener("pointerup", tapEnded, true);
+addEventListener("pointercancel", tapEnded, true);
+const whenTapEnds = fn => { if (pointerIsDown) afterTap = fn; else fn(); };
 
 // act records one undoable step and redraws.
 function act(label, ops, opts = {}) {
   const fk = opts.focusKey || activeFk();
   if (!store.change(label, ops)) return;
   items = store.items();
-  paint(fk, opts.animate);
+  if (opts.leaving) whenTapEnds(() => paint(null, false));
+  else paint(fk, opts.animate);
 }
 function paint(fk, animate) {
   const run = () => {
@@ -108,7 +151,7 @@ function refreshFromStore() {
   renderPending = false;
   items = store.items();
   for (const id of [...settling]) { const it = find(id); if (!it || !it.checked) settling.delete(id); }
-  paint(activeFk());
+  paint(activeFk(), false);
 }
 function step(fn, verb) {
   const r = fn();
@@ -127,7 +170,7 @@ function scheduleSettle() {
   settleTimer = setTimeout(() => {
     if (editingId || drag) return scheduleSettle();
     settling.clear();
-    paint(activeFk());
+    paint(activeFk(), false);
   }, SETTLE_MS);
 }
 
@@ -143,43 +186,60 @@ function toggle(id, checked) {
   } else {
     settling.delete(id);
     const ops = [[id, "checked", false], [id, "checkedAt", 0]];
-    if (!wasSettling) ops.push([id, "pos", maxPos(it.section) + 1]);
+    if (!wasSettling) {
+      const sec = isShown(it.section) ? it.section : sections[0].id;
+      ops.push([id, "section", sec], [id, "pos", maxPos(sec) + 1]);
+    }
     announce(it.text + " back on the list");
     act("unchecking " + q(it.text), ops, { animate: !wasSettling });
   }
   scheduleSettle();
 }
+function loadDrafts() {
+  try { return JSON.parse(localStorage.getItem(DRAFTS_KEY)) || {}; } catch (_) { return {}; }
+}
+function saveDraft(sec, text) {
+  const d = loadDrafts();
+  if (text) d[sec] = text; else delete d[sec];
+  try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(d)); } catch (_) {}
+}
 function clearAdd(sec) {
   shells[sec].input.value = "";
+  shells[sec].form.classList.remove("typing");
+  saveDraft(sec, "");
   closeSug();
 }
-function revive(id, sec) {
+function revive(id, sec, opts = {}) {
   clearAdd(sec);
   const it = find(id);
   settling.delete(id);
   flashId = id;
   announce(it.text + " is back on the list");
-  act("putting back " + q(it.text), [[id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "checked", false], [id, "checkedAt", 0]]);
+  act("putting back " + q(it.text), [[id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "checked", false], [id, "checkedAt", 0]], opts);
 }
-function submitAdd(sec) {
-  const pick = ui.sugSec === sec && ui.sugIndex >= 0 && ui.sug[ui.sugIndex];
+// submitAdd adds what was typed into a section's "Add item" field: on Enter, or, with
+// leaving, when you leave the field or reopen the app with text still in it.
+function submitAdd(sec, leaving = false) {
+  const opts = leaving ? { leaving: true } : {};
+  const pick = !leaving && ui.sugSec === sec && ui.sugIndex >= 0 && ui.sug[ui.sugIndex];
   if (pick) return revive(pick.id, sec);
   const text = clean(shells[sec].input.value);
-  if (!text) return;
+  if (!text) { clearAdd(sec); return; }
   const ex = items.find(i => keyOf(i.text) === keyOf(text));
-  if (ex && ex.checked && !settling.has(ex.id)) return revive(ex.id, sec);
+  if (ex && ex.checked && !settling.has(ex.id)) return revive(ex.id, sec, opts);
   clearAdd(sec);
   if (ex) {
     flashId = ex.id;
     announce(ex.text + " is already on the list");
-    paint(null, false);
+    if (leaving) whenTapEnds(() => paint(null, false));
+    else paint(null, false);
     return;
   }
   const id = store.newId();
   flashId = id;
   announce("Added " + text);
   act("adding " + q(text), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1],
-    [id, "checked", false], [id, "checkedAt", 0], [id, "deleted", false]]);
+    [id, "checked", false], [id, "checkedAt", 0], [id, "deleted", false]], opts);
 }
 function del(id) {
   const it = find(id);
@@ -195,12 +255,37 @@ function nudge(id, dir) {
     act("moving " + q(it.text), [[id, "pos", other.pos], [other.id, "pos", it.pos]], { focusKey: "chk-" + id });
     return;
   }
-  const next = SECTIONS[SECTIONS.findIndex(s => s.id === it.section) + dir];
+  const next = sections[sections.findIndex(s => s.id === it.section) + dir];
   if (!next) return;
   const l = shown(next.id);
   const pos = dir > 0 ? (l.length ? l[0].pos - 1 : 1) : maxPos(next.id) + 1;
   announce(it.text + " moved to " + next.name);
   act("moving " + q(it.text), [[id, "section", next.id], [id, "pos", pos]], { focusKey: "chk-" + id });
+}
+
+function addSection(raw) {
+  const name = clean(raw, MAX_SECTION);
+  if (!name) return;
+  $("#add-sec").value = "";
+  const id = store.newId(), key = "#" + id;
+  const usedColors = new Set(sections.map(s => s.color));
+  const color = PALETTE.find(c => !usedColors.has(c)) || PALETTE[sectionInfo.size % PALETTE.length];
+  const pos = sections.reduce((m, s) => Math.max(m, s.pos), 0) + 1;
+  announce("Added section " + name);
+  act("adding section " + q(name), [[key, "name", name], [key, "pos", pos], [key, "color", color], [key, "deleted", false]], { focusKey: "add-" + id });
+}
+function renameSection(id, name) {
+  const info = sectionInfo.get(id);
+  const fallback = (DEFAULTS.find(d => d.id === id) || {}).name;
+  announce("Renamed section to " + name);
+  act("renaming section " + q(info.name), [["#" + id, "name", name, fallback]], { animate: false });
+}
+// A section can only be deleted once it has nothing to get, and the last one stays.
+const canDelete = id => sections.length > 1 && !items.some(i => i.section === id && inList(i));
+function deleteSection(id) {
+  const name = nameOf(id);
+  announce("Deleted section " + name);
+  act("deleting section " + q(name), [["#" + id, "deleted", true, false]]);
 }
 
 /* ---------- Editing in place ---------- */
@@ -222,10 +307,11 @@ function caretAt(span, x, y) {
   } catch (_) {}
   return null;
 }
-function startEdit(span, id, x, y) {
+// editInPlace turns a text span into an editable field until Enter, Escape or leaving
+// it. With onDelete, a bin appears at the end of the row while editing.
+function editInPlace(span, { key, row, orig, max, x, y, onSave, onDelete, deleteLabel }) {
   if (editingId || drag) return;
-  const orig = find(id).text;
-  editingId = id;
+  editingId = key;
   span.contentEditable = PLAIN ? "plaintext-only" : "true";
   span.classList.add("editing");
   span.setAttribute("role", "textbox");
@@ -237,27 +323,29 @@ function startEdit(span, id, x, y) {
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
   } catch (_) {}
   let cancelled = false, done = false;
-  const li = span.closest(".item");
-  const bin = h("button", {
-    type: "button", class: "bin", "aria-label": "Delete " + orig,
+  const bin = onDelete && h("button", {
+    type: "button", class: "bin", "aria-label": deleteLabel,
     onpointerdown: e => e.preventDefault(), onmousedown: e => e.preventDefault(),
-    onclick: () => { cancelled = true; finish(); del(id); },
+    onclick: () => { cancelled = true; finish(); onDelete(); },
   }, icon("bin"));
-  li.classList.add("editing");
-  li.append(bin);
+  row.classList.add("editing");
+  if (bin) row.append(bin);
   const onKey = e => {
     if (e.key === "Enter") { e.preventDefault(); span.blur(); }
     else if (e.key === "Escape") { e.preventDefault(); cancelled = true; span.blur(); }
   };
   const onBefore = e => {
-    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") { e.preventDefault(); span.blur(); }
+    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") { e.preventDefault(); span.blur(); return; }
+    // Keep to the length limit while typing or pasting.
+    const room = max - span.textContent.length + (getSelection().toString().length || 0);
+    if (e.data && e.data.length > room) e.preventDefault();
   };
   const onPaste = e => {
     if (PLAIN) return;
     e.preventDefault();
     document.execCommand("insertText", false, (e.clipboardData && e.clipboardData.getData("text/plain")) || "");
   };
-  const onSpanBlur = e => { if (e.relatedTarget !== bin) finish(); };
+  const onSpanBlur = e => { if (!bin || e.relatedTarget !== bin) finish(); };
   const onBinBlur = e => { if (e.relatedTarget !== span) finish(); };
   function finish() {
     if (done) return;
@@ -266,38 +354,56 @@ function startEdit(span, id, x, y) {
     span.removeEventListener("beforeinput", onBefore);
     span.removeEventListener("paste", onPaste);
     span.removeEventListener("blur", onSpanBlur);
-    bin.removeEventListener("blur", onBinBlur);
+    if (bin) { bin.removeEventListener("blur", onBinBlur); bin.remove(); }
     span.contentEditable = "false";
     span.classList.remove("editing");
     span.setAttribute("role", "button");
-    li.classList.remove("editing");
-    bin.remove();
+    row.classList.remove("editing");
     editingId = null;
-    const text = clean(span.textContent);
+    const text = clean(span.textContent, max);
     if (cancelled || !text || text === orig) {
       span.textContent = orig;
       if (renderPending && !cancelled) refreshFromStore();
       return;
     }
-    const dup = items.find(i => i.id !== id && keyOf(i.text) === keyOf(text));
-    if (dup && onScreen(dup)) {
-      span.textContent = orig;
-      flashId = dup.id;
-      announce(dup.text + " is already on the list");
-      items = store.items();
-      paint(activeFk(), false);
-      return;
-    }
-    const ops = [[id, "text", text]];
-    if (dup) ops.push([dup.id, "deleted", true]);
-    announce("Renamed to " + text);
-    act("renaming " + q(orig), ops, { animate: false });
+    if (onSave(text) === false) span.textContent = orig;
   }
   span.addEventListener("keydown", onKey);
   span.addEventListener("beforeinput", onBefore);
   span.addEventListener("paste", onPaste);
   span.addEventListener("blur", onSpanBlur);
-  bin.addEventListener("blur", onBinBlur);
+  if (bin) bin.addEventListener("blur", onBinBlur);
+}
+
+function editItem(span, id, x, y) {
+  const orig = find(id).text;
+  editInPlace(span, {
+    key: id, row: span.closest(".item"), orig, max: MAX_ITEM, x, y,
+    onDelete: () => del(id), deleteLabel: "Delete " + orig,
+    onSave: text => {
+      const dup = items.find(i => i.id !== id && keyOf(i.text) === keyOf(text));
+      if (dup && onScreen(dup)) {
+        flashId = dup.id;
+        announce(dup.text + " is already on the list");
+        items = store.items();
+        paint(activeFk(), false);
+        return false;
+      }
+      const ops = [[id, "text", text]];
+      if (dup) ops.push([dup.id, "deleted", true]);
+      announce("Renamed to " + text);
+      act("renaming " + q(orig), ops, { animate: false });
+    },
+  });
+}
+
+function editSection(span, id, x, y) {
+  const orig = nameOf(id);
+  editInPlace(span, {
+    key: "#" + id, row: span.closest(".sec-head"), orig, max: MAX_SECTION, x, y,
+    onDelete: canDelete(id) ? () => deleteSection(id) : null, deleteLabel: "Delete section " + orig,
+    onSave: name => renameSection(id, name),
+  });
 }
 
 /* ---------- Suggestions from everything bought before ---------- */
@@ -352,35 +458,66 @@ function closeSug() {
   ui.sugSec = null; ui.sug = []; ui.sugIndex = -1;
 }
 
-/* ---------- List cards, built once so a focused field keeps its keyboard ---------- */
+/* ---------- Section cards, kept between renders so a focused field keeps its keyboard ---------- */
 
 const shells = {};
-for (const s of SECTIONS) {
-  const ul = h("ul", { class: "items", "data-sec": s.id });
+function buildShell(id) {
+  const ul = h("ul", { class: "items", "data-sec": id });
   const input = h("input", {
-    type: "text", class: "add-input", id: "add-" + s.id, placeholder: "Add item", "aria-label": "Add item to " + s.name,
-    maxlength: "80", enterkeyhint: "enter", autocomplete: "off", autocapitalize: "sentences", spellcheck: "false",
-    role: "combobox", "aria-autocomplete": "list", "aria-expanded": "false", "aria-controls": "sug-" + s.id,
-    dataset: { fk: "add-" + s.id },
+    type: "text", class: "add-input", id: "add-" + id, placeholder: "Add item",
+    maxlength: String(MAX_ITEM), enterkeyhint: "enter", autocomplete: "off", autocapitalize: "sentences", spellcheck: "false",
+    role: "combobox", "aria-autocomplete": "list", "aria-expanded": "false", "aria-controls": "sug-" + id,
+    dataset: { fk: "add-" + id },
   });
-  const form = h("form", { class: "add", autocomplete: "off", style: "view-transition-name:add-" + s.id,
-    onsubmit: e => { e.preventDefault(); submitAdd(s.id); } },
-    h("label", { class: "add-plus", for: "add-" + s.id, "aria-hidden": "true" }, icon("plus")), input);
-  const sug = h("ul", { class: "sug", id: "sug-" + s.id, role: "listbox", "aria-label": "Bought before", hidden: true });
-  $("#list").append(h("section", { class: "sec", "data-sec": s.id, "aria-labelledby": "h-" + s.id, style: "--sec:var(--" + s.id + ")" },
-    h("h2", { class: "sr", id: "h-" + s.id }, s.name),
-    h("span", { class: "kind", "aria-hidden": "true" }, icon(s.icon)),
-    ul, sug, form));
-  input.addEventListener("input", () => updateSug(s.id));
-  input.addEventListener("focus", () => updateSug(s.id));
-  input.addEventListener("blur", () => { if (ui.sugSec === s.id) closeSug(); });
+  const form = h("form", { class: "add", autocomplete: "off", onsubmit: e => { e.preventDefault(); submitAdd(id); } },
+    h("label", { class: "add-plus", for: "add-" + id, "aria-hidden": "true" }, icon("plus")), input);
+  const sug = h("ul", { class: "sug", id: "sug-" + id, role: "listbox", "aria-label": "Bought before", hidden: true });
+  const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id } });
+  name.addEventListener("click", e => { if (editingId !== "#" + id) editSection(name, id, e.clientX, e.clientY); });
+  name.addEventListener("keydown", e => {
+    if (editingId === "#" + id) return;
+    if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editSection(name, id); }
+  });
+  const kind = h("span", { class: "kind", "aria-hidden": "true" });
+  const head = h("h2", { class: "sec-head" }, name, kind);
+  const el = h("section", { class: "sec", "data-sec": id, "aria-labelledby": "h-" + id }, head, ul, sug, form);
+  input.addEventListener("input", () => {
+    form.classList.toggle("typing", !!input.value.trim());
+    saveDraft(id, input.value.trim() ? input.value : "");
+    updateSug(id);
+  });
+  input.addEventListener("focus", () => updateSug(id));
+  input.addEventListener("blur", () => {
+    if (ui.sugSec === id) closeSug();
+    // Leaving the field adds the item, but not when the whole app loses focus (a
+    // notification, another app): the text is kept and you carry on typing.
+    setTimeout(() => {
+      if (document.hasFocus() && document.activeElement !== input && shells[id] === sh) submitAdd(id, true);
+    }, 0);
+  });
   input.addEventListener("keydown", e => {
     if (e.key === "Escape") { closeSug(); return; }
-    if (ui.sugSec !== s.id || !ui.sug.length) return;
-    if (e.key === "ArrowDown") { e.preventDefault(); ui.sugIndex = (ui.sugIndex + 1) % ui.sug.length; paintSug(s.id, ui.sug); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); ui.sugIndex = ui.sugIndex <= 0 ? ui.sug.length - 1 : ui.sugIndex - 1; paintSug(s.id, ui.sug); }
+    if (ui.sugSec !== id || !ui.sug.length) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); ui.sugIndex = (ui.sugIndex + 1) % ui.sug.length; paintSug(id, ui.sug); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); ui.sugIndex = ui.sugIndex <= 0 ? ui.sug.length - 1 : ui.sugIndex - 1; paintSug(id, ui.sug); }
   });
-  shells[s.id] = { ul, input, sug };
+  const sh = { el, ul, input, form, sug, name, kind, icon: undefined };
+  return sh;
+}
+function syncShells() {
+  const list = $("#list");
+  for (const id of Object.keys(shells)) {
+    if (!isShown(id)) { shells[id].el.remove(); delete shells[id]; }
+  }
+  sections.forEach((s, i) => {
+    const sh = shells[s.id] || (shells[s.id] = buildShell(s.id));
+    sh.el.style.setProperty("--sec", "var(--" + s.color + ")");
+    if (editingId !== "#" + s.id && sh.name.textContent !== s.name) sh.name.textContent = s.name;
+    sh.name.setAttribute("aria-label", s.name + ", rename");
+    sh.input.setAttribute("aria-label", "Add item to " + s.name);
+    if (sh.icon !== s.icon) { sh.icon = s.icon; sh.kind.replaceChildren(s.icon ? icon(s.icon) : ""); }
+    if (list.children[i] !== sh.el) list.insertBefore(sh.el, list.children[i] || null);
+  });
 }
 
 /* ---------- Items ---------- */
@@ -388,7 +525,7 @@ for (const s of SECTIONS) {
 function itemEl(it) {
   const li = h("li", {
     class: "item" + (it.checked ? " done" : ""), "data-id": it.id,
-    style: "--sec:var(--" + it.section + ");view-transition-name:v" + it.id.replace(/[^A-Za-z0-9]/g, "_"),
+    style: "--sec:var(--" + colorOf(it.section) + ");view-transition-name:v" + it.id.replace(/[^A-Za-z0-9]/g, "_"),
   });
   const chk = h("input", { type: "checkbox", class: "chk", id: "chk-" + it.id, "aria-label": it.text, dataset: { fk: "chk-" + it.id } });
   chk.checked = it.checked;
@@ -403,11 +540,11 @@ function itemEl(it) {
   const text = h("span", { class: "text", id: "txt-" + it.id, role: "button", tabindex: "0", "aria-label": "Edit " + it.text, dataset: { fk: "txt-" + it.id } }, it.text);
   text.addEventListener("click", e => {
     if (suppressClick) { suppressClick = false; return; }
-    if (editingId !== it.id) startEdit(text, it.id, e.clientX, e.clientY);
+    if (editingId !== it.id) editItem(text, it.id, e.clientX, e.clientY);
   });
   text.addEventListener("keydown", e => {
     if (editingId === it.id) return;
-    if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); startEdit(text, it.id); }
+    if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editItem(text, it.id); }
     else if (e.key === "Delete") { e.preventDefault(); del(it.id); }
   });
   li.append(cell, text);
@@ -474,7 +611,7 @@ function startDrag(li, id, offY, y) {
   document.body.append(ghost);
   li.classList.add("placeholder");
   document.documentElement.classList.add("dragging");
-  drag = { id, li, ghost, offY, y, raf: 0 };
+  drag = { id, li, ghost, offY, y, raf: 0, toTick: false };
   addEventListener("pointermove", onDragMove);
   addEventListener("pointerup", endDrag);
   addEventListener("pointercancel", endDrag);
@@ -497,6 +634,16 @@ function dragTick() {
   drag.raf = requestAnimationFrame(dragTick);
 }
 function place(y) {
+  // Over the drop zone below the sections: the item will be ticked.
+  const toTick = y > $("#tick-drop").getBoundingClientRect().top - 12;
+  if (toTick !== drag.toTick) {
+    drag.toTick = toTick;
+    drag.li.classList.toggle("away", toTick);
+    drag.ghost.classList.toggle("to-tick", toTick);
+    $("#tick-drop").classList.toggle("over", toTick);
+    if (toTick) buzz(8);
+  }
+  if (toTick) return;
   const secs = [...document.querySelectorAll("#list .sec")];
   let target = secs[secs.length - 1];
   for (const s of secs) { if (y < s.getBoundingClientRect().bottom) { target = s; break; } }
@@ -509,26 +656,34 @@ function place(y) {
   }
   if (drag.li.parentElement === ul && drag.li.nextElementSibling === before) return;
   ul.insertBefore(drag.li, before);
-  drag.li.style.setProperty("--sec", "var(--" + ul.dataset.sec + ")");
-  drag.ghost.style.setProperty("--sec", "var(--" + ul.dataset.sec + ")");
+  drag.li.style.setProperty("--sec", "var(--" + colorOf(ul.dataset.sec) + ")");
+  drag.ghost.style.setProperty("--sec", "var(--" + colorOf(ul.dataset.sec) + ")");
 }
 function endDrag() {
   if (!drag) return;
-  const { li, ghost, id } = drag;
+  const { li, ghost, id, toTick } = drag;
   cancelAnimationFrame(drag.raf);
   removeEventListener("pointermove", onDragMove);
   removeEventListener("pointerup", endDrag);
   removeEventListener("pointercancel", endDrag);
   ghost.remove();
   document.documentElement.classList.remove("dragging");
+  $("#tick-drop").classList.remove("over");
   drag = null;
   try { localStorage.setItem(HINT_KEY, "1"); } catch (_) {}
+  if (toTick) {
+    const it = find(id);
+    buzz(12);
+    announce(it.text + " ticked");
+    act("checking " + q(it.text), [[id, "checked", true], [id, "checkedAt", Date.now()]]);
+    return;
+  }
   const ul = li.parentElement, sec = ul.dataset.sec;
   const sibs = [...ul.children], i = sibs.indexOf(li);
   const prev = sibs[i - 1] && find(sibs[i - 1].dataset.id);
   const next = sibs[i + 1] && find(sibs[i + 1].dataset.id);
   const it = find(id);
-  if (it.section !== sec) announce(it.text + " moved to " + SEC[sec].name);
+  if (it.section !== sec) announce(it.text + " moved to " + nameOf(sec));
   const fk = activeFk();
   if (!store.change("moving " + q(it.text), [[id, "section", sec], [id, "pos", between(prev && prev.pos, next && next.pos)]])) {
     if (renderPending) refreshFromStore();
@@ -554,7 +709,9 @@ function paintStatus() {
   el.textContent = (full ? "The list is full on the server" : "Offline") + queued;
 }
 function render() {
-  for (const s of SECTIONS) shells[s.id].ul.replaceChildren(...shown(s.id).map(itemEl));
+  computeSections();
+  syncShells();
+  for (const s of sections) shells[s.id].ul.replaceChildren(...shown(s.id).map(itemEl));
   const since = Date.now() - TRIP_MS;
   const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= since).sort((a, b) => b.checkedAt - a.checkedAt);
   $("#basket").hidden = basket.length === 0;
@@ -575,7 +732,7 @@ function render() {
     if (li) {
       li.classList.add("flash");
       const rect = li.getBoundingClientRect();
-      if (rect.top < 0 || rect.bottom > innerHeight - 80) {
+      if (!pointerIsDown && (rect.top < 0 || rect.bottom > innerHeight - 80)) {
         window.scrollBy({ top: rect.top - innerHeight / 3, behavior: reduceMotion.matches ? "auto" : "smooth" });
       }
     }
@@ -630,6 +787,7 @@ $("#copy-link").addEventListener("click", async e => {
 
 /* ---------- Wiring and start ---------- */
 
+$("#add-sec-form").addEventListener("submit", e => { e.preventDefault(); addSection($("#add-sec").value); });
 $("#undo").addEventListener("click", undo);
 $("#redo").addEventListener("click", redo);
 document.addEventListener("keydown", e => {
@@ -657,6 +815,13 @@ function showList() {
   $("#app").hidden = false;
   items = store.items();
   render();
+  // Text left in an "Add item" field when the app was closed becomes an item now.
+  for (const [sec, text] of Object.entries(loadDrafts())) {
+    const target = shells[sec] ? sec : sections[0].id;
+    shells[target].input.value = text;
+    submitAdd(target, true);
+  }
+  try { localStorage.removeItem(DRAFTS_KEY); } catch (_) {}
   dragHint();
 }
 function showWelcome(message) {

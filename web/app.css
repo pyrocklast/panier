@@ -1,7 +1,7 @@
 @font-face { font-family: "Atkinson Hyperlegible"; src: url("fonts/atkinson-hyperlegible-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Atkinson Hyperlegible"; src: url("fonts/atkinson-hyperlegible-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
 
-/* Layout: one calm column with a card per kind of list (icon in the corner), ticked items after them, undo and redo floating at the bottom within thumb reach. */
+/* Layout: one calm column with a named card per section, a row to add sections, the ticked items after them, and undo and redo floating at the bottom within thumb reach. */
 :root {
   --bg: #f4f5f3;
   --surface: #ffffff;
@@ -12,6 +12,11 @@
   --ess: #3a8a62;
   --look: #c27b1a;
   --long: #6a6fc4;
+  --teal: #2a8a8f;
+  --rose: #b84d6e;
+  --blue: #3f72b8;
+  --olive: #7a7f2a;
+  --plum: #8a52a6;
   --danger: #c0392b;
   --shadow: 0 1px 2px rgb(20 30 25 / 0.05), 0 0 0 1px rgb(20 30 25 / 0.05);
   --float: 0 14px 34px -10px rgb(20 30 25 / 0.28), 0 0 0 1px rgb(20 30 25 / 0.06);
@@ -22,6 +27,7 @@
   :root:not([data-theme="light"]) {
     --bg: #111513; --surface: #1a1f1d; --press: #242a27; --ink: #e6ebe8; --muted: #98a39d; --line: #272e2b;
     --ess: #6ec99c; --look: #e9ae58; --long: #a7abf2; --danger: #ff8a80;
+    --teal: #6cc9cc; --rose: #f08fac; --blue: #8fb6f0; --olive: #c4c86a; --plum: #cfa0e6;
     --shadow: 0 0 0 1px #242b28; --float: 0 14px 34px -10px rgb(0 0 0 / 0.6), 0 0 0 1px #2f3733;
     color-scheme: dark;
   }
@@ -29,6 +35,7 @@
 :root[data-theme="dark"] {
   --bg: #111513; --surface: #1a1f1d; --press: #242a27; --ink: #e6ebe8; --muted: #98a39d; --line: #272e2b;
   --ess: #6ec99c; --look: #e9ae58; --long: #a7abf2; --danger: #ff8a80;
+  --teal: #6cc9cc; --rose: #f08fac; --blue: #8fb6f0; --olive: #c4c86a; --plum: #cfa0e6;
   --shadow: 0 0 0 1px #242b28; --float: 0 14px 34px -10px rgb(0 0 0 / 0.6), 0 0 0 1px #2f3733;
   color-scheme: dark;
 }
@@ -54,9 +61,14 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16px; }
 #list { display: flex; flex-direction: column; gap: 16px; }
 .sec, .basket-list { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
-.sec { position: relative; }
-.sec > .kind { position: absolute; top: 16px; right: 16px; z-index: 1; pointer-events: none; }
-.sec .items > .item:first-child .text, .sec .items:empty ~ .add, .sec .items:empty + .sug .sugopt:first-child { padding-right: 48px; }
+.sec-head { margin: 0; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 16px 0; font-size: 1rem; }
+.sec-name {
+  flex: 1; min-width: 0; padding: 8px 0 4px; font-weight: 700; overflow-wrap: anywhere; cursor: text; outline: none; border-radius: 4px;
+}
+.sec-name:focus-visible { box-shadow: 0 0 0 2px var(--ink); }
+.sec-name.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 var(--sec); border-radius: 0; }
+.sec-head .bin { width: 36px; height: 36px; margin-right: -8px; }
+.sec-head:has(.bin) > .kind { display: none; }
 
 /* Items */
 .items { list-style: none; margin: 0; padding: 0; }
@@ -95,8 +107,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .item.done .text { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .item.done .text.editing { color: var(--ink); text-decoration: none; }
 .item.editing { grid-template-columns: 54px minmax(0, 1fr) 48px; }
-.sec .items > .item.editing:first-child .text, .item.editing .text { padding-right: 4px; }
-.sec:has(.items > .item.editing:first-child) > .kind { visibility: hidden; }
+.item.editing .text { padding-right: 4px; }
 .bin { display: grid; place-items: center; align-self: stretch; padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; }
 .bin:focus-visible { outline-offset: -6px; border-radius: 10px; }
 
@@ -109,6 +120,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   color: var(--ink); font: inherit; font-size: 1.0625rem;
 }
 .add-input::placeholder { color: var(--muted); }
+/* Once you type, the row is a new item: its plus becomes a tick box. */
+.add.typing .add-plus svg { display: none; }
+.add.typing .add-plus::before { content: ""; width: 21px; height: 21px; box-sizing: border-box; border: 2px solid var(--sec); border-radius: 5px; }
 
 /* Suggestions */
 .sug { list-style: none; margin: 0; padding: 4px 0; box-shadow: inset 0 1px 0 var(--line); }
@@ -152,6 +166,24 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 }
 .item.placeholder { background-color: color-mix(in oklab, var(--sec) 10%, var(--surface)); }
 .item.placeholder > * { visibility: hidden; }
+.item.placeholder.away { background-color: var(--surface); } /* heading for the ticked items: its slot empties, nothing moves */
+
+/* Dropping an item here ticks it */
+.drop {
+  display: none; align-items: center; min-height: 52px; box-sizing: border-box; color: var(--muted);
+  border: 2px dashed var(--line); border-radius: var(--r); transition: background-color 0.15s, border-color 0.15s;
+}
+:root.dragging .drop { display: flex; }
+.drop .tickmark { margin-left: 16px; }
+.drop.over { border-style: solid; border-color: var(--muted); background-color: color-mix(in oklab, var(--muted) 12%, var(--surface)); }
+.ghost.to-tick .box { opacity: 1; background: var(--muted); border-color: var(--muted); color: var(--surface); }
+.ghost.to-tick .grip { opacity: 0; }
+.ghost.to-tick .text { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* Adding a section */
+.add-sec { display: flex; align-items: center; min-height: 48px; padding-right: 16px; border-radius: var(--r); color: var(--muted); }
+.add-sec:focus-within { background: var(--surface); box-shadow: var(--shadow); color: var(--ink); }
+.add-sec .add-plus { color: var(--muted); }
 :root.dragging, :root.dragging * { cursor: grabbing !important; }
 .item.flash { animation: flash 1.4s ease-out; }
 @keyframes flash { 0%, 35% { background-color: color-mix(in oklab, var(--sec) 20%, var(--surface)); } 100% { background-color: var(--surface); } }

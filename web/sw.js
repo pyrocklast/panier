@@ -2,7 +2,7 @@
 // refreshed in the background, so an update shows on the next launch. The list itself
 // never goes through here: it lives on the phone and syncs through /api/.
 
-const CACHE = "panier-1";
+const CACHE = "panier-2"; // change with each release that changes several files, so phones switch over together
 const FILES = [
   "./", "app.css", "app.js", "store.js", "vendor/qrcode.js", "manifest.webmanifest",
   "icon.svg", "icon-192.png", "fonts/atkinson-hyperlegible-400.woff2", "fonts/atkinson-hyperlegible-700.woff2",

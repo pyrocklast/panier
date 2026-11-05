@@ -6,23 +6,27 @@ A private, collaborative shopping list. Minimal, end-to-end encrypted, on Cloudf
 
 ## How it behaves
 
-### Three kinds of list
+### Sections
 
-Each kind is a card, in this order:
+Each section is a card with its name at the top. A list starts with three:
 
-| List | Icon | For |
+| Section | Icon | For |
 | --- | --- | --- |
-| Essentials | house | everyday things the home runs on (the default) |
+| Essentials | house | everyday things the home runs on |
 | Look out for | eye | things to buy if you come across them |
 | Long term | bookmark | things to get eventually |
 
-The icon sits in the card's top-right corner and the tick boxes take the list's colour. The names are read out to screen readers.
+- Tap a section's name to rename it. Both phones see the new name.
+- *Add a section*, below the cards, adds one at the end with its own colour; the cursor moves to its *Add item* field.
+- While you rename a section that has nothing left to get, a bin appears to delete it. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
+- Tick boxes take their section's colour.
 
 ### Adding
 
-- Every card ends with an *Add item* row. Tapping the row or its `+` opens the field; Enter adds the item to the end of that list and keeps the field open for the next one.
+- Every card ends with an *Add item* row. Tapping the row or its `+` opens the field. Items hold up to 120 characters, about four lines.
+- As soon as you type, the `+` becomes a tick box: the row is a new item. Enter adds it and keeps the field open for the next one. Leaving the field adds it too, so nothing typed is lost. A notification or switching apps doesn't cut it short, and text left in the field when the app closes is added the next time it opens.
 - Typing something already on the list highlights it instead of adding a copy.
-- Typing something bought before puts it back, into the list you are typing in.
+- Typing something bought before puts it back, into the section you are typing in.
 
 ### Suggestions
 
@@ -35,7 +39,8 @@ The icon sits in the card's top-right corner and the tick boxes take the list's 
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row move together and the list does not shift under your thumb.
 - They then move to the ticked group below the lists. Its header is a filled tick box, a count and a collapse arrow.
 - The group shows what was ticked in the last 12 hours. Older items are hidden but still suggested.
-- Tapping a ticked square puts the item back at the end of its list.
+- Dragging an item down onto the drop zone that appears below the sections ticks it straight away; the item shows as ticked while it's over the zone.
+- Tapping a ticked square puts the item back at the end of its section, or of the first section if its own was deleted.
 
 ### Editing and deleting
 
@@ -45,7 +50,7 @@ The icon sits in the card's top-right corner and the tick boxes take the list's 
 
 ### Reordering
 
-- Hold an item for about half a second: it lifts and its tick box turns into a grip. Move to drag it, including into another list; the grip takes the colour of the list it is over. Releasing without moving does nothing.
+- Hold an item for about half a second: it lifts and its tick box turns into a grip. Move to drag it, including into another section; the grip takes the colour of the section it is over. Releasing without moving does nothing.
 - With a mouse, dragging starts as soon as you move.
 - Until someone has dragged once, the first item lifts briefly when the app opens, to show that items can move.
 
@@ -61,7 +66,7 @@ The icon sits in the card's top-right corner and the tick boxes take the list's 
 
 ### Keyboard and accessibility
 
-- Space ticks, Enter or F2 edits, Delete deletes, Alt+↑/↓ moves an item (across lists at the ends), Ctrl+Z and Ctrl+Shift+Z undo and redo.
+- Space ticks, Enter or F2 edits an item or a section name, Delete deletes, Alt+↑/↓ moves an item (across sections at the ends), Ctrl+Z and Ctrl+Shift+Z undo and redo.
 - Changes are announced to screen readers. Light and dark themes follow the system; reduced motion is respected.
 
 ## How it works
@@ -69,7 +74,7 @@ The icon sits in the card's top-right corner and the tick boxes take the list's 
 - **App:** an installable web app in plain HTML, CSS and JavaScript ([`web/`](web/)), with no framework and no build step. A service worker keeps it working offline; the list is stored on the phone.
 - **One secret per list.** The first phone creates a random 256-bit key. From it, each phone derives (HKDF-SHA-256) the list's id, an access token and an AES-GCM encryption key. The pairing link carries the key after `#`, so it never reaches the server.
 - **End-to-end encryption.** Every change is encrypted on the phone before it is sent. The server stores the encrypted changes and a SHA-256 hash of the access token; it never sees item names.
-- **Merging.** Each field of each item (name, list, position, ticked) keeps the most recent write, so two phones can edit offline and end up identical. Undo only reverses fields that still hold what you set; if the other phone changed one since, its change stands.
+- **Merging.** Each field of each item (name, section, position, ticked) and of each section (name, position, colour) keeps the most recent write, so two phones can edit offline and end up identical. Undo only reverses fields that still hold what you set; if the other phone changed one since, its change stands.
 - **Server:** two interchangeable servers implement the same small API, and the app works with either. Both store the encrypted changes for each list in arrival order and announce new ones over a WebSocket. New lists need a setup code.
   - **Cloudflare Workers** ([`worker/index.js`](worker/index.js)): one Durable Object, with its own SQLite database, per list. It sleeps between changes.
   - **Go** ([`main.go`](main.go), [`api.go`](api.go), [`store.go`](store.go), [`live.go`](live.go)): one program using only the standard library, with one log file per list, for running on your own machine.
@@ -103,7 +108,15 @@ BASE=http://127.0.0.1:8080 SETUP=<code> node --test test/api.test.mjs
 3. Hosting: Cloudflare Workers, or your own server ✓
 4. Install on both phones and test in a shop
 
-Later: changing a list's key, to remove a phone; compacting the change log; exporting a list; several lists; lists shared with different groups of people; folding a list by tapping its icon.
+Later:
+
+- Rolling backups
+- More people, and several lists each shared with different people
+- Recurring lists or sections, such as a weekly shop
+- Thematic sub-sections within a section: fruit and vegetables, cleaning, clothes, baby things
+- Changing a list's key, to remove a phone
+- Compacting the change log, and exporting a list
+- Folding a section
 
 ## Licence
 

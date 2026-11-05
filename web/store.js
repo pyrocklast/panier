@@ -59,10 +59,12 @@ function tick() {
   return s.clock;
 }
 
+// Items and sections share one map. A section's key is "#" followed by its id; the
+// three default sections ("ess", "look", "long") are only stored once changed.
 export function items() {
   const out = [];
   for (const [id, f] of Object.entries(s.items)) {
-    if (!f.text || (f.deleted && f.deleted[0])) continue;
+    if (id[0] === "#" || !f.text || (f.deleted && f.deleted[0])) continue;
     out.push({
       id,
       text: f.text[0],
@@ -75,17 +77,35 @@ export function items() {
   return out;
 }
 
+export function sections() {
+  const out = [];
+  for (const [key, f] of Object.entries(s.items)) {
+    if (key[0] !== "#") continue;
+    out.push({
+      id: key.slice(1),
+      name: f.name ? f.name[0] : undefined,
+      pos: f.pos ? f.pos[0] : undefined,
+      color: f.color ? f.color[0] : undefined,
+      deleted: !!(f.deleted && f.deleted[0]),
+    });
+  }
+  return out;
+}
+
 /* ---------- Local changes and undo ---------- */
 
 const undoStack = [], redoStack = [];
 
-// change applies [[id, field, value], ...] as one step. With a label, the step can be
-// undone. Returns what changed as [id, field, newValue, previousValue] records.
+// change applies [[id, field, value, fallback?], ...] as one step. fallback is the value
+// to assume when the field was never stored, such as a default section's name, so undo
+// can restore it. With a label, the step can be undone. Returns what changed as
+// [id, field, newValue, previousValue] records.
 export function change(label, ops) {
   const t = tick();
   const recs = [];
-  for (const [id, field, value] of ops) {
-    const prev = valueOf(id, field);
+  for (const [id, field, value, fallback] of ops) {
+    const stored = valueOf(id, field);
+    const prev = stored === undefined ? fallback : stored;
     if (prev !== undefined && same(prev, value)) continue;
     put(id, field, value, t, s.dev);
     recs.push([id, field, value, prev]);
