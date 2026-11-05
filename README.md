@@ -112,10 +112,12 @@ Small, and felt every day.
 1. **Clearer status.** Make being offline or a failed sync obvious and plain, such as a red dot with *Offline*, and say what happens next: changes are kept and sent when the connection returns.
 2. Clearing an item's text and leaving it deletes the item, instead of restoring the old text.
 3. Enter in the middle of an item's text splits it in two, with the cursor at the start of the second.
-4. Ticked items slide into the ticked group again. The page-wide animation was turned off because browsers ignore taps while it plays; the items themselves need animating instead.
-5. On Android in dark mode, the navigation bar stays white.
-6. The *Add a section* field uses the same type as section names.
-7. *Add a phone* reads as adding a person, such as *Add someone to this list*.
+4. When dragging an item to tick it, the drop zone appears inside the ticked group, under its heading, rather than above it. The heading shows during the drag even when nothing is ticked yet.
+5. Drag a ticked item back into a section to untick it.
+6. Ticked items slide into the ticked group again. The page-wide animation was turned off because browsers ignore taps while it plays; the items themselves need animating instead.
+7. On Android in dark mode, the navigation bar stays white.
+8. The *Add a section* field uses the same type as section names.
+9. *Add a phone* reads as adding a person, such as *Add someone to this list*.
 
 ### 2. Look and language
 
