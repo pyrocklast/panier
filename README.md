@@ -105,6 +105,13 @@ BASE=http://127.0.0.1:8080 SETUP=<code> node --test test/api.test.mjs
 
 In order of priority. Done so far: the interaction prototype; the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; running on two phones.
 
+### 0. Groundwork
+
+Before the fixes, so they can't break what already works.
+
+- Move the two-phone browser tests into the repository, so GitHub runs them before every deploy.
+- Remove the outdated interaction prototype; it stays in the history. Keep the Go server and its Raspberry Pi guide for anyone who hosts Panier themselves.
+
 ### 1. Fixes
 
 Small, and felt every day.
@@ -118,11 +125,15 @@ Small, and felt every day.
 7. On Android in dark mode, the navigation bar stays white.
 8. The *Add a section* field uses the same type as section names.
 9. *Add a phone* reads as adding a person, such as *Add someone to this list*.
+10. A small × on each suggestion removes that item from the suggestions for good, for typos such as *Mlik*.
+11. A new version applies on the next launch, not the one after. The app switches as soon as it's downloaded, unless you're in the middle of an edit.
 
-### 2. Look and language
+### 2. Small changes
 
-Small, and independent of each other.
+Independent of each other.
 
+- Reorder sections by dragging them.
+- **Quantities, without a new field.** A number at the start of an item, such as *2 milk*, *2× milk* or *500 g flour*, is shown slightly apart from the name, and ignored when spotting duplicates and making suggestions, so *2 milk* still finds *Milk*.
 - Remove the section icons.
 - Choose a section's colour from a palette.
 - A new app icon: simple and monochrome, in the style of Arcticons, with a monochrome version for Android's themed icons.
