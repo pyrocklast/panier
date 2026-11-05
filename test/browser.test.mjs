@@ -511,3 +511,47 @@ test("on a touch screen, the tap that leaves an item still lands", async () => {
   assert.ok(await eventually(async () => (await texts(b, "Essentials")).includes("Milk (oat)")));
   await t.close();
 });
+
+test("Backspace at the start of an item joins it to the one above", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  const now = () => texts(a, "Essentials");
+  const splitAt = async (text, n) => {
+    await item(a, text).locator(".text").click();
+    await a.keyboard.press("Home");
+    for (let i = 0; i < n; i++) await a.keyboard.press("ArrowRight");
+    await a.keyboard.press("Enter");
+  };
+  await add(a, "ess", "Milk eggs");
+  await add(a, "ess", "Bread");
+  await blur(a);
+
+  await splitAt("Milk eggs", 5);
+  assert.deepEqual(await now(), ["Milk", "eggs", "Bread"]);
+  await a.keyboard.press("Backspace");
+  assert.deepEqual(await now(), ["Milk eggs", "Bread"], "right after a split, Backspace undoes it");
+  assert.deepEqual(await editing(a), { editing: true, text: "Milk eggs", at: 5 }, "the cursor is where the parts meet");
+  await blur(a);
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk eggs,Bread"));
+
+  await splitAt("Bread", 3);
+  assert.deepEqual(await now(), ["Milk eggs", "Bre", "ad"]);
+  await a.evaluate(() => document.activeElement.dispatchEvent(new InputEvent("beforeinput", { inputType: "deleteContentBackward", bubbles: true, cancelable: true })));
+  assert.deepEqual(await now(), ["Milk eggs", "Bread"], "a word split in the middle joins without a space, also from a phone keyboard");
+  await blur(a);
+
+  await item(a, "Bread").locator(".text").click();
+  await clearText(a);
+  await a.keyboard.press("Backspace");
+  assert.deepEqual(await now(), ["Milk eggs"], "Backspace in an emptied item deletes it");
+  assert.deepEqual(await editing(a), { editing: true, text: "Milk eggs", at: 9 }, "and moves to the end of the one above");
+  await a.keyboard.press("Home");
+  await a.keyboard.press("Backspace");
+  assert.deepEqual(await now(), ["Milk eggs"], "the first item has nothing to join");
+  assert.equal((await editing(a)).editing, true);
+  await blur(a);
+
+  await a.click("#undo");
+  assert.deepEqual(await now(), ["Milk eggs", "Bread"], "undo brings the deleted item back");
+  await t.close();
+});

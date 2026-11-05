@@ -324,8 +324,8 @@ function caretAt(span, x, y) {
   } catch (_) {}
   return null;
 }
-// The text before and after the cursor, when both have something in them.
-function splitParts(span, max) {
+// The text before and after the cursor (or the selection) in a span being edited.
+function aroundCursor(span) {
   const sel = getSelection();
   if (!sel.rangeCount) return null;
   const r = sel.getRangeAt(0);
@@ -335,14 +335,14 @@ function splitParts(span, max) {
   head.setEnd(r.startContainer, r.startOffset);
   tail.selectNodeContents(span);
   tail.setStart(r.endContainer, r.endOffset);
-  const a = clean(head.toString(), max), b = clean(tail.toString(), max);
-  return a && b ? [a, b] : null;
+  return { head: head.toString(), tail: tail.toString(), collapsed: r.collapsed };
 }
 // editInPlace turns a text span into an editable field until Enter, Escape or leaving
-// it. With onDelete, a bin appears at the end of the row while editing. With onSplit,
-// Enter in the middle of the text splits it there; with onEmpty, leaving the text empty
-// calls it instead of restoring the old text.
-function editInPlace(span, { key, row, orig, max, x, y, start, onSave, onDelete, deleteLabel, onSplit, onEmpty }) {
+// it, with the cursor where you tapped, or at caret. With onDelete, a bin appears at the
+// end of the row while editing. With onSplit, Enter in the middle of the text splits it
+// there; with onJoin, Backspace at its very start joins it to what's above, when canJoin
+// allows; with onEmpty, leaving the text empty calls it instead of restoring the old text.
+function editInPlace(span, { key, row, orig, max, x, y, caret, onSave, onDelete, deleteLabel, onSplit, canJoin, onJoin, onEmpty }) {
   if (editingId || drag) return;
   editingId = key;
   span.contentEditable = PLAIN ? "plaintext-only" : "true";
@@ -352,7 +352,12 @@ function editInPlace(span, { key, row, orig, max, x, y, start, onSave, onDelete,
   span.focus();
   try {
     let r = at;
-    if (!r) { r = document.createRange(); r.selectNodeContents(span); r.collapse(!!start); }
+    if (!r) {
+      r = document.createRange();
+      const t = span.firstChild;
+      if (caret != null && t && t.nodeType === Node.TEXT_NODE) { r.setStart(t, Math.min(caret, t.length)); r.collapse(true); }
+      else { r.selectNodeContents(span); r.collapse(caret === 0); }
+    }
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
   } catch (_) {}
   let cancelled = false, binned = false, done = false;
@@ -364,16 +369,29 @@ function editInPlace(span, { key, row, orig, max, x, y, start, onSave, onDelete,
   row.classList.add("editing");
   if (bin) row.append(bin);
   const enter = () => {
-    const parts = onSplit && splitParts(span, max);
-    if (parts) finish(parts);
+    const c = onSplit && aroundCursor(span);
+    const a = c && clean(c.head, max), b = c && clean(c.tail, max);
+    // A split between words joins back with a space; one inside a word, without.
+    const glue = c && c.collapsed && !/\s$/.test(c.head) && !/^\s/.test(c.tail) ? "" : " ";
+    if (a && b) finish(() => onSplit(a, b, glue));
     else span.blur();
+  };
+  const back = e => {
+    const c = onJoin && aroundCursor(span);
+    if (!c || !c.collapsed || c.head !== "") return;
+    const text = clean(span.textContent, max);
+    if (!canJoin(text)) return;
+    e.preventDefault();
+    finish(() => onJoin(text));
   };
   const onKey = e => {
     if (e.key === "Enter") { e.preventDefault(); enter(); }
+    else if (e.key === "Backspace") back(e);
     else if (e.key === "Escape") { e.preventDefault(); cancelled = true; span.blur(); }
   };
   const onBefore = e => {
     if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") { e.preventDefault(); enter(); return; }
+    if (e.inputType === "deleteContentBackward") { back(e); return; } // phone keyboards may only send this
     // Keep to the length limit while typing or pasting.
     const room = max - span.textContent.length + (getSelection().toString().length || 0);
     if (e.data && e.data.length > room) e.preventDefault();
@@ -390,7 +408,7 @@ function editInPlace(span, { key, row, orig, max, x, y, start, onSave, onDelete,
     finish();
   };
   const onBinBlur = e => { if (e.relatedTarget !== span) finish(); };
-  function finish(split) {
+  function finish(then) {
     if (done) return;
     done = true;
     span.removeEventListener("keydown", onKey);
@@ -403,8 +421,8 @@ function editInPlace(span, { key, row, orig, max, x, y, start, onSave, onDelete,
     span.setAttribute("role", "button");
     row.classList.remove("editing");
     editingId = null;
+    if (then) return then();
     const text = clean(span.textContent, max);
-    if (split) return onSplit(...split);
     if (!text && !cancelled && !away && onEmpty) return onEmpty();
     if (cancelled || !text || text === orig) {
       span.textContent = orig;
@@ -420,13 +438,15 @@ function editInPlace(span, { key, row, orig, max, x, y, start, onSave, onDelete,
   if (bin) bin.addEventListener("blur", onBinBlur);
 }
 
-function editItem(span, id, x, y, start = false) {
+function editItem(span, id, x, y, caret) {
   const orig = find(id).text;
   const row = span.closest(".item");
   editInPlace(span, {
-    key: id, row, orig, max: MAX_ITEM, x, y, start,
+    key: id, row, orig, max: MAX_ITEM, x, y, caret,
     onDelete: () => del(id), deleteLabel: "Delete " + orig,
-    onSplit: (first, second) => splitItem(id, first, second),
+    onSplit: (first, second, glue) => splitItem(id, first, second, glue),
+    canJoin: text => !!joinTarget(id, text),
+    onJoin: text => joinItem(id, text),
     // Hidden at once but redrawn after the tap, so nothing moves under your finger.
     onEmpty: () => { row.style.visibility = "hidden"; del(id, { leaving: true }); },
     onSave: text => {
@@ -448,7 +468,8 @@ function editItem(span, id, x, y, start = false) {
 // Enter inside an item's text splits it in two: the first part stays, the second becomes
 // the next item, ready to edit. As when adding or renaming, a part that's already on the
 // list isn't added twice, and one bought before comes back.
-function splitItem(id, first, second) {
+let lastSplit = null; // so Backspace can join the two parts back exactly
+function splitItem(id, first, second, glue) {
   const it = find(id);
   const dupOf = text => items.find(i => i.id !== id && keyOf(i.text) === keyOf(text));
   const sib = shown(it.section), k = sib.indexOf(it);
@@ -456,8 +477,8 @@ function splitItem(id, first, second) {
   const ops = [];
   let next = null; // the item to carry on editing
   let msg = "Split into " + first + " and " + second;
-  const d1 = dupOf(first);
-  if (d1 && onScreen(d1)) { ops.push([id, "deleted", true]); flashId = d1.id; }
+  const d1 = dupOf(first), kept = !(d1 && onScreen(d1));
+  if (!kept) { ops.push([id, "deleted", true]); flashId = d1.id; }
   else { ops.push([id, "text", first]); if (d1) ops.push([d1.id, "deleted", true]); }
   const here = nid => [[nid, "section", it.section], [nid, "pos", pos], [nid, "checked", it.checked], [nid, "checkedAt", it.checkedAt]];
   const d2 = dupOf(second);
@@ -467,13 +488,33 @@ function splitItem(id, first, second) {
   else {
     next = store.newId();
     ops.push([next, "text", second], ...here(next), [next, "deleted", false]);
+    if (kept) lastSplit = { a: id, b: next, glue };
   }
   if (next && settling.has(id)) settling.add(next);
   announce(msg);
   // Nothing to save when the second part was already on the list: just redraw.
   if (!act("splitting " + q(it.text), ops, { animate: false })) paint(activeFk(), false);
   const span = next && document.getElementById("txt-" + next);
-  if (span) editItem(span, next, null, null, true);
+  if (span) editItem(span, next, null, null, 0);
+}
+
+// Backspace at the very start of an item joins it onto the item above, the reverse of
+// Enter; an empty item is simply deleted. The cursor lands where the two meet.
+function joinTarget(id, text) {
+  const it = find(id), sib = shown(it.section), k = sib.indexOf(it);
+  const prev = k > 0 ? sib[k - 1] : null;
+  return prev && prev.text.length + 1 + text.length <= MAX_ITEM ? prev : null;
+}
+function joinItem(id, text) {
+  const it = find(id), prev = joinTarget(id, text);
+  const glue = !text ? "" : lastSplit && lastSplit.a === prev.id && lastSplit.b === id ? lastSplit.glue : " ";
+  lastSplit = null;
+  const joined = prev.text + glue + text;
+  announce(text ? "Joined into " + joined : "Deleted " + it.text);
+  act(text ? "joining " + q(prev.text) + " and " + q(text) : "deleting " + q(it.text),
+    [[prev.id, "text", joined], [id, "deleted", true]], { animate: false });
+  const span = document.getElementById("txt-" + prev.id);
+  if (span) editItem(span, prev.id, null, null, prev.text.length + glue.length);
 }
 
 function editSection(span, id, x, y) {

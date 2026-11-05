@@ -47,6 +47,7 @@ Each section is a card with its name at the top. A list starts with three:
 
 - Tap the words to edit them in place; the cursor lands where you tapped. Enter saves, Escape cancels.
 - Enter in the middle of the text splits the item in two: the first part stays, the second becomes the next item, with the cursor at its start. One undo joins them again.
+- Backspace at the very start of an item joins it onto the item above, the reverse of Enter; straight after a split, the two parts join back exactly. In an emptied item, Backspace deletes it and moves to the end of the item above.
 - Clearing the text and leaving deletes the item. An emptied section name goes back to the old one.
 - While editing, a bin appears at the right of the row. Tapping it deletes the item.
 - Renaming to the name of another item on screen cancels and highlights that item. Renaming to an older, hidden item merges the two.
@@ -110,7 +111,7 @@ BASE=http://127.0.0.1:8080 SETUP=<code> STORE=./data node --test test/browser.te
 
 In order. Each batch is built, tested on both servers, deployed, and tried on the phones before the next.
 
-Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*; splitting an item with Enter, deleting it by clearing its text, removing suggestions; a tap that leaves a field always lands, on touch screens too.
+Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*; splitting an item with Enter and joining it back with Backspace, deleting it by clearing its text, removing suggestions; a tap that leaves a field always lands, on touch screens too.
 
 ### 1. Fixes
 
