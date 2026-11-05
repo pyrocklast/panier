@@ -127,10 +127,14 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* Suggestions */
 .sug { list-style: none; margin: 0; padding: 4px 0; box-shadow: inset 0 1px 0 var(--line); }
 .items:empty + .sug { box-shadow: none; }
-.sugopt { display: flex; align-items: center; min-height: 46px; padding-right: 16px; color: var(--muted); cursor: pointer; }
-.sugopt > svg { width: 54px; flex: none; }
-.sugopt[aria-selected="true"] { background: var(--press); }
-@media (hover: hover) { .sugopt:hover, .ib:hover { background: var(--press); } .bin:hover { color: var(--danger); } }
+.sugopt { display: flex; min-height: 46px; color: var(--muted); }
+.sugopt.active { background: var(--press); }
+.sug-pick { flex: 1; min-width: 0; display: flex; align-items: center; padding-block: 6px; cursor: pointer; }
+.sug-pick > svg { width: 54px; flex: none; }
+.sug-x-cell { display: flex; flex: none; }
+.sug-x { width: 48px; padding: 0; border: 0; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.sug-x-cell[aria-selected="true"] .sug-x { color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); border-radius: 10px; }
+@media (hover: hover) { .sugopt:hover, .ib:hover { background: var(--press); } .bin:hover, .sug-x:hover { color: var(--danger); } }
 .sugopt .t { color: var(--ink); overflow-wrap: anywhere; }
 .sugopt mark { background: none; color: inherit; font-weight: 700; }
 
@@ -199,6 +203,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .add-sec { display: flex; align-items: center; min-height: 48px; padding-right: 16px; border-radius: var(--r); color: var(--muted); }
 .add-sec:focus-within { background: var(--surface); box-shadow: var(--shadow); color: var(--ink); }
 .add-sec .add-plus { color: var(--muted); }
+#add-sec { font-size: 1rem; font-weight: 700; } /* typed like a section name */
+#add-sec::placeholder { font-weight: 400; }
 :root.dragging, :root.dragging * { cursor: grabbing !important; }
 .item.flash { animation: flash 1.4s ease-out; }
 @keyframes flash { 0%, 35% { background-color: color-mix(in oklab, var(--sec) 20%, var(--surface)); } 100% { background-color: var(--surface); } }

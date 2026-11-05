@@ -71,7 +71,7 @@ Keep it for the next step. The first visit can take a minute while the certifica
 
 ## 5. The phones
 
-1. On your phone, open the setup link. Panier creates the list and shows **Add a phone**.
+1. On your phone, open the setup link. Panier creates the list and shows **Add someone to this list**.
 2. On the other phone, scan the QR code with the camera, or send the link through a private messenger.
 3. Install the app on each phone: in Firefox, **⋮ → Install** (or **Add to home screen**); in Chrome, **⋮ → Install app**; on an iPhone, Safari's **Share → Add to Home Screen**.
 4. Save the pairing link in your password manager. It is the key to the list: with it you can recover the list on a new phone; without it, nobody can, not even you.

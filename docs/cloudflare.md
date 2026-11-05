@@ -41,7 +41,7 @@ The deploy log hides your address, because a public repository's logs are public
 
 ## 4. The phones
 
-1. On your phone, open `https://panier.<subdomain>.workers.dev/#setup=<your setup code>`. Panier creates the list and shows **Add a phone**.
+1. On your phone, open `https://panier.<subdomain>.workers.dev/#setup=<your setup code>`. Panier creates the list and shows **Add someone to this list**.
 2. On the other phone, scan the QR code with the camera, or send the link through a private messenger.
 3. Install the app on each phone: in Firefox, **⋮ → Install** (or **Add to home screen**); in Chrome, **⋮ → Install app**; on an iPhone, Safari's **Share → Add to Home Screen**.
 4. Save the pairing link in your password manager. It is the key to the list: with it you can recover the list on a new phone; without it, nobody can, not even you.

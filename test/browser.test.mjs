@@ -4,7 +4,8 @@
 //   BASE=http://127.0.0.1:8080 SETUP=ABCD-EFGH-JKMN STORE=./data node --test test/browser.test.mjs
 //
 // STORE, optional, is the server's data directory; the tests then check that no item
-// name was ever written to it. Needs Playwright with Chromium.
+// name was ever written to it. BROWSER picks Playwright's chromium (the default) or
+// firefox.
 
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -13,14 +14,15 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
-const { chromium } = require("playwright");
+const ENGINE = process.env.BROWSER || "chromium";
+const engine = require("playwright")[ENGINE];
 
 const BASE = process.env.BASE || "http://127.0.0.1:8080";
 const SETUP = process.env.SETUP;
 if (!SETUP) throw new Error("set SETUP to the server's setup code");
 
 let browser;
-before(async () => { browser = await chromium.launch(); });
+before(async () => { browser = await engine.launch(); });
 after(async () => { await browser.close(); });
 
 /* ---------- Helpers ---------- */
@@ -49,9 +51,9 @@ function watch(page, errors) {
 }
 
 // Two phones sharing a new list: A creates it, B joins with the pairing link.
-async function pair() {
+async function pair(options) {
   const errors = [];
-  const A = await phone(errors), B = await phone(errors);
+  const A = await phone(errors, options), B = await phone(errors, options);
   await A.page.goto(BASE + "/#setup=" + SETUP.toLowerCase());
   await A.page.locator("#pair").waitFor();
   await A.page.click("#pair-close");
@@ -207,6 +209,8 @@ test("sections can be renamed, added, and deleted once empty", async () => {
   assert.ok(await eventually(async () => (await names(a))[0] === "Essentials" && (await names(b))[0] === "Essentials"), "undo restores the default name");
 
   await a.fill("#add-sec", "Fruit & Veg");
+  const type = sel => a.evaluate(s => { const c = getComputedStyle(document.querySelector(s)); return c.fontSize + " " + c.fontWeight; }, sel);
+  assert.equal(await type("#add-sec"), await type(".sec-name"), "a new section's name is typed like one");
   await a.press("#add-sec", "Enter");
   assert.equal(await a.evaluate(() => document.activeElement.getAttribute("aria-label")), "Add item to Fruit & Veg", "the cursor moves to the new section at once");
   await a.keyboard.type("Apples");
@@ -363,5 +367,146 @@ test("text left in the field when the app closes is added next time", async () =
   assert.deepEqual(await texts(a, "Long term"), ["Coffee filters"]);
   await online(A, a);
   assert.ok(await eventually(async () => (await texts(b, "Long term")).join() === "Coffee filters", 10000));
+  await t.close();
+});
+
+const clearText = async pg => { await pg.keyboard.press("Control+A"); await pg.keyboard.press("Backspace"); };
+const editing = pg => pg.evaluate(() => {
+  const el = document.activeElement, sel = getSelection();
+  return { editing: el.isContentEditable, text: el.textContent, at: sel.focusOffset };
+});
+
+test("clearing an item's text deletes it, and the tap that left it still works", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  for (const x of ["Milk", "Eggs", "Bread"]) await add(a, "ess", x);
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).length === 3));
+
+  await item(a, "Milk").locator(".text").click();
+  await clearText(a);
+  await a.keyboard.press("Enter");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Eggs,Bread"), "an emptied item is deleted");
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Eggs,Bread"), "the delete reaches the other phone");
+  await a.click("#undo");
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk", "Eggs", "Bread"], "undo brings it back");
+
+  await item(a, "Milk").locator(".text").click();
+  await clearText(a);
+  await a.evaluate(() => { document.hasFocus = () => false; document.activeElement.blur(); delete document.hasFocus; });
+  await sleep(200);
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk", "Eggs", "Bread"], "switching apps with the text cleared keeps the item");
+
+  await item(a, "Eggs").locator(".text").click();
+  await clearText(a);
+  await item(a, "Bread").locator(".boxcell").click();
+  await sleep(300);
+  assert.ok(await item(a, "Bread").locator(".chk").isChecked(), "the tap that left it still ticks Bread");
+  await sleep(1900);
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk"]);
+  assert.deepEqual(await ticked(a), ["Bread"]);
+
+  await add(a, "ess", "Butter");
+  await item(a, "Milk").locator(".text").click();
+  await clearText(a);
+  await item(a, "Butter").locator(".text").click();
+  assert.equal((await editing(a)).text, "Butter", "the tap that left it starts editing Butter");
+  await a.keyboard.press("End");
+  await a.keyboard.type(" (salted)");
+  await a.keyboard.press("Enter");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Butter (salted)"), "Milk goes once the edit ends");
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Butter (salted)"));
+  await t.close();
+});
+
+test("Enter in the middle of an item splits it in two", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await add(a, "ess", "Milk eggs");
+  await add(a, "ess", "Bread");
+  await item(a, "Milk eggs").locator(".text").click();
+  await a.keyboard.press("Home");
+  for (let i = 0; i < 5; i++) await a.keyboard.press("ArrowRight");
+  await a.keyboard.press("Enter");
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk", "eggs", "Bread"]);
+  assert.deepEqual(await editing(a), { editing: true, text: "eggs", at: 0 }, "the cursor is at the start of the second part");
+  await a.keyboard.type("Free-range ");
+  await blur(a);
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Free-range eggs,Bread"));
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk,Free-range eggs,Bread"), "both parts reach the other phone");
+
+  await a.click("#undo"); // the edit after splitting
+  await a.click("#undo"); // the split
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk eggs", "Bread"], "one undo joins the parts again");
+
+  await item(a, "Bread").locator(".text").click();
+  await a.keyboard.press("End");
+  await a.keyboard.press("Enter");
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk eggs", "Bread"], "Enter at the end only finishes editing");
+  assert.equal((await editing(a)).editing, false);
+
+  await item(a, "Milk eggs").locator(".text").click();
+  await a.keyboard.press("End");
+  await a.keyboard.type(" bread");
+  for (let i = 0; i < 5; i++) await a.keyboard.press("ArrowLeft");
+  await a.keyboard.press("Enter");
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk eggs", "Bread"], "a part already on the list isn't added twice");
+  await t.close();
+});
+
+test("a × on a suggestion removes that item for good", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  for (const x of ["Mlik", "Milk", "Mild cheese"]) {
+    await add(a, "ess", x);
+    await item(a, x).locator(".boxcell").click();
+  }
+  await sleep(1900);
+  assert.ok(await eventually(async () => (await ticked(b)).length === 3));
+
+  await a.fill("#add-ess", "mli");
+  assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Mlik"]);
+  await a.locator("#sug-ess .sug-x").first().click();
+  assert.equal(await a.locator("#sug-ess").isHidden(), true, "the suggestion goes");
+  assert.equal(await a.evaluate(() => document.activeElement.id), "add-ess", "the cursor stays in the field");
+  assert.equal(await a.inputValue("#add-ess"), "mli");
+  assert.deepEqual(await ticked(a), ["Mild cheese", "Milk"]);
+  assert.ok(await eventually(async () => (await ticked(b)).join() === "Mild cheese,Milk"), "it goes on the other phone too");
+
+  await a.fill("#add-ess", "mil");
+  assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Mild cheese", "Milk"]);
+  await a.keyboard.press("ArrowDown");
+  await a.keyboard.press("ArrowRight");
+  assert.equal(await a.getAttribute("#add-ess", "aria-activedescendant"), "sug-ess-0-x");
+  await a.keyboard.press("Enter");
+  assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Milk"], "the keyboard can remove one too");
+
+  await a.fill("#add-ess", "");
+  await blur(a);
+  await a.click("#undo");
+  assert.deepEqual(await ticked(a), ["Mild cheese", "Milk"], "undo brings it back");
+  await t.close();
+});
+
+// With a finger, a field is left only once it lifts, just before the tap itself.
+test("on a touch screen, the tap that leaves an item still lands", async () => {
+  const t = await pair(ENGINE === "firefox" ? { hasTouch: true } : { hasTouch: true, isMobile: true });
+  const { a, b } = t;
+  for (const x of ["Milk", "Eggs", "Bread", "Tea"]) await add(a, "ess", x);
+  await blur(a);
+
+  await item(a, "Eggs").locator(".text").tap();
+  await clearText(a);
+  await item(a, "Bread").locator(".boxcell").tap();
+  await sleep(300);
+  assert.ok(await item(a, "Bread").locator(".chk").isChecked(), "after clearing an item, the tap ticks Bread");
+  assert.equal(await item(a, "Eggs").count(), 0);
+
+  await item(a, "Milk").locator(".text").tap();
+  await a.keyboard.press("End");
+  await a.keyboard.type(" (oat)");
+  await item(a, "Tea").locator(".text").tap();
+  assert.equal((await editing(a)).text, "Tea", "after renaming an item, the tap edits Tea");
+  await a.keyboard.press("Escape");
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).includes("Milk (oat)")));
   await t.close();
 });

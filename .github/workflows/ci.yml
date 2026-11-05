@@ -30,10 +30,10 @@ jobs:
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race ./...
-      - name: Install Playwright and Chromium for the browser tests
+      - name: Install Playwright, Chromium and Firefox for the browser tests
         run: |
           npm install --no-save --no-audit --no-fund "$PLAYWRIGHT"
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium firefox
       - name: Start the Go server
         run: |
           go build -o panier .
@@ -53,6 +53,8 @@ jobs:
         run: |
           BASE=http://127.0.0.1:8080 SETUP="$GO_SETUP" STORE="$RUNNER_TEMP/data" node --test test/browser.test.mjs
           BASE=http://127.0.0.1:8787 SETUP=TEST-CODE-1234 STORE="$RUNNER_TEMP/worker" node --test test/browser.test.mjs
+      - name: Browser tests in Firefox
+        run: BROWSER=firefox BASE=http://127.0.0.1:8080 SETUP="$GO_SETUP" STORE="$RUNNER_TEMP/data" node --test test/browser.test.mjs
       - name: Update test, with two builds of the Go server
         run: |
           cp web/sw.js "$RUNNER_TEMP/sw.js"

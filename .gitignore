@@ -2,3 +2,4 @@
 /dist/
 /panier
 /node_modules/
+/.wrangler/

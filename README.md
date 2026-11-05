@@ -17,7 +17,7 @@ Each section is a card with its name at the top. A list starts with three:
 | Long term | bookmark | things to get eventually |
 
 - Tap a section's name to rename it. Both phones see the new name.
-- *Add a section*, below the cards, adds one at the end with its own colour; the cursor moves to its *Add item* field.
+- *Add a section*, below the cards, adds one at the end with its own colour. Its name is typed like a section name, and the cursor then moves to its *Add item* field.
 - While you rename a section that has nothing left to get, a bin appears to delete it. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 - Tick boxes take their section's colour.
 
@@ -32,6 +32,7 @@ Each section is a card with its name at the top. A list starts with three:
 
 - From three letters, items bought before are suggested above the field, so the phone keyboard never hides them.
 - Matching ignores accents and case. Matches at the start of the name come first, then the start of a word, then the most recently bought. Five at most.
+- A × at the end of each suggestion removes that item for good, for typos such as *Mlik*. Undo brings it back.
 
 ### Ticking
 
@@ -44,7 +45,9 @@ Each section is a card with its name at the top. A list starts with three:
 
 ### Editing and deleting
 
-- Tap the words to edit them in place; the cursor lands where you tapped. Enter saves, Escape cancels, an empty name restores the old one.
+- Tap the words to edit them in place; the cursor lands where you tapped. Enter saves, Escape cancels.
+- Enter in the middle of the text splits the item in two: the first part stays, the second becomes the next item, with the cursor at its start. One undo joins them again.
+- Clearing the text and leaving deletes the item. An emptied section name goes back to the old one.
 - While editing, a bin appears at the right of the row. Tapping it deletes the item.
 - Renaming to the name of another item on screen cancels and highlights that item. Renaming to an older, hidden item merges the two.
 
@@ -61,12 +64,13 @@ Each section is a card with its name at the top. A list starts with three:
 
 ### Pairing and sync
 
-- The first phone starts the list with the server's setup code. *Add a phone*, at the bottom of the list, shows a QR code and a link for the second phone.
+- The first phone starts the list with the server's setup code. *Add someone to this list*, at the bottom of the list, shows a QR code and a link for the second phone.
 - Changes appear on the other phone within a second. Without signal, the app keeps working and shows *Offline* with the number of changes waiting; they are sent when the connection returns.
 
 ### Keyboard and accessibility
 
 - Space ticks, Enter or F2 edits an item or a section name, Delete deletes, Alt+↑/↓ moves an item (across sections at the ends), Ctrl+Z and Ctrl+Shift+Z undo and redo.
+- In suggestions, ↓ and ↑ choose one, → moves to its ×, and Enter picks; Shift+Delete removes the one chosen.
 - Changes are announced to screen readers. Light and dark themes follow the system; reduced motion is respected.
 
 ## How it works
@@ -106,16 +110,9 @@ BASE=http://127.0.0.1:8080 SETUP=<code> STORE=./data node --test test/browser.te
 
 In order. Each batch is built, tested on both servers, deployed, and tried on the phones before the next.
 
-Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*.
+Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*; splitting an item with Enter, deleting it by clearing its text, removing suggestions; a tap that leaves a field always lands, on touch screens too.
 
 ### 1. Fixes
-
-**Typing and editing**
-
-- Clearing an item's text and leaving it deletes the item, instead of restoring the old text.
-- Enter in the middle of an item's text splits it in two, with the cursor at the start of the second.
-- The *Add a section* field uses the same type as section names.
-- A small × on each suggestion removes that item from the suggestions for good, for typos such as *Mlik*.
 
 **Dragging**
 

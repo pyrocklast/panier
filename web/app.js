@@ -30,7 +30,7 @@ let sectionInfo = new Map(); // every section ever seen, for names and colours
 const settling = new Set();
 let settleTimer = null, flashId = null, drag = null, editingId = null, renderPending = false;
 let suppressClick = false, lifted = false;
-const ui = { sugSec: null, sug: [], sugIndex: -1, basketOpen: true };
+const ui = { sugSec: null, sug: [], sugIndex: -1, sugCol: 0, basketOpen: true };
 try { ui.basketOpen = localStorage.getItem("panier-basket-open") !== "0"; } catch (_) {}
 
 /* ---------- DOM helpers ---------- */
@@ -62,6 +62,7 @@ const ICONS = {
   bookmark: SVG(18, '<path d="M6 3.5h8v13l-4-3.2-4 3.2z" ' + STROKE + ' stroke-width="1.7"/>'),
   bin: SVG(19, '<path d="M4 6h12M8 6V4.5h4V6M5.8 6l.8 10h6.8l.8-10M8.6 9v4.5M11.4 9v4.5" ' + STROKE + ' stroke-width="1.6"/>'),
   back: SVG(16, '<path d="M7.5 4.4L3.1 8.75l4.4 4.35M3.75 8.75h8.75a4.4 4.4 0 0 1 0 8.75H10" ' + STROKE + ' stroke-width="2.1"/>'),
+  cross: SVG(16, '<path d="M5.5 5.5l9 9M14.5 5.5l-9 9" ' + STROKE + ' stroke-width="1.8"/>'),
 };
 function icon(name) {
   const t = document.createElement("template");
@@ -112,26 +113,36 @@ function computeSections() {
 /* ---------- Changes ---------- */
 
 // Browsers send every tap to the page itself while an animation plays, so animations
-// only follow your own actions, never the other phone's. A change made in the middle of
-// a tap (leaving a field by tapping elsewhere) redraws once the tap is over, so the
-// thing you tapped is still there to receive it.
-let pointerIsDown = false, afterTap = null;
+// only follow your own actions, never the other phone's. A change made while leaving a
+// field by tapping elsewhere redraws once that tap has landed, so the thing you tapped is
+// still there to receive it. With a mouse, the field is left as the button goes down;
+// with a finger, only after it lifts, just before the tap itself.
+let pointerIsDown = false, afterTap = [];
 addEventListener("pointerdown", () => { pointerIsDown = true; }, true);
 const tapEnded = () => {
   pointerIsDown = false;
-  if (afterTap) { const f = afterTap; afterTap = null; setTimeout(f, 0); }
+  const fns = afterTap;
+  afterTap = [];
+  for (const f of fns) setTimeout(f, 0);
 };
 addEventListener("pointerup", tapEnded, true);
 addEventListener("pointercancel", tapEnded, true);
-const whenTapEnds = fn => { if (pointerIsDown) afterTap = fn; else fn(); };
+const whenTapEnds = fn => { if (pointerIsDown) afterTap.push(fn); else setTimeout(fn, 0); };
 
 // act records one undoable step and redraws.
 function act(label, ops, opts = {}) {
   const fk = opts.focusKey || activeFk();
-  if (!store.change(label, ops)) return;
+  if (!store.change(label, ops)) return false;
   items = store.items();
-  if (opts.leaving) whenTapEnds(() => paint(null, false));
+  if (opts.leaving) whenTapEnds(leftPaint);
   else paint(fk, opts.animate, !!opts.focusKey);
+  return true;
+}
+// The redraw after leaving a field waits for anything that tap started, such as editing
+// another item, so the item being edited isn't redrawn under the cursor.
+function leftPaint() {
+  if (editingId || drag) renderPending = true;
+  else paint(null, false);
 }
 // paint redraws, keeping the cursor where it was: on the redrawn copy of the focused
 // element, or on fk when the action asked to move it. If you've moved the cursor
@@ -227,7 +238,7 @@ function revive(id, sec, opts = {}) {
 function submitAdd(sec, leaving = false) {
   const opts = leaving ? { leaving: true } : {};
   const pick = !leaving && ui.sugSec === sec && ui.sugIndex >= 0 && ui.sug[ui.sugIndex];
-  if (pick) return revive(pick.id, sec);
+  if (pick) return ui.sugCol ? forget(pick.id, sec, true) : revive(pick.id, sec);
   const text = clean(shells[sec].input.value);
   if (!text) { clearAdd(sec); return; }
   const ex = items.find(i => keyOf(i.text) === keyOf(text));
@@ -236,7 +247,7 @@ function submitAdd(sec, leaving = false) {
   if (ex) {
     flashId = ex.id;
     announce(ex.text + " is already on the list");
-    if (leaving) whenTapEnds(() => paint(null, false));
+    if (leaving) whenTapEnds(leftPaint);
     else paint(null, false);
     return;
   }
@@ -246,11 +257,11 @@ function submitAdd(sec, leaving = false) {
   act("adding " + q(text), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1],
     [id, "checked", false], [id, "checkedAt", 0], [id, "deleted", false]], opts);
 }
-function del(id) {
+function del(id, opts) {
   const it = find(id);
   settling.delete(id);
   announce("Deleted " + it.text);
-  act("deleting " + q(it.text), [[id, "deleted", true]]);
+  act("deleting " + q(it.text), [[id, "deleted", true]], opts);
 }
 function nudge(id, dir) {
   const it = find(id);
@@ -284,7 +295,7 @@ function renameSection(id, name) {
   const info = sectionInfo.get(id);
   const fallback = (DEFAULTS.find(d => d.id === id) || {}).name;
   announce("Renamed section to " + name);
-  act("renaming section " + q(info.name), [["#" + id, "name", name, fallback]], { animate: false });
+  act("renaming section " + q(info.name), [["#" + id, "name", name, fallback]], { leaving: true });
 }
 // A section can only be deleted once it has nothing to get, and the last one stays.
 const canDelete = id => sections.length > 1 && !items.some(i => i.section === id && inList(i));
@@ -313,9 +324,25 @@ function caretAt(span, x, y) {
   } catch (_) {}
   return null;
 }
+// The text before and after the cursor, when both have something in them.
+function splitParts(span, max) {
+  const sel = getSelection();
+  if (!sel.rangeCount) return null;
+  const r = sel.getRangeAt(0);
+  if (!span.contains(r.startContainer) || !span.contains(r.endContainer)) return null;
+  const head = document.createRange(), tail = document.createRange();
+  head.selectNodeContents(span);
+  head.setEnd(r.startContainer, r.startOffset);
+  tail.selectNodeContents(span);
+  tail.setStart(r.endContainer, r.endOffset);
+  const a = clean(head.toString(), max), b = clean(tail.toString(), max);
+  return a && b ? [a, b] : null;
+}
 // editInPlace turns a text span into an editable field until Enter, Escape or leaving
-// it. With onDelete, a bin appears at the end of the row while editing.
-function editInPlace(span, { key, row, orig, max, x, y, onSave, onDelete, deleteLabel }) {
+// it. With onDelete, a bin appears at the end of the row while editing. With onSplit,
+// Enter in the middle of the text splits it there; with onEmpty, leaving the text empty
+// calls it instead of restoring the old text.
+function editInPlace(span, { key, row, orig, max, x, y, start, onSave, onDelete, deleteLabel, onSplit, onEmpty }) {
   if (editingId || drag) return;
   editingId = key;
   span.contentEditable = PLAIN ? "plaintext-only" : "true";
@@ -325,23 +352,28 @@ function editInPlace(span, { key, row, orig, max, x, y, onSave, onDelete, delete
   span.focus();
   try {
     let r = at;
-    if (!r) { r = document.createRange(); r.selectNodeContents(span); r.collapse(false); }
+    if (!r) { r = document.createRange(); r.selectNodeContents(span); r.collapse(!!start); }
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
   } catch (_) {}
-  let cancelled = false, done = false;
+  let cancelled = false, binned = false, done = false;
   const bin = onDelete && h("button", {
     type: "button", class: "bin", "aria-label": deleteLabel,
     onpointerdown: e => e.preventDefault(), onmousedown: e => e.preventDefault(),
-    onclick: () => { cancelled = true; finish(); onDelete(); },
+    onclick: () => { cancelled = binned = true; finish(); onDelete(); },
   }, icon("bin"));
   row.classList.add("editing");
   if (bin) row.append(bin);
+  const enter = () => {
+    const parts = onSplit && splitParts(span, max);
+    if (parts) finish(parts);
+    else span.blur();
+  };
   const onKey = e => {
-    if (e.key === "Enter") { e.preventDefault(); span.blur(); }
+    if (e.key === "Enter") { e.preventDefault(); enter(); }
     else if (e.key === "Escape") { e.preventDefault(); cancelled = true; span.blur(); }
   };
   const onBefore = e => {
-    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") { e.preventDefault(); span.blur(); return; }
+    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") { e.preventDefault(); enter(); return; }
     // Keep to the length limit while typing or pasting.
     const room = max - span.textContent.length + (getSelection().toString().length || 0);
     if (e.data && e.data.length > room) e.preventDefault();
@@ -351,9 +383,14 @@ function editInPlace(span, { key, row, orig, max, x, y, onSave, onDelete, delete
     e.preventDefault();
     document.execCommand("insertText", false, (e.clipboardData && e.clipboardData.getData("text/plain")) || "");
   };
-  const onSpanBlur = e => { if (!bin || e.relatedTarget !== bin) finish(); };
+  let away = false; // the whole app lost focus: a notification, another app
+  const onSpanBlur = e => {
+    if (bin && e.relatedTarget === bin) return;
+    away = !document.hasFocus();
+    finish();
+  };
   const onBinBlur = e => { if (e.relatedTarget !== span) finish(); };
-  function finish() {
+  function finish(split) {
     if (done) return;
     done = true;
     span.removeEventListener("keydown", onKey);
@@ -367,9 +404,11 @@ function editInPlace(span, { key, row, orig, max, x, y, onSave, onDelete, delete
     row.classList.remove("editing");
     editingId = null;
     const text = clean(span.textContent, max);
+    if (split) return onSplit(...split);
+    if (!text && !cancelled && !away && onEmpty) return onEmpty();
     if (cancelled || !text || text === orig) {
       span.textContent = orig;
-      if (renderPending && !cancelled) refreshFromStore();
+      if (renderPending && !binned) whenTapEnds(refreshFromStore);
       return;
     }
     if (onSave(text) === false) span.textContent = orig;
@@ -381,26 +420,60 @@ function editInPlace(span, { key, row, orig, max, x, y, onSave, onDelete, delete
   if (bin) bin.addEventListener("blur", onBinBlur);
 }
 
-function editItem(span, id, x, y) {
+function editItem(span, id, x, y, start = false) {
   const orig = find(id).text;
+  const row = span.closest(".item");
   editInPlace(span, {
-    key: id, row: span.closest(".item"), orig, max: MAX_ITEM, x, y,
+    key: id, row, orig, max: MAX_ITEM, x, y, start,
     onDelete: () => del(id), deleteLabel: "Delete " + orig,
+    onSplit: (first, second) => splitItem(id, first, second),
+    // Hidden at once but redrawn after the tap, so nothing moves under your finger.
+    onEmpty: () => { row.style.visibility = "hidden"; del(id, { leaving: true }); },
     onSave: text => {
       const dup = items.find(i => i.id !== id && keyOf(i.text) === keyOf(text));
       if (dup && onScreen(dup)) {
         flashId = dup.id;
         announce(dup.text + " is already on the list");
-        items = store.items();
-        paint(activeFk(), false);
+        whenTapEnds(leftPaint);
         return false;
       }
       const ops = [[id, "text", text]];
       if (dup) ops.push([dup.id, "deleted", true]);
       announce("Renamed to " + text);
-      act("renaming " + q(orig), ops, { animate: false });
+      act("renaming " + q(orig), ops, { leaving: true });
     },
   });
+}
+
+// Enter inside an item's text splits it in two: the first part stays, the second becomes
+// the next item, ready to edit. As when adding or renaming, a part that's already on the
+// list isn't added twice, and one bought before comes back.
+function splitItem(id, first, second) {
+  const it = find(id);
+  const dupOf = text => items.find(i => i.id !== id && keyOf(i.text) === keyOf(text));
+  const sib = shown(it.section), k = sib.indexOf(it);
+  const pos = between(it.pos, k >= 0 && sib[k + 1] ? sib[k + 1].pos : null);
+  const ops = [];
+  let next = null; // the item to carry on editing
+  let msg = "Split into " + first + " and " + second;
+  const d1 = dupOf(first);
+  if (d1 && onScreen(d1)) { ops.push([id, "deleted", true]); flashId = d1.id; }
+  else { ops.push([id, "text", first]); if (d1) ops.push([d1.id, "deleted", true]); }
+  const here = nid => [[nid, "section", it.section], [nid, "pos", pos], [nid, "checked", it.checked], [nid, "checkedAt", it.checkedAt]];
+  const d2 = dupOf(second);
+  if (keyOf(second) === keyOf(first)) { /* "milk milk": one is enough */ }
+  else if (d2 && inList(d2)) { flashId = d2.id; msg = d2.text + " is already on the list"; }
+  else if (d2) { ops.push(...here(d2.id)); next = d2.id; }
+  else {
+    next = store.newId();
+    ops.push([next, "text", second], ...here(next), [next, "deleted", false]);
+  }
+  if (next && settling.has(id)) settling.add(next);
+  announce(msg);
+  // Nothing to save when the second part was already on the list: just redraw.
+  if (!act("splitting " + q(it.text), ops, { animate: false })) paint(activeFk(), false);
+  const span = next && document.getElementById("txt-" + next);
+  if (span) editItem(span, next, null, null, true);
 }
 
 function editSection(span, id, x, y) {
@@ -438,17 +511,23 @@ function highlight(text, query) {
   frag.append(nfc.slice(0, at), h("mark", {}, nfc.slice(at, at + nq.length)), nfc.slice(at + nq.length));
   return frag;
 }
+// Each suggestion is a row of two cells: the item, which brings it back, and a × that
+// removes it for good. With the keyboard, arrows move between them and Enter picks.
+const sugCellId = (sec, i, col) => "sug-" + sec + "-" + i + (col ? "-x" : "");
 function paintSug(sec, list) {
   const sh = shells[sec], query = sh.input.value;
-  sh.sug.replaceChildren(...list.map((it, i) => h("li", {
-    role: "option", id: "sug-" + sec + "-" + i, class: "sugopt",
-    "aria-selected": String(ui.sugSec === sec && i === ui.sugIndex),
-    onpointerdown: e => e.preventDefault(),
-    onclick: () => revive(it.id, sec),
-  }, icon("back"), h("span", { class: "t" }, highlight(it.text, query)))));
+  const active = ui.sugSec === sec ? ui.sugIndex : -1;
+  const keep = e => e.preventDefault(); // the cursor stays in the field
+  sh.sug.replaceChildren(...list.map((it, i) => h("li", { role: "row", class: "sugopt" + (i === active ? " active" : ""), onpointerdown: keep, onmousedown: keep },
+    h("span", {
+      role: "gridcell", class: "sug-pick", id: sugCellId(sec, i, 0), "aria-selected": String(i === active && !ui.sugCol),
+      onclick: () => revive(it.id, sec),
+    }, icon("back"), h("span", { class: "t" }, highlight(it.text, query))),
+    h("span", { role: "gridcell", class: "sug-x-cell", id: sugCellId(sec, i, 1), "aria-selected": String(i === active && !!ui.sugCol) },
+      h("button", { type: "button", class: "sug-x", tabindex: "-1", "aria-label": "Remove " + it.text + " from suggestions", onclick: () => forget(it.id, sec) }, icon("cross"))))));
   sh.sug.hidden = !list.length;
   sh.input.setAttribute("aria-expanded", String(list.length > 0));
-  if (list.length && ui.sugIndex >= 0) sh.input.setAttribute("aria-activedescendant", "sug-" + sec + "-" + ui.sugIndex);
+  if (list.length && active >= 0) sh.input.setAttribute("aria-activedescendant", sugCellId(sec, active, ui.sugCol));
   else sh.input.removeAttribute("aria-activedescendant");
 }
 function updateSug(sec) {
@@ -457,11 +536,24 @@ function updateSug(sec) {
   ui.sugSec = list.length ? sec : null;
   ui.sug = list;
   ui.sugIndex = -1;
+  ui.sugCol = 0;
   paintSug(sec, list);
 }
 function closeSug() {
   if (ui.sugSec) paintSug(ui.sugSec, []);
-  ui.sugSec = null; ui.sug = []; ui.sugIndex = -1;
+  ui.sugSec = null; ui.sug = []; ui.sugIndex = -1; ui.sugCol = 0;
+}
+// The × on a suggestion deletes that item, so a typo such as "Mlik" stops coming back.
+function forget(id, sec, keyboard = false) {
+  const it = find(id), was = ui.sugIndex;
+  announce("Removed " + it.text + " from suggestions");
+  act("removing " + q(it.text) + " from suggestions", [[id, "deleted", true]], { animate: false });
+  updateSug(sec);
+  if (keyboard && ui.sug.length) {
+    ui.sugIndex = Math.min(was, ui.sug.length - 1);
+    ui.sugCol = 1;
+    paintSug(sec, ui.sug);
+  }
 }
 
 /* ---------- Section cards, kept between renders so a focused field keeps its keyboard ---------- */
@@ -472,12 +564,12 @@ function buildShell(id) {
   const input = h("input", {
     type: "text", class: "add-input", id: "add-" + id, placeholder: "Add item",
     maxlength: String(MAX_ITEM), enterkeyhint: "enter", autocomplete: "off", autocapitalize: "sentences", spellcheck: "false",
-    role: "combobox", "aria-autocomplete": "list", "aria-expanded": "false", "aria-controls": "sug-" + id,
+    role: "combobox", "aria-autocomplete": "list", "aria-haspopup": "grid", "aria-expanded": "false", "aria-controls": "sug-" + id,
     dataset: { fk: "add-" + id },
   });
   const form = h("form", { class: "add", autocomplete: "off", onsubmit: e => { e.preventDefault(); submitAdd(id); } },
     h("label", { class: "add-plus", for: "add-" + id, "aria-hidden": "true" }, icon("plus")), input);
-  const sug = h("ul", { class: "sug", id: "sug-" + id, role: "listbox", "aria-label": "Bought before", hidden: true });
+  const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": "Bought before", hidden: true });
   const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id } });
   name.addEventListener("click", e => { if (editingId !== "#" + id) editSection(name, id, e.clientX, e.clientY); });
   name.addEventListener("keydown", e => {
@@ -504,8 +596,14 @@ function buildShell(id) {
   input.addEventListener("keydown", e => {
     if (e.key === "Escape") { closeSug(); return; }
     if (ui.sugSec !== id || !ui.sug.length) return;
-    if (e.key === "ArrowDown") { e.preventDefault(); ui.sugIndex = (ui.sugIndex + 1) % ui.sug.length; paintSug(id, ui.sug); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); ui.sugIndex = ui.sugIndex <= 0 ? ui.sug.length - 1 : ui.sugIndex - 1; paintSug(id, ui.sug); }
+    const n = ui.sug.length, i = ui.sugIndex;
+    if (e.key === "ArrowDown") ui.sugIndex = (i + 1) % n;
+    else if (e.key === "ArrowUp") ui.sugIndex = i <= 0 ? n - 1 : i - 1;
+    else if (i >= 0 && (e.key === "ArrowRight" || e.key === "ArrowLeft")) ui.sugCol = e.key === "ArrowRight" ? 1 : 0;
+    else if (i >= 0 && e.key === "Delete" && e.shiftKey) { e.preventDefault(); forget(ui.sug[i].id, id, true); return; }
+    else return;
+    e.preventDefault();
+    paintSug(id, ui.sug);
   });
   const sh = { el, ul, input, form, sug, name, kind, icon: undefined };
   return sh;
