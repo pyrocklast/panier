@@ -112,11 +112,10 @@ function computeSections() {
 
 /* ---------- Changes ---------- */
 
-// Browsers send every tap to the page itself while an animation plays, so animations
-// only follow your own actions, never the other phone's. A change made while leaving a
-// field by tapping elsewhere redraws once that tap has landed, so the thing you tapped is
-// still there to receive it. With a mouse, the field is left as the button goes down;
-// with a finger, only after it lifts, just before the tap itself.
+// A change made while leaving a field by tapping elsewhere redraws once that tap has
+// landed, so the thing you tapped is still there to receive it. With a mouse, the field
+// is left as the button goes down; with a finger, only after it lifts, just before the
+// tap itself.
 let pointerIsDown = false, afterTap = [];
 addEventListener("pointerdown", () => { pointerIsDown = true; }, true);
 const tapEnded = () => {
@@ -147,26 +146,32 @@ function leftPaint() {
 // paint redraws, keeping the cursor where it was: on the redrawn copy of the focused
 // element, or on fk when the action asked to move it. If you've moved the cursor
 // yourself in the meantime, it stays where you put it.
-function paint(fk, animate, move = false) {
+// With animate, things glide from where they were (see Motion); snap is where they
+// were, when the caller has already taken it.
+function paint(fk, animate, move = false, snap = null) {
+  for (const a of [...flights]) a.finish(); // anything still gliding lands first
   const was = document.activeElement;
-  const run = () => {
-    render();
-    if (!fk) return;
+  if (animate !== false && !reduceMotion.matches && !drag) snap = snap || snapshot();
+  render();
+  if (fk) {
     const t = document.querySelector('[data-fk="' + fk + '"]');
     const now = document.activeElement;
     const untouched = now === was || !now || now === document.body;
     if (t && t !== now && untouched && (move || !was || !was.isConnected)) t.focus({ preventScroll: true });
-  };
-  if (animate !== false && document.startViewTransition && !reduceMotion.matches && !drag) {
-    document.startViewTransition(run).ready.catch(() => {}); // a newer change can cut an animation short
-  } else run();
+  }
+  if (snap) glide(snap);
 }
-// Changes from the other phone wait while you are editing or dragging.
-function refreshFromStore() {
-  if (editingId || drag) { renderPending = true; return; }
+// Takes in what the store holds now, including the other phone's changes.
+function sync() {
   renderPending = false;
   items = store.items();
   for (const id of [...settling]) { const it = find(id); if (!it || !it.checked) settling.delete(id); }
+}
+// Changes from the other phone wait while you are editing or dragging, and appear
+// without motion, so nothing slides away just as you reach for it.
+function refreshFromStore() {
+  if (editingId || drag) { renderPending = true; return; }
+  sync();
   paint(activeFk(), false);
 }
 function step(fn, verb) {
@@ -186,7 +191,7 @@ function scheduleSettle() {
   settleTimer = setTimeout(() => {
     if (editingId || drag) return scheduleSettle();
     settling.clear();
-    paint(activeFk(), false);
+    paint(activeFk());
   }, SETTLE_MS);
 }
 
@@ -670,7 +675,7 @@ function syncShells() {
 function itemEl(it) {
   const li = h("li", {
     class: "item" + (it.checked ? " done" : ""), "data-id": it.id,
-    style: "--sec:var(--" + colorOf(it.section) + ");view-transition-name:v" + it.id.replace(/[^A-Za-z0-9]/g, "_"),
+    style: "--sec:var(--" + colorOf(it.section) + ")",
   });
   const chk = h("input", { type: "checkbox", class: "chk", id: "chk-" + it.id, "aria-label": it.text, dataset: { fk: "chk-" + it.id } });
   chk.checked = it.checked;
@@ -707,7 +712,7 @@ function bindPress(li, id) {
     removeEventListener("pointerup", off);
     removeEventListener("pointercancel", off);
   };
-  const draggable = () => !!(li.parentElement && li.parentElement.dataset.sec);
+  const draggable = () => !!li.closest("#list .items, #basket-list");
   const lift = () => {
     clearTimeout(timer); timer = null;
     if (!p || p.lifted) return;
@@ -750,13 +755,16 @@ function startDrag(li, id, offY, y) {
   const ghost = li.cloneNode(true);
   ghost.classList.remove("lifted", "pressing", "flash", "hint");
   ghost.classList.add("ghost");
-  ghost.style.viewTransitionName = "none";
   ghost.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
   Object.assign(ghost.style, { left: r.left + "px", top: (y - offY) + "px", width: r.width + "px" });
   document.body.append(ghost);
   li.classList.add("placeholder");
+  // A ticked item can go back into a section; over the ticked group, it returns to its place there.
+  const ticked = li.parentElement.id === "basket-list";
   document.documentElement.classList.add("dragging");
-  drag = { id, li, ghost, offY, y, raf: 0, toTick: false };
+  document.documentElement.classList.toggle("drag-ticked", ticked);
+  const home = { ul: li.parentElement, next: li.nextElementSibling, sec: li.style.getPropertyValue("--sec") };
+  drag = { id, li, ghost, offY, y, raf: 0, toTick: null, ticked, home };
   addEventListener("pointermove", onDragMove);
   addEventListener("pointerup", endDrag);
   addEventListener("pointercancel", endDrag);
@@ -778,15 +786,25 @@ function dragTick() {
   if (dy) { window.scrollBy(0, dy); place(y); }
   drag.raf = requestAnimationFrame(dragTick);
 }
+function setSec(sec) {
+  drag.li.style.setProperty("--sec", sec);
+  drag.ghost.style.setProperty("--sec", sec);
+}
 function place(y) {
-  // Over the drop zone below the sections: the item will be ticked.
-  const toTick = y > $("#tick-drop").getBoundingClientRect().top - 12;
+  // Over the ticked group, from its heading down: the item will be ticked, or stay ticked.
+  const toTick = y > $("#basket").getBoundingClientRect().top - 8;
   if (toTick !== drag.toTick) {
+    if (toTick && drag.toTick === false) buzz(8);
     drag.toTick = toTick;
-    drag.li.classList.toggle("away", toTick);
-    drag.ghost.classList.toggle("to-tick", toTick);
-    $("#tick-drop").classList.toggle("over", toTick);
-    if (toTick) buzz(8);
+    drag.ghost.classList.toggle("done", toTick);
+    drag.ghost.querySelector(".chk").checked = toTick;
+    if (!drag.ticked) {
+      drag.li.classList.toggle("away", toTick); // its slot empties, nothing moves
+      $("#tick-drop").classList.toggle("over", toTick);
+    } else if (toTick) {
+      drag.home.ul.insertBefore(drag.li, drag.home.next);
+      setSec(drag.home.sec);
+    }
   }
   if (toTick) return;
   const secs = [...document.querySelectorAll("#list .sec")];
@@ -801,44 +819,111 @@ function place(y) {
   }
   if (drag.li.parentElement === ul && drag.li.nextElementSibling === before) return;
   ul.insertBefore(drag.li, before);
-  drag.li.style.setProperty("--sec", "var(--" + colorOf(ul.dataset.sec) + ")");
-  drag.ghost.style.setProperty("--sec", "var(--" + colorOf(ul.dataset.sec) + ")");
+  setSec("var(--" + colorOf(ul.dataset.sec) + ")");
 }
 function endDrag() {
   if (!drag) return;
-  const { li, ghost, id, toTick } = drag;
+  const { li, ghost, id, toTick, ticked } = drag;
   cancelAnimationFrame(drag.raf);
   removeEventListener("pointermove", onDragMove);
   removeEventListener("pointerup", endDrag);
   removeEventListener("pointercancel", endDrag);
-  ghost.remove();
-  document.documentElement.classList.remove("dragging");
+  // Taken before anything changes, with the ghost where it was let go: it glides into place from there.
+  const snap = reduceMotion.matches ? null : snapshot();
+  if (snap) snap.items.set(id, { li: ghost, rect: ghost.getBoundingClientRect(), part: null });
+  else ghost.remove();
+  document.documentElement.classList.remove("dragging", "drag-ticked");
   $("#tick-drop").classList.remove("over");
   drag = null;
   try { localStorage.setItem(HINT_KEY, "1"); } catch (_) {}
-  if (toTick) {
-    const it = find(id);
+  const it = find(id);
+  if (toTick && !ticked) {
+    settling.delete(id);
     buzz(12);
     announce(it.text + " ticked");
-    act("checking " + q(it.text), [[id, "checked", true], [id, "checkedAt", Date.now()]]);
-    return;
+    store.change("checking " + q(it.text), [[id, "checked", true], [id, "checkedAt", Date.now()]]);
+  } else if (!toTick) {
+    const ul = li.parentElement, sec = ul.dataset.sec;
+    const sibs = [...ul.children], i = sibs.indexOf(li);
+    const prev = sibs[i - 1] && find(sibs[i - 1].dataset.id);
+    const next = sibs[i + 1] && find(sibs[i + 1].dataset.id);
+    const ops = [[id, "section", sec], [id, "pos", between(prev && prev.pos, next && next.pos)]];
+    if (it.checked) { // dragged out of the ticked group, or just ticked: back on the list
+      settling.delete(id);
+      ops.push([id, "checked", false], [id, "checkedAt", 0]);
+      announce(it.text + " back on the list");
+    } else if (it.section !== sec) announce(it.text + " moved to " + nameOf(sec));
+    store.change((it.checked ? "unchecking " : "moving ") + q(it.text), ops);
   }
-  const ul = li.parentElement, sec = ul.dataset.sec;
-  const sibs = [...ul.children], i = sibs.indexOf(li);
-  const prev = sibs[i - 1] && find(sibs[i - 1].dataset.id);
-  const next = sibs[i + 1] && find(sibs[i + 1].dataset.id);
-  const it = find(id);
-  if (it.section !== sec) announce(it.text + " moved to " + nameOf(sec));
-  const fk = activeFk();
-  if (!store.change("moving " + q(it.text), [[id, "section", sec], [id, "pos", between(prev && prev.pos, next && next.pos)]])) {
-    // Dropped where it started: nothing to save, but the item must come back into view.
-    if (renderPending) refreshFromStore();
-    else paint(fk, false);
-    return;
-  }
-  items = store.items();
-  paint(fk, false);
+  // Also when nothing changed, such as an item dropped where it started: it comes back into view.
+  sync();
+  paint(activeFk(), !!snap, false, snap);
   scheduleSettle();
+}
+
+/* ---------- Motion ---------- */
+
+// After a change, things glide to their new places: each part of the page (a section
+// card, the ticked group) from where it was, each item within its part, and an item that
+// changes part, such as one being ticked, flies across. New items fade in, removed ones
+// fade out. Each element animates on its own, so taps keep working throughout, unlike
+// with the browser's page-wide transitions.
+const MOTION = { duration: 260, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" };
+const PARTS = "#list > .sec, #add-sec-form, .basket-head, #basket-list, .foot";
+const flights = new Set();
+function snapshot() {
+  for (const a of [...flights]) a.finish(); // one change at a time: the last lands at once
+  const parts = new Map([...document.querySelectorAll(PARTS)].map(p => [p, p.getBoundingClientRect()]));
+  const its = new Map();
+  for (const li of document.querySelectorAll("#list .item[data-id], #basket-list .item[data-id]")) {
+    its.set(li.dataset.id, { li, rect: li.getBoundingClientRect(), part: li.closest(PARTS) });
+  }
+  return { parts, items: its };
+}
+function glide(snap) {
+  const seen = r => r && r.height > 0;
+  // Measure everything before moving anything.
+  const parts = new Map([...document.querySelectorAll(PARTS)].map(p => [p, p.getBoundingClientRect()]));
+  const now = [...document.querySelectorAll("#list .item[data-id], #basket-list .item[data-id]")]
+    .map(li => ({ li, rect: li.getBoundingClientRect(), part: li.closest(PARTS) }));
+  const head = $(".basket-head").getBoundingClientRect();
+  const slides = [], flies = [], fades = [];
+  for (const [p, r] of parts) {
+    const was = snap.parts.get(p);
+    if (seen(was) && seen(r)) slides.push([p, was.top - r.top]);
+  }
+  const kept = new Set();
+  for (const n of now) {
+    const o = snap.items.get(n.li.dataset.id);
+    kept.add(n.li.dataset.id);
+    if (!o || !seen(o.rect)) { if (seen(n.rect)) fades.push(n.li); }
+    else if (!seen(n.rect)) flies.push([o, head, null]); // into the folded ticked group
+    else if (o.part === n.part) slides.push([n.li, (o.rect.top - snap.parts.get(o.part).top) - (n.rect.top - parts.get(n.part).top)]);
+    else flies.push([o, n.rect, n.li]);
+  }
+  for (const [id, o] of snap.items) if (!kept.has(id) && seen(o.rect)) flies.push([o, o.rect, null]); // deleted
+  for (const [el, dy] of slides) if (Math.abs(dy) > 0.5) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], MOTION);
+  for (const li of fades) li.animate([{ opacity: 0 }, { opacity: 1 }], MOTION);
+  for (const [o, to, target] of flies) fly(o, to, target);
+}
+// The item's old element (or the drag ghost) travels from its old place to the new one,
+// over everything; the real item shows when it lands. With no target, it fades away.
+function fly(o, to, target) {
+  const el = o.li;
+  if (!el.classList.contains("ghost")) {
+    el.classList.remove("placeholder", "away", "lifted", "pressing", "flash", "hint");
+    el.classList.add("flying");
+    el.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
+    el.setAttribute("aria-hidden", "true");
+    Object.assign(el.style, { left: o.rect.left + "px", top: o.rect.top + "px", width: o.rect.width + "px" });
+    document.body.append(el);
+  }
+  if (target) target.style.opacity = "0";
+  const move = `translate(${to.left - o.rect.left}px, ${to.top - o.rect.top}px)`;
+  const a = el.animate([{ transform: "none" }, target ? { transform: move } : { transform: move + " scale(0.9)", opacity: 0 }], MOTION);
+  flights.add(a);
+  const land = () => { flights.delete(a); el.remove(); if (target) target.style.opacity = ""; };
+  a.finished.then(land, land);
 }
 
 /* ---------- Render ---------- */
@@ -900,7 +985,7 @@ function render() {
   for (const s of sections) shells[s.id].ul.replaceChildren(...shown(s.id).map(itemEl));
   const since = Date.now() - TRIP_MS;
   const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= since).sort((a, b) => b.checkedAt - a.checkedAt);
-  $("#basket").hidden = basket.length === 0;
+  $("#basket").classList.toggle("empty", basket.length === 0);
   $("#basket-count").textContent = String(basket.length);
   $("#basket-toggle").setAttribute("aria-expanded", String(ui.basketOpen));
   const bl = $("#basket-list");

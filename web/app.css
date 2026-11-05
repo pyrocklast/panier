@@ -90,6 +90,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .grip { display: grid; place-items: center; color: var(--sec); opacity: 0; transition: opacity 0.15s; }
 .item.lifted .box, .item.hint .box, .ghost .box { opacity: 0; }
 .item.lifted .grip, .item.hint .grip, .ghost .grip { opacity: 1; }
+.ghost.done .box { opacity: 1; } /* over the ticked group: shown as it will be */
+.ghost.done .grip { opacity: 0; }
 .ghost .grip { transition: color 0.15s; }
 .chk { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
 .box {
@@ -140,7 +142,11 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 
 /* Basket */
 .basket { display: flex; flex-direction: column; gap: 8px; }
-.basket-head { margin: 0; view-transition-name: baskethead; }
+.basket.empty { display: none; }
+:root.dragging .basket.empty { display: flex; } /* its heading shows during a drag, to drop under */
+.basket.empty #basket-count, .basket.empty .chev { display: none; }
+.basket-head { margin: 0; }
+.basket-list:empty { display: none; }
 #basket-toggle {
   display: flex; align-items: center; gap: 8px; padding: 6px 4px; border: 0; background: none;
   color: var(--muted); font-size: 0.9375rem; font-weight: 700; cursor: pointer;
@@ -187,17 +193,20 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .item.placeholder > * { visibility: hidden; }
 .item.placeholder.away { background-color: var(--surface); } /* heading for the ticked items: its slot empties, nothing moves */
 
-/* Dropping an item here ticks it */
+/* Dropping an item here, under the ticked group's heading, ticks it: an empty ticked row */
 .drop {
-  display: none; align-items: center; min-height: 52px; box-sizing: border-box; color: var(--muted);
+  display: none; align-items: center; min-height: 52px; box-sizing: border-box; padding-left: 14.5px; --sec: var(--muted);
   border: 2px dashed var(--line); border-radius: var(--r); transition: background-color 0.15s, border-color 0.15s;
 }
-:root.dragging .drop { display: flex; }
-.drop .tickmark { margin-left: 16px; }
+:root.dragging:not(.drag-ticked) .drop { display: flex; }
 .drop.over { border-style: solid; border-color: var(--muted); background-color: color-mix(in oklab, var(--muted) 12%, var(--surface)); }
-.ghost.to-tick .box { opacity: 1; background: var(--muted); border-color: var(--muted); color: var(--surface); }
-.ghost.to-tick .grip { opacity: 0; }
-.ghost.to-tick .text { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.drop.over .box { background: var(--muted); color: var(--surface); }
+
+/* An item on its way to its new place */
+.flying {
+  position: fixed; z-index: 20; margin: 0; pointer-events: none; background-image: none !important;
+  border-radius: 12px; box-shadow: var(--float);
+}
 
 /* Adding a section */
 .add-sec { display: flex; align-items: center; min-height: 48px; padding-right: 16px; border-radius: var(--r); color: var(--muted); }
@@ -209,12 +218,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .item.flash { animation: flash 1.4s ease-out; }
 @keyframes flash { 0%, 35% { background-color: color-mix(in oklab, var(--sec) 20%, var(--surface)); } 100% { background-color: var(--surface); } }
 
-/* Motion */
-::view-transition-old(root) { display: none; }
-::view-transition-new(root) { animation: none; }
-::view-transition-group(*) { animation-duration: 0.22s; animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1); }
+/* Motion: items glide from app.js; this only turns the rest off when asked */
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*) { animation: none; }
   .item.flash, .item.hint { animation: none; }
   .item, .box, #basket-toggle .chev { transition: none; }
 }

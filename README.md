@@ -38,10 +38,10 @@ Each section is a card with its name at the top. A list starts with three:
 
 - Tap the square to tick. A short vibration confirms it.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row move together and the list does not shift under your thumb.
-- They then move to the ticked group below the lists. Its header is a filled tick box, a count and a collapse arrow.
+- They then slide to the ticked group below the lists. Its header is a filled tick box, a count and a collapse arrow.
 - The group shows what was ticked in the last 12 hours. Older items are hidden but still suggested.
-- Dragging an item down onto the drop zone that appears below the sections ticks it straight away; the item shows as ticked while it's over the zone.
-- Tapping a ticked square puts the item back at the end of its section, or of the first section if its own was deleted.
+- Dragging an item down onto the drop zone that appears under the ticked group's heading ticks it straight away; the item shows as ticked while it's over the group. The heading shows during the drag even when nothing is ticked yet.
+- Tapping a ticked square puts the item back at the end of its section, or of the first section if its own was deleted. Dragging a ticked item into a section puts it back right where you drop it.
 
 ### Editing and deleting
 
@@ -55,6 +55,7 @@ Each section is a card with its name at the top. A list starts with three:
 ### Reordering
 
 - Hold an item for about half a second: it lifts and its tick box turns into a grip. Move to drag it, including into another section; the grip takes the colour of the section it is over. Releasing without moving does nothing.
+- When you let go, the item glides into its place. Things that move after a change glide too, without ever getting in the way of a tap.
 - With a mouse, dragging starts as soon as you move.
 - Until someone has dragged once, the first item lifts briefly when the app opens, to show that items can move.
 
@@ -111,18 +112,9 @@ BASE=http://127.0.0.1:8080 SETUP=<code> STORE=./data node --test test/browser.te
 
 In order. Each batch is built, tested on both servers, deployed, and tried on the phones before the next.
 
-Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*; splitting an item with Enter and joining it back with Backspace, deleting it by clearing its text, removing suggestions; a tap that leaves a field always lands, on touch screens too.
+Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*; splitting an item with Enter and joining it back with Backspace, deleting it by clearing its text, removing suggestions; a tap that leaves a field always lands, on touch screens too; the drop zone inside the ticked group, dragging ticked items back, and items gliding into place again.
 
-### 1. Fixes
-
-**Dragging**
-
-- ✓ An item dropped back where it started no longer stays hidden.
-- When dragging an item to tick it, the drop zone appears inside the ticked group, under its heading, rather than above it. The heading shows during the drag even when nothing is ticked yet.
-- Drag a ticked item back into a section to untick it.
-- Ticked items slide into the ticked group again. The page-wide animation was turned off because browsers ignore taps while it plays; the items themselves need animating instead.
-
-### 2. Small changes
+### 1. Small changes
 
 **Section look**
 
@@ -135,7 +127,7 @@ Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Wor
 - **Quantities, without a new field.** A number at the start of an item, such as *2 milk*, *2× milk* or *500 g flour*, is shown slightly apart from the name, and ignored when spotting duplicates and making suggestions, so *2 milk* still finds *Milk*.
 - A new app icon: simple and monochrome, in the style of Arcticons, with a monochrome version for Android's themed icons.
 
-### 3. Settings
+### 2. Settings
 
 One new screen.
 
@@ -145,11 +137,11 @@ One new screen.
   - How much storage the list uses, and exporting it.
 - **About:** version, server, and what the server can and can't see.
 
-### 4. French
+### 3. French
 
 A French translation, following the phone's language. It comes after Settings so it covers the final wording of every screen at once.
 
-### 5. Bigger features
+### 4. Bigger features
 
 These change how lists are stored and shared, so each starts with a short design note and sketches of the screens, agreed before building.
 

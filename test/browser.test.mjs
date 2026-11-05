@@ -251,21 +251,23 @@ test("a section deleted on one phone while the other adds to it stays", async ()
   await t.close();
 });
 
-test("dragging an item onto the drop zone ticks it", async () => {
+test("dragging an item onto the drop zone, under the ticked group's heading, ticks it", async () => {
   const t = await pair();
   const { a, b } = t;
   for (const w of ["Milk", "Bread", "Eggs"]) await add(a, "ess", w);
   await blur(a);
   await sleep(300);
+  assert.equal(await a.locator("#basket").isVisible(), false, "nothing is ticked yet");
   await dragTo(a, item(a, "Bread"), async () => {
     const z = await a.locator("#tick-drop").boundingBox();
     return z.y + z.height / 2;
   }, { hold: true });
-  assert.equal(await a.locator(".ghost.to-tick").count(), 1, "the item shows as ticked over the zone");
+  const head = await a.locator(".basket-head").boundingBox(), zone = await a.locator("#tick-drop").boundingBox();
+  assert.ok(head && zone.y >= head.y + head.height, "during the drag, the heading shows with the zone under it");
+  assert.equal(await a.locator(".ghost.done").count(), 1, "the item shows as ticked over the zone");
   assert.equal(await a.locator("#tick-drop.over").count(), 1);
   await a.mouse.up();
-  await sleep(300);
-  assert.ok((await ticked(a)).includes("Bread"));
+  assert.ok(await eventually(async () => (await ticked(a)).includes("Bread")));
   assert.deepEqual(await texts(a, "Essentials"), ["Milk", "Eggs"]);
   assert.ok(!(await a.locator("#tick-drop").isVisible()), "the zone hides again");
   assert.ok(await eventually(async () => (await ticked(b)).includes("Bread")));
@@ -553,5 +555,55 @@ test("Backspace at the start of an item joins it to the one above", async () => 
 
   await a.click("#undo");
   assert.deepEqual(await now(), ["Milk eggs", "Bread"], "undo brings the deleted item back");
+  await t.close();
+});
+
+test("a ticked item dragged into a section goes back on the list there", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  for (const w of ["Milk", "Bread", "Eggs"]) await add(a, "ess", w);
+  await blur(a);
+  await item(a, "Bread").locator(".boxcell").click();
+  await sleep(1900);
+  assert.deepEqual(await ticked(a), ["Bread"]);
+  const bread = () => a.locator('#basket-list .item:has(.text:text-is("Bread"))');
+  const belowMilk = async () => { const m = await item(a, "Milk").boundingBox(); return m.y + m.height - 4; };
+
+  await dragTo(a, bread(), belowMilk, { hold: true });
+  assert.equal(await a.locator(".ghost.done").count(), 0, "over a section, it shows unticked");
+  assert.equal(await a.locator("#tick-drop").isVisible(), false, "no drop zone for an item already ticked");
+  await a.mouse.up();
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Bread,Eggs"), "it lands where it was dropped");
+  assert.equal(await item(a, "Bread").locator(".chk").isChecked(), false);
+  assert.deepEqual(await ticked(a), []);
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk,Bread,Eggs"), "the other phone sees it");
+
+  await a.click("#undo");
+  assert.ok(await eventually(async () => (await ticked(a)).join() === "Bread"), "undo ticks it again");
+  const home = await bread().boundingBox();
+  await dragTo(a, bread(), belowMilk, { hold: true });
+  for (let i = 1; i <= 10; i++) { await a.mouse.move(home.x + 60, home.y + home.height / 2); await sleep(20); }
+  await sleep(150);
+  assert.equal(await a.locator(".ghost.done").count(), 1, "back over the ticked group, it shows ticked");
+  await a.mouse.up();
+  await sleep(400);
+  assert.deepEqual(await ticked(a), ["Bread"], "dropped there, it stays ticked");
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk", "Eggs"]);
+  assert.equal(await a.locator(".item.placeholder, .ghost, .flying").count(), 0, "nothing is left behind");
+  await t.close();
+});
+
+test("ticked items slide into the ticked group, and taps land meanwhile", async () => {
+  const t = await pair();
+  const { a } = t;
+  for (const w of ["Milk", "Bread", "Eggs"]) await add(a, "ess", w);
+  await blur(a);
+  await item(a, "Eggs").locator(".boxcell").click();
+  const milk = await item(a, "Milk").locator(".boxcell").boundingBox();
+  assert.ok(await eventually(async () => (await a.locator(".flying").count()) === 1, 3000), "Eggs flies to the ticked group");
+  await a.mouse.click(milk.x + milk.width / 2, milk.y + milk.height / 2);
+  assert.equal(await item(a, "Milk").locator(".chk").isChecked(), true, "a tap during the motion ticks Milk");
+  assert.ok(await eventually(async () => (await a.locator(".flying").count()) === 0 && (await ticked(a)).join() === "Eggs"));
+  assert.ok(await eventually(async () => (await ticked(a)).join() === "Milk,Eggs", 4000));
   await t.close();
 });
