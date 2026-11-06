@@ -1,8 +1,35 @@
 # ADR-0001: Panier v2 collaboration architecture
 
-Status: **Proposed — review required before implementation**  
+Status: **Product decisions approved; cryptographic protocol remains proposed and requires review.**  
 Tracks: [#2](https://github.com/pyrocklast/panier/issues/2)  
 Scope: browser PWA and Cloudflare Worker only. The Go/Raspberry Pi implementation is **out of scope** for v2.
+
+## Approved product decisions (2026-11-06)
+
+The following are **decided**, not open design questions:
+
+1. **Owner recovery = recovery kit + optional ownership transfer.** The list
+   owner can export a locally generated, user-controlled encrypted recovery kit,
+   and explicitly transfer the owner role to an active member. Neither a server
+   administrator nor another member may silently assume ownership. A lost kit
+   with no remaining authorised owner means loss of administrative control;
+   no server-side account reset is promised. The exact recovery credential,
+   transfer proof and lost-device workflow require a protocol specification.
+2. **Invitations = link.** The owner creates a random, single-use, list-scoped
+   invitation link. Joining does **not** require a separate approval screen.
+   Unused invitations are revocable and may expire. Possession of the complete
+   link grants the ability to redeem it before expiry; this is a bearer-capability
+   security trade-off, not proof of the recipient's real-world identity. The
+   recipient must receive a cryptographically authenticated key envelope; that
+   handshake still requires review.
+3. **Migration = explicit copy.** Users consciously copy a v1 list into a
+   freshly generated independent v2 list. The source v1 list, `#k=` pairing
+   links, browser data, and server log remain unchanged. There is no automatic
+   in-place upgrade or ongoing bidirectional v1/v2 bridge. See the
+   [migration plan](../v2-migration.md).
+
+These choices are approved for the product. **They do not constitute approval
+of the key-transfer protocol, revocation implementation or recovery cryptography.**
 
 ## Product contract
 
@@ -78,6 +105,15 @@ otherwise an owner losing a device can permanently strand the list.
 An anonymous identity cannot reliably identify a *human*. Device labels are
 optional local-friendly names, not security claims.
 
+**Owner transfer policy (approved at product level):** the current owner may
+explicitly designate an active member as replacement owner. The transfer must
+be authenticated by the current owner's signing credential, committed atomically
+with the role change and reflected in an append-only audit record. A stale owner
+credential, replayed transfer or unapproved member must not be able to appoint
+an owner. Whether to permit more than one owner and how recovery credentials
+authorize a replacement key are **still technical review gates**. Avoid assuming
+the server's role table alone protects E2EE if compromised.
+
 ## E2EE key lifecycle
 
 Each list has an independently random 256-bit content secret for its current
@@ -94,8 +130,9 @@ recipient and sender identity, and authentication of the issuer. Client-side
 verification is required; do not silently accept unauthenticated envelopes.
 Private key material and plaintext list keys never enter server APIs.
 
-**Invitation:** an owner creates a cryptographically random, list-scoped,
-single-use and revocable capability; expiry is supported. Redemption atomically
+**Invitation (approved UX):** an owner creates a cryptographically random,
+list-scoped, **single-use link**; unused links can be revoked and may expire.
+No separate owner approval is required once the link is issued. Redemption atomically
 consumes it and registers a recipient public key. An invitation URL can carry
 client-only secret material in its fragment, which is not sent with an HTTP
 request. However, **the whole URL is a bearer secret** and can leak through
@@ -157,6 +194,14 @@ but do not assume approval. A decrypted local list cache is accessible to code
 running in the app origin and potentially to someone with access to the device.
 Document this limit.
 
+**Owner recovery choice:** provide a recovery kit and allow explicit ownership
+transfer. The kit must carry enough encrypted information to recover both
+list decryption and authorised owner access without relying on an old browser
+installation; a bare backup of the list key is insufficient. A stolen kit
+may confer powerful access, so require a reviewed encryption/authentication
+and recovery-credential invalidation strategy. Ownership transfer must not
+leave the former owner with irrevocable administrative authority.
+
 For anonymous E2EE, credentials and the content key are both required to regain
 access. Provide an explicit encrypted recovery bundle (and safe offline backup
 instructions) or an independently specified re-enrollment path through a trusted
@@ -199,16 +244,30 @@ generic distributed database or required background synchronization.
 
 ## Decision gates / unresolved protocol details
 
-The following **must be decided and tested**, not guessed at during feature work:
+**Approved:** recovery kit + explicit ownership transfer, single-use invitation
+links without approval, and opt-in v1 → v2 **copy** (no in-place migration).
 
-1. Owner recovery and whether list ownership can be transferred.
-2. Exact invitation enrollment handshake and authentication of recipient keys.
-3. Key rotation transaction, offline member rekeying and old-epoch pending writes.
-4. Cryptographic envelope serialization, nonce strategy and cross-browser Web
-   Crypto support; review by a security practitioner before production.
-5. Versioning, ciphertext size/cost ceilings, safe snapshot compaction and
-   backup trust model.
-6. V1 migration strategy in [v2 migration plan](./v2-migration.md).
+**Still blocking security-sensitive implementation / approval:**
+
+1. **Key recovery and ownership-transfer protocol:** key material in encrypted
+   recovery kit, secret strength, recovery credential revocation, authenticated
+   role transfer, lost-owner behavior and tests.
+2. **Invitation enrollment handshake:** authenticating ephemeral/recipient
+   public keys, ensuring single-use atomic redemption, preventing envelope
+   substitution, confirming what link theft permits and cross-browser tests.
+3. **Key epoch rotation:** atomic membership/rekey boundaries, recovering
+   remaining offline members, conflict handling for queued old-epoch writes,
+   split-brain/rollback avoidance and explicit treatment of revoked devices.
+4. **Wire format:** exact versioned canonical encoding, authenticated metadata,
+   signatures, key-envelope algorithm and nonce/key separation. Browser
+   compatibility and independent security review before production.
+5. **Retention and recovery:** log size limits, encrypted authenticated
+   checkpoints, quota behavior, compaction safety and restore/integrity tests.
+
+The [approved-decision and security review record](./0002-v2-product-decisions.md)
+details the approved UX contract and protocol acceptance gates. The
+[v1-to-v2 migration plan](../v2-migration.md) now records the **approved copy**
+policy; implementation and rollout still require tests.
 
 ## Implementation order
 
