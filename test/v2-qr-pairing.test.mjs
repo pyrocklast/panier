@@ -103,8 +103,8 @@ test("tampered or swapped ciphertext, signature, metadata or token commitment fa
     r => { r.ownerId = "otherowner01"; },
     r => { r.inviteId = "otherinvite01"; },
     r => { r.tokenHash = "B".repeat(43); },
-    r => { r.ciphertext = "A" + r.ciphertext.slice(1); },
-    r => { r.signature = "B" + r.signature.slice(1); },
+    r => { r.ciphertext = (r.ciphertext[0] === "A" ? "B" : "A") + r.ciphertext.slice(1); },
+    r => { r.signature = (r.signature[0] === "A" ? "B" : "A") + r.signature.slice(1); },
     r => { r.nonce = "AAAAAAAAAAAAAAAA"; },
     r => { r.unexpected = "payload"; },
   ]) await rejectBadRecord(f, mutate);
@@ -142,4 +142,14 @@ test("QR contains no recipient permissions; physical display does not prove prox
   assert.deepEqual(a, b); // client alone cannot enforce single-use!
   // This test deliberately documents the required server-side consume/revoke rule.
   assert.equal(f.serverRecord.redeemed, undefined);
+});
+
+test("owner signing private/public key mismatch is detected before QR display", async () => {
+  const owner = await generateSigningIdentity();
+  const foreign = await generateSigningIdentity();
+  await assert.rejects(prepareQrInvitation({
+    listId: LIST, ownerId: owner.actorId, epoch: 1,
+    listSecret: secret(), ownerPrivateKey: owner.privateKey,
+    ownerPublicJwk: foreign.publicKeyJwk, now: NOW,
+  }), /owner key pair mismatch/);
 });
