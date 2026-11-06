@@ -256,7 +256,7 @@ test("list isolation and versionchange notification; existing data preserved", a
       await s.commitLocalMutation(db, { listId: "household01", id: "mutation01",
         type: "item.add", payload: { id: "itemAA001", name: "Milk", position: "a" } });
       const other = await s.readLocalList(db, "household02");
-      const opened = indexedDB.open(name, 2);
+      const opened = indexedDB.open(name, 3); // v2 storage schema now opens at version 2
       const upgrade = new Promise((resolve, reject) => {
         opened.onupgradeneeded = () => {};
         opened.onsuccess = () => { opened.result.close(); resolve(true); };
