@@ -27,6 +27,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: V2 domain reducer tests
+        run: node --test test/v2-domain.test.mjs
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race ./...
