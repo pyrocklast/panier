@@ -167,3 +167,18 @@ test("independent remote additions and local pending edits remain in the project
   assert.equal(snapshot.local.items[A].name, "Milk");
   assert.equal(snapshot.local.items[B].name, "Eggs");
 });
+
+test("sync retains verification and stale-epoch error codes from secure transport",async()=>{
+  const pull=harness({pending:[{...first,revision:undefined}]});
+  pull.transport.pull=async()=>{throw new SyncFailure("verification",
+    "Pinned membership history was substituted");};
+  await assert.rejects(runSync(pull),e=>e.code==="verification");
+  assert.equal(pull.snapshot().accepted.revision,0);
+  assert.equal(pull.snapshot().queue.length,1);
+  const push=harness({pending:[{...first,revision:undefined}]});
+  push.transport.push=async()=>{throw new SyncFailure("stale-epoch",
+    "Cannot upload prior-epoch ciphertext");};
+  await assert.rejects(runSync(push),e=>e.code==="stale-epoch");
+  assert.equal(push.snapshot().queue.length,1);
+  assert.equal(push.snapshot().accepted.revision,0);
+});

@@ -19,6 +19,8 @@ const REKEY_SOURCE = readFileSync(fileURLToPath(new URL("../v2/rekey.mjs", impor
 const TRUST_SOURCE = readFileSync(fileURLToPath(new URL("../v2/trust.mjs", import.meta.url)), "utf8");
 const LEDGER_SOURCE = readFileSync(fileURLToPath(new URL("../v2/membership-ledger.mjs", import.meta.url)), "utf8");
 const REGISTRY_SOURCE = readFileSync(fileURLToPath(new URL("../v2/qr-registry.mjs", import.meta.url)), "utf8");
+const AUTH_SOURCE = readFileSync(fileURLToPath(new URL("../v2/api-auth.mjs", import.meta.url)), "utf8");
+const TRUSTED_SYNC_SOURCE = readFileSync(fileURLToPath(new URL("../v2/trusted-sync.mjs", import.meta.url)), "utf8");
 let browser, server, origin;
 
 before(async () => {
@@ -31,7 +33,8 @@ before(async () => {
         path === "/v2/sync.mjs" || path === "/v2/crypto.mjs" ||
         path === "/v2/qr-pairing.mjs" || path === "/v2/rekey.mjs" ||
         path === "/v2/trust.mjs" || path === "/v2/membership-ledger.mjs" ||
-        path === "/v2/qr-registry.mjs") {
+        path === "/v2/qr-registry.mjs" || path === "/v2/api-auth.mjs" ||
+        path === "/v2/trusted-sync.mjs") {
       res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
       res.end(path === "/v2/storage.mjs" ? STORAGE_SOURCE :
         path === "/v2/domain.mjs" ? DOMAIN_SOURCE :
@@ -40,7 +43,9 @@ before(async () => {
         path === "/v2/qr-pairing.mjs" ? QR_SOURCE :
         path === "/v2/rekey.mjs" ? REKEY_SOURCE :
         path === "/v2/trust.mjs" ? TRUST_SOURCE :
-        path === "/v2/membership-ledger.mjs" ? LEDGER_SOURCE : REGISTRY_SOURCE);
+        path === "/v2/membership-ledger.mjs" ? LEDGER_SOURCE :
+        path === "/v2/qr-registry.mjs" ? REGISTRY_SOURCE :
+        path === "/v2/api-auth.mjs" ? AUTH_SOURCE : TRUSTED_SYNC_SOURCE);
     } else {
       res.writeHead(404); res.end("Not found");
     }
@@ -882,5 +887,159 @@ test("two tabs cannot persist different valid membership forks over the same che
       finally{db.close();}
     },{name,events:[histories.first[0]]});
     assert.equal(stale,true);
+  }finally{await context.close();}
+});
+
+test("trusted browser sync verifies owner-pinned history before pull and upload",async()=>{
+  const context=await browser.newContext();
+  try{
+    const page=await pageWithModules(context);
+    const result=await evaluate(page,async ({name,trustName})=>{
+      const {generateSigningIdentity,sealMutation}=await import("/v2/crypto.mjs");
+      const trust=await import("/v2/trust.mjs");
+      const storage=await import("/v2/storage.mjs");
+      const {createTrustedSync}=await import("/v2/trusted-sync.mjs");
+      const {signGenesis}=await import("/v2/membership-ledger.mjs");
+      const owner=await generateSigningIdentity();
+      const listId="household01";
+      const secret=crypto.getRandomValues(new Uint8Array(32));
+      const trustDb=await trust.openTrustDatabase({name:trustName});
+      const {event}=await trust.pinNewOwnerBeforeBootstrap(trustDb,{
+        listId,identity:owner});
+      const db=await storage.openPanierDatabase({name});
+      await storage.createLocalList(db,listId);
+      const draft={listId,id:"mutation01",type:"item.add",
+        payload:{id:"itemAA001",name:"Milk",position:"a"}};
+      const sealed=await sealMutation({draft,epoch:1,actorId:owner.actorId,
+        privateKey:owner.privateKey,listSecret:secret});
+      await storage.commitSealedLocalMutation(db,draft,sealed);
+      let history=[event],accepted=[],uploadCount=0;
+      const reply=data=>new Response(JSON.stringify(data),{
+        status:200,headers:{"Content-Type":"application/json"}});
+      const request=async(url,options)=>{
+        const path=new URL(url).pathname;
+        const {auth,body}=JSON.parse(options.body);
+        if(auth.listId!==listId||auth.memberId!==owner.actorId||
+          auth.path!==path||options.credentials!=="omit"||
+          options.redirect!=="error")throw Error("untrusted API credentials");
+        if(path.endsWith("/history"))return reply({events:history});
+        if(path.endsWith("/pull"))return reply({
+          latest:accepted.length,
+          changes:accepted.filter(e=>e.revision>body.since)});
+        if(path.endsWith("/mutations")){
+          uploadCount++;
+          accepted.push({id:body.id,revision:accepted.length+1,
+            ciphertext:body.ciphertext});
+          return reply({id:body.id,revision:accepted.length,duplicate:false});
+        }
+        throw Error("unknown API request");
+      };
+      const sync=createTrustedSync({
+        db,trustDb,listId,memberId:owner.actorId,
+        memberSigningPrivateKey:owner.privateKey,
+        secretForEpoch:epoch=>epoch===1?secret:null,
+        baseUrl:"https://example.invalid/",request});
+      const done=await sync.sync();
+      const restored=await storage.readLocalList(db,listId);
+      const rogue=await generateSigningIdentity();
+      history=[await signGenesis({listId,ownerId:rogue.actorId,
+        ownerPublicJwk:rogue.publicKeyJwk,
+        privateKey:rogue.privateKey})];
+      let refusal=null;
+      try{await sync.pull();}catch(error){refusal=error.code;}
+      const after=await storage.readLocalList(db,listId);
+      const anchored=await trust.readPinnedTrust(trustDb,listId);
+      db.close();trustDb.close();
+      return {done,uploadCount,
+        milk:restored.accepted.items.itemAA001.name,
+        pending:restored.pending.length,
+        revisionAfterAttack:after.accepted.revision,
+        refusal,anchoredRoot:anchored.ownerId===owner.actorId};
+    },{name:dbName(),trustName:dbName()});
+    assert.deepEqual(result,{
+      done:{revision:1,pending:0,pushed:1,pulled:1,synced:true},
+      uploadCount:1,milk:"Milk",pending:0,revisionAfterAttack:1,
+      refusal:"verification",anchoredRoot:true,
+    });
+  }finally{await context.close();}
+});
+
+test("obsolete-epoch offline edit stays encrypted and queued after verified revocation",async()=>{
+  const context=await browser.newContext();
+  try{
+    const page=await pageWithModules(context);
+    const result=await evaluate(page,async ({name,trustName})=>{
+      const {generateSigningIdentity,sealMutation}=await import("/v2/crypto.mjs");
+      const {generateRecipientAgreementKey}=await import("/v2/rekey.mjs");
+      const {prepareQrInvitation}=await import("/v2/qr-pairing.mjs");
+      const {enrollmentStatement}=await import("/v2/qr-registry.mjs");
+      const ledger=await import("/v2/membership-ledger.mjs");
+      const storage=await import("/v2/storage.mjs");
+      const trust=await import("/v2/trust.mjs");
+      const {createTrustedSync}=await import("/v2/trusted-sync.mjs");
+      const owner=await generateSigningIdentity();
+      const listId="household01";
+      const secret=crypto.getRandomValues(new Uint8Array(32));
+      const trustDb=await trust.openTrustDatabase({name:trustName});
+      const {event}=await trust.pinNewOwnerBeforeBootstrap(trustDb,{
+        listId,identity:owner});
+      const db=await storage.openPanierDatabase({name});
+      await storage.createLocalList(db,listId);
+      const draft={listId,id:"mutation01",type:"item.add",
+        payload:{id:"itemAA001",name:"Bread",position:"a"}};
+      const sealed=await sealMutation({draft,epoch:1,actorId:owner.actorId,
+        privateKey:owner.privateKey,listSecret:secret});
+      await storage.commitSealedLocalMutation(db,draft,sealed);
+      const recipient=await generateSigningIdentity();
+      const agreement=await generateRecipientAgreementKey();
+      const {serverRecord}=await prepareQrInvitation({
+        listId,ownerId:owner.actorId,epoch:1,listSecret:secret,
+        ownerPrivateKey:owner.privateKey,ownerPublicJwk:owner.publicKeyJwk});
+      const nonce=btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
+        .replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"");
+      const memberId="removed001";
+      const proofBytes=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},
+        recipient.privateKey,new TextEncoder().encode(enrollmentStatement({
+          listId,inviteId:serverRecord.inviteId,memberId,nonce,
+          tokenHash:serverRecord.tokenHash,agreementPublicJwk:agreement.publicJwk})));
+      const proof=btoa(String.fromCharCode(...new Uint8Array(proofBytes)))
+        .replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"");
+      const base=await ledger.verifyMembershipHistory([event],owner.publicKeyJwk);
+      const join={v:2,kind:"join",listId,sequence:2,previous:base.head,
+        ownerId:owner.actorId,epoch:1,inviteId:serverRecord.inviteId,memberId,
+        memberPublicJwk:{kty:"EC",crv:"P-256",
+          x:recipient.publicKeyJwk.x,y:recipient.publicKeyJwk.y},
+        agreementPublicJwk:agreement.publicJwk,nonce,proof,grant:serverRecord};
+      const before=await ledger.verifyMembershipHistory([event,join],owner.publicKeyJwk);
+      const rotation=await ledger.signRotation({listId,sequence:3,previous:before.head,
+        ownerId:owner.actorId,epoch:2,removedMemberId:memberId,
+        privateKey:owner.privateKey});
+      const history=[event,join,rotation];
+      let uploadCount=0;
+      const request=async(url,options)=>{
+        const path=new URL(url).pathname;
+        if(path.endsWith("/history"))
+          return new Response(JSON.stringify({events:history}),{status:200});
+        if(path.endsWith("/pull"))
+          return new Response(JSON.stringify({latest:0,changes:[]}),{status:200});
+        if(path.endsWith("/mutations"))uploadCount++;
+        throw Error("unexpected mutation submission");
+      };
+      const sync=createTrustedSync({db,trustDb,listId,
+        memberId:owner.actorId,memberSigningPrivateKey:owner.privateKey,
+        secretForEpoch:epoch=>epoch===1?secret:null,
+        baseUrl:"https://example.invalid/",request});
+      let code=null;
+      try{await sync.sync();}catch(error){code=error.code;}
+      const state=await storage.readLocalList(db,listId);
+      const anchored=await trust.readPinnedTrust(trustDb,listId);
+      const identical=(await storage.loadSealedMutation(db,listId,draft.id))
+        .ciphertext===sealed.ciphertext;
+      db.close();trustDb.close();
+      return {code,uploadCount,pending:state.pending.length,
+        revision:state.accepted.revision,identical,epoch:anchored.checkpoint.epoch};
+    },{name:dbName(),trustName:dbName()});
+    assert.deepEqual(result,{code:"stale-epoch",uploadCount:0,
+      pending:1,revision:0,identical:true,epoch:2});
   }finally{await context.close();}
 });
