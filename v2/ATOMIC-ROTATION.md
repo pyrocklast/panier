@@ -9,7 +9,8 @@ After a member is revoked, the server must not expose a new membership
 epoch without also storing the correctly encrypted new epoch secret for
 **every active surviving recipient**. An offline recipient needs to retrieve
 their specific wrapped key when they reconnect, without requiring the owner
-to remain online.
+to remain online. The **rotation head** is preserved as a separate epoch
+fence even if a later QR join advances the current membership-chain head.
 
 `v2/atomic-rotation.mjs` provides `publishAtomicRotation(storage,
 {event,envelopes})` for a *single list's* Durable Object storage namespace.
@@ -52,6 +53,10 @@ experimental rekey packages cannot be used with atomic publication.
 
 `readCurrentKeyPackage(storage,{listId,memberId})` allows a returning
 active recipient to fetch the current epoch ciphertext and manifest.
+A later membership join in the same epoch does **not** invalidate the
+earlier rotation's encryption envelopes. The epoch fence retains the
+original rotation head and sequence while membership events extend the
+hash-linked chain.
 It requires its caller to **authenticate the recipient** separately; passing
 a claimed member ID from an unauthenticated HTTP request would be insecure.
 
@@ -98,8 +103,8 @@ fixtures and **must never be wired into a Worker endpoint**.
 `node --test test/v2-atomic-rotation.test.mjs` covers complete publication,
 concurrent competing rotations, rollback on a faulted final fence write,
 package signature/recipient substitution, missing or duplicate packages,
-offline retrieval, owner-only rotation, replay, old/future-epoch mutation
-fences, and revoked-member access.
+offline retrieval **even after a later join in the same epoch**, owner-only
+rotation, replay, old/future-epoch mutation fences, and revoked-member access.
 
 It uses a serializing transaction/rollback mock, **not a deployed Durable
 Object**. CI also runs the older v2 Web Crypto and Chromium/Firefox suites.
