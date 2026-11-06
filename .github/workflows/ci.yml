@@ -41,6 +41,8 @@ jobs:
         run: node --test test/v2-membership-ledger.test.mjs
       - name: V2 post-revocation key envelope tests
         run: node --test test/v2-rekey.test.mjs
+      - name: V2 authenticated rekey receipt tests
+        run: node --test test/v2-rekey-receipt.test.mjs
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race ./...
