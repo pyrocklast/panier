@@ -87,7 +87,7 @@ test("dangerous object-key-shaped IDs cannot affect object prototypes", () => {
     add(1, "__proto__", "Private"),
     add(2, "constructor", "Second"),
   ]);
-  assert.deepEqual(visibleItems(state).map(i => i.name), ["Second", "Private"]);
+  assert.deepEqual(visibleItems(state).map(i => i.name), ["Private", "Second"]);
   assert.equal(Object.getPrototypeOf(state.items), null);
   assert.equal(({}).name, undefined);
 });
