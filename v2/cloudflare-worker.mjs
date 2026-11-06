@@ -1,3 +1,5 @@
+import { DurableObject } from "cloudflare:workers";
+
 // Panier v2 isolated Cloudflare Durable Object HTTP service.
 // This file is NOT referenced by production wrangler.jsonc or worker/index.js.
 // All mutation content remains encrypted. No bearer list tokens.
@@ -155,8 +157,8 @@ async function route(storage,request,listId,routeName,path){
   }
   throw Error("not found");
 }
-export class V2List {
-  constructor(ctx){this.storage=ctx.storage;}
+export class V2List extends DurableObject {
+  constructor(ctx,env){super(ctx,env);this.storage=ctx.storage;}
   async fetch(request){
     const match=pathOf(request);
     if(!match)return reply(404,{error:"not found"});
