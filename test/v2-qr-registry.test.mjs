@@ -92,7 +92,7 @@ test("stolen token / altered signature / substitute device identity cannot regis
   const f=await setup();
   await f.registry.createInvitation(f.serverRecord);
   const r=await f.request();
-  await assert.rejects(f.registry.redeem({...r,token:Buffer.alloc(32,2).toString("base64url")}),/unavailable/);
+  await assert.rejects(f.registry.redeem({...r,token:Buffer.alloc(32,2).toString("base64url")}),/proof/);
   await assert.rejects(f.registry.redeem({...r,memberId:"newmember02"}),/proof/);
   const foreign=await generateSigningIdentity();
   await assert.rejects(f.registry.redeem({...r,memberPublicJwk:foreign.publicKeyJwk}),/proof/);
