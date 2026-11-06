@@ -51,6 +51,14 @@ cryptographic protocols.
   binding from verified in-person QR on recipient devices; non-extractable
   signing key persistence and race-safe IndexedDB membership checkpoints
   rejecting any observed signed fork, shorter history or substituted root.
+- PR #28 — trust-gated encrypted browser sync using pinned membership
+  checkpoints before/after pull, signed authenticated API calls, and
+  fail-closed quarantine of stale-epoch sealed outbox entries.
+- PR #29 — bounded signed nonce replay state, list/member request budgets,
+  and a transactional cap of five active QR invitations in the isolated DO.
+- PR #30 — durable member-signed key-delivery receipts and owner-only
+  retrieval. The server validates member identity/package binding but
+  explicitly cannot validate secret-derived HMAC confirmations.
 
 ## Reviewer priorities
 
@@ -99,13 +107,17 @@ cryptographic protocols.
 8. **Storage/browser threats:** non-extractable keys in IndexedDB, same-origin
    malicious JavaScript, plaintext optimistic cache, local data eviction,
    user-supplied crypto/IDB adapter behavior, CSP/supply chain controls.
-9. **Backend abuse and availability:** assess PR #26's actual DO routes,
-   P-256 request authentication, nonce replay storage growth, bootstrap
-   owner-key pinning, signed ciphertext append validation, epoch fences,
-   bounded request parsing, authenticated member key retrieval, and safe
-   retry/idempotency semantics. Still missing: rate limiting, invitation
-   quota/garbage collection, persistent receipts, clock manipulation,
-   withholding/rollback, stale snapshots and production abuse controls.
+9. **Backend abuse and availability:** inspect the actual DO routes in
+   PR #26, request-signature and accepted-mutation validation, and PR #29's
+   bounded six-slot nonce replay ring, list/member rate budgets and five
+   active invitation cap. PR #30 adds durable receipt forwarding, but
+   Cloudflare cannot verify the secret-derived HMAC or claim delivery
+   confirmed. Evaluate race conditions, idempotent response loss, stale
+   epochs, clock manipulation and long-term durable metadata retention.
+   **Still missing:** global WAF protections against random-list DO creation,
+   cryptographically auditable accepted-log authorization ordering,
+   invitation-history compaction, owner recovery, server withholding/forks,
+   and security controls for a deployed PWA origin.
 
 ## Explicit unresolved integration dependencies
 
@@ -129,8 +141,10 @@ owner recovery or production traffic/abuse protections.
 The separate QR-enrollment lost-response receipt protocol is still absent.
 
 PR #27 adds a **client-side** IndexedDB trust-anchor store and
-monotonic membership checkpoints, but no shipped PWA calls these functions
-yet. Locally saved roots and checkpoint comparisons cannot prove freshness
+monotonic membership checkpoints. PR #28 connects those checks to an
+**isolated, unshipped** browser sync coordinator and signed API transport:
+cryptographic membership refusals and stale key epochs stop upload while
+preserving immutable queued edits. Locally saved roots and checkpoint comparisons cannot prove freshness
 beyond the last observed authenticated state, and private-browser-data
 eviction requires trusted recovery, not server-side TOFU.
 
