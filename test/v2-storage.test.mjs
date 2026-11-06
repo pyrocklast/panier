@@ -536,3 +536,53 @@ test("interrupted write transaction rolls back both sealed outbox and optimistic
       cursor: 0, itemCount: 0, envelope: null });
   } finally { await context.close(); }
 });
+
+test("experimental v2 unsealed entries survive schema upgrade but cannot be uploaded", async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await pageWithModules(context);
+    const result = await evaluate(page, async name => {
+      localStorage.setItem("panier", "original-v1-data-must-survive");
+      // Build a historical v2 prototype database at version 1.
+      const open = indexedDB.open(name, 1);
+      const original = await new Promise((resolve, reject) => {
+        open.onupgradeneeded = () => {
+          const db = open.result;
+          db.createObjectStore("lists", { keyPath: "listId" });
+          db.createObjectStore("outbox", { keyPath: ["listId", "id"] })
+            .createIndex("byList", "listId");
+        };
+        open.onsuccess = () => resolve(open.result);
+        open.onerror = () => reject(open.error);
+      });
+      const { emptyList } = await import("/v2/domain.mjs");
+      const state = emptyList("household01");
+      const tx = original.transaction(["lists", "outbox"], "readwrite");
+      tx.objectStore("lists").add({ listId: state.listId, accepted: state,
+        local: state, nextLocalSeq: 1 });
+      tx.objectStore("outbox").add({
+        listId: state.listId, id: "mutation01", type: "item.add",
+        payload: { id: "itemAA001", name: "Milk", position: "a" }, localSeq: 1,
+      });
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = resolve;
+        tx.onabort = () => reject(tx.error);
+      });
+      original.close();
+      const storage = await import("/v2/storage.mjs");
+      const upgraded = await storage.openPanierDatabase({ name });
+      const pending = await storage.readLocalList(upgraded, state.listId);
+      let denied = false;
+      try { await storage.loadSealedMutation(upgraded, state.listId, "mutation01"); }
+      catch (_) { denied = true; }
+      const schema = upgraded.version;
+      upgraded.close();
+      return { pending: pending.pending.length, denied, schema,
+        v1: localStorage.getItem("panier") };
+    }, dbName());
+    assert.deepEqual(result, {
+      pending: 1, denied: true, schema: 2,
+      v1: "original-v1-data-must-survive",
+    });
+  } finally { await context.close(); }
+});
