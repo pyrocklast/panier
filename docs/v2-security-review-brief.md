@@ -35,6 +35,9 @@ cryptographic protocols.
   agreement public key in the signed enrollment proof and membership ledger,
   and derives rekey recipients from the verified ledger rather than a
   server-supplied list.
+- PR #24 — recipient-signed, secret-derived authenticated receipts proving
+  the registered signing identity knows the newly decrypted epoch secret
+  for an exact owner-signed key package and membership rotation head.
 
 ## Reviewer priorities
 
@@ -57,9 +60,12 @@ cryptographic protocols.
    role escalation and canonical encoding inconsistencies.
 5. **Epoch rotation:** examine PR #22's per-member ECDH envelopes and
    PR #23's **signed ECDH public-key binding**, key separation, replacement
-   of v1 enrollment statements by v2, and the missing ECDH private-key
-   confirmation/receipt. Review the race between signed rotation and key
-   package publication, lack of delivery to offline retained devices, and
+   of v1 enrollment statements by v2, and PR #24's owner-verifiable
+   confirmation receipts (signature plus secret-derived HMAC). Assess whether
+   this actually demonstrates device access to the new key under the intended
+   threat model: it is not unconditional proof of the ECDH private key.
+   Review the race between signed rotation and key package publication,
+   lack of durable/idempotent receipts and offline retained devices, and
    quarantine/rebasing of old-epoch edits after lost acknowledgements.
    Ensure old-epoch writes cannot be silently accepted.
 6. **Owner recovery/transfer:** recovery-kit content, encryption, authority
@@ -85,8 +91,11 @@ these adapters, the prototype fails closed. The **experimental** membership-ledg
 with `ledgerAuthorizers` callbacks, a pinned owner genesis and
 transactional join evidence. However, authenticated production bootstrap,
 server/client agreement on the latest membership head, signed ownership
-transfer, retry receipts and reviewed key-epoch distribution are still absent.
-The recipient challenge/receipt protocol is not yet implemented.
+transfer, production-level durable/idempotent receipt storage and atomic
+key-epoch distribution are still absent. PR #24 now implements a
+**client-side key-delivery receipt prototype**, but does not define server
+receipt transport, retry/freshness rules or guarantees for offline recipients.
+The separate QR-enrollment lost-response receipt protocol is still absent.
 
 The implementation stores server-visible metadata and encrypted list-key
 packages, never a QR seed or plaintext list key. It does not prove that a
