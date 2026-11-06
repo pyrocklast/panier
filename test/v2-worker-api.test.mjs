@@ -4,7 +4,8 @@ import {generateSigningIdentity,sealMutation} from "../v2/crypto.mjs";
 import {generateRecipientAgreementKey,sealRotatedKeyPackages,
   openRotatedKeyPackage} from "../v2/rekey.mjs";
 import {signGenesis,signRotation,previewSignedRotation,
-  verifyMembershipHistory} from "../v2/membership-ledger.mjs";
+  verifyMembershipHistory,membershipEventHash} from "../v2/membership-ledger.mjs";
+import {verifyTrustedHistory} from "../v2/trust.mjs";
 import {prepareQrInvitation,prepareQrRedemption} from "../v2/qr-pairing.mjs";
 import {enrollmentStatement} from "../v2/qr-registry.mjs";
 import {signV2Request,signedRequestPath} from "../v2/api-auth.mjs";
@@ -80,8 +81,19 @@ test("real SQLite DO: QR enrollment, signed reads, encrypted mutation, rotation 
   assert.match(duplicate.error,/unavailable|used|consumed/);
 
   const headData=await signed({listId,member:owner,route:"history",body:{listId}});
-  const trusted=await verifyMembershipHistory(headData.events,owner.keys.publicKeyJwk);
+  // The owner must have pinned this locally signed genesis BEFORE sending
+  // it to bootstrap. Never treat Cloudflare's first history as a trust root.
+  const root={listId,ownerId:owner.id,ownerPublicJwk:owner.keys.publicKeyJwk,
+    source:"owner-local",checkpoint:{
+      sequence:1,head:await membershipEventHash(headData.events[0]),epoch:1,
+    }};
+  const trusted=await verifyTrustedHistory(root,headData.events);
   assert.equal(trusted.members.length,3);
+  // An older but valid signed history cannot undo already observed members.
+  const currentAnchor={...root,checkpoint:{sequence:trusted.sequence,
+    head:trusted.head,epoch:trusted.epoch}};
+  await assert.rejects(verifyTrustedHistory(currentAnchor,headData.events.slice(0,1)),
+    /rollback/);
   const mutation={listId,id:crypto.randomUUID(),type:"item.add",
     payload:{id:crypto.randomUUID(),name:"Eggs",position:"a"}};
   const sealed=await sealMutation({draft:mutation,epoch:1,actorId:b.member.id,
