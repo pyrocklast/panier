@@ -69,7 +69,7 @@ test("isolated v2 Worker health route; production routing not used",async()=>{
 });
 
 test("real SQLite DO: QR enrollment, signed reads, encrypted mutation, rotation and offline retrieval",async()=>{
-  const {listId,owner}=await bootstrap();
+  const {listId,owner,event:locallySignedGenesis}=await bootstrap();
   const initial=crypto.getRandomValues(new Uint8Array(32));
   const first=await invite({listId,owner,secret:initial});
   const a=await recipientEnroll({listId,prepared:first});
@@ -85,7 +85,7 @@ test("real SQLite DO: QR enrollment, signed reads, encrypted mutation, rotation 
   // it to bootstrap. Never treat Cloudflare's first history as a trust root.
   const root={listId,ownerId:owner.id,ownerPublicJwk:owner.keys.publicKeyJwk,
     source:"owner-local",checkpoint:{
-      sequence:1,head:await membershipEventHash(headData.events[0]),epoch:1,
+      sequence:1,head:await membershipEventHash(locallySignedGenesis),epoch:1,
     }};
   const trusted=await verifyTrustedHistory(root,headData.events);
   assert.equal(trusted.members.length,3);
