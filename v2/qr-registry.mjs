@@ -157,6 +157,10 @@ export class QrInvitationRegistry {
       keyShape(memberPublicJwk) && keyShape(agreementPublicJwk) &&
       !samePublicKey(memberPublicJwk, agreementPublicJwk),
       "invalid enrollment request");
+    // A well-formed JWK is not necessarily a valid P-256 curve point.
+    // Reject malformed ECDH agreement keys before membership enrollment.
+    await crypto.subtle.importKey("jwk", jwkXY(agreementPublicJwk),
+      {name:"ECDH",namedCurve:"P-256"},false,[]);
     const tokenHash = b64(new Uint8Array(await crypto.subtle.digest("SHA-256", b64data(token))));
     check(await signed(memberPublicJwk, proof, proofPayload({
       listId, inviteId, memberId, nonce, tokenHash, agreementPublicJwk,
