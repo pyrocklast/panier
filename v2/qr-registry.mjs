@@ -14,6 +14,9 @@ const validEpoch = n => Number.isSafeInteger(n) && n > 0;
 const validTime = n => Number.isSafeInteger(n) && n >= 0;
 const validB64 = (s, max) => typeof s === "string" && s.length > 0 && s.length <= max && B64.test(s);
 const signatureFields = ["v","listId","inviteId","ownerId","epoch","expiresAt","tokenHash","fingerprint","nonce","ciphertext","ownerPublicJwk","signature"];
+const ACTIVE_INVITES="invite:active-index";
+export const MAX_OPEN_INVITES=5;
+
 const unsigned = r => ({ v: r.v, listId: r.listId, inviteId: r.inviteId, ownerId: r.ownerId,
   epoch: r.epoch, expiresAt: r.expiresAt, tokenHash: r.tokenHash, fingerprint: r.fingerprint,
   nonce: r.nonce, ciphertext: r.ciphertext });
@@ -113,8 +116,18 @@ export class QrInvitationRegistry {
         "owner authorization changed before invitation registration");
       const prior = await tx.get(key("invite", inviteId));
       check(!prior, "invitation ID already registered");
+      // Bounded, transactionally maintained active invitation index. Expired
+      // invitations no longer consume slots; closed invites are removed on
+      // successful use/cancellation. The historical member ledger retains
+      // consumed IDs independently for replay protection.
+      const indexed=await tx.get(ACTIVE_INVITES)||[];
+      check(Array.isArray(indexed),"invalid active invitation index");
+      const active=indexed.filter(inv=>inv.expiresAt>now);
+      check(active.length<MAX_OPEN_INVITES,
+        "active invitation quota exceeded");
       await tx.put(key("invite", inviteId), { listId, ownerId, epoch,
         expiresAt, tokenHash, status: "open", serverRecord });
+      await tx.put(ACTIVE_INVITES,[...active,{inviteId,expiresAt}]);
       return { inviteId, expiresAt };
     });
   }
@@ -139,6 +152,8 @@ export class QrInvitationRegistry {
       if (saved.status !== "open") return {status: saved.status};
       saved.status = "revoked";
       await tx.put(key("invite",inviteId), saved);
+      const indexed=await tx.get(ACTIVE_INVITES)||[];
+      await tx.put(ACTIVE_INVITES,indexed.filter(inv=>inv.inviteId!==inviteId));
       return {status:"revoked"};
     });
   }
@@ -196,6 +211,8 @@ export class QrInvitationRegistry {
       saved.status = "used";
       saved.memberId = memberId;
       await tx.put(key("invite", inviteId), saved);
+      const indexed=await tx.get(ACTIVE_INVITES)||[];
+      await tx.put(ACTIVE_INVITES,indexed.filter(inv=>inv.inviteId!==inviteId));
       return {listId, inviteId, memberId, epoch: saved.epoch,
         serverRecord: saved.serverRecord};
     });
