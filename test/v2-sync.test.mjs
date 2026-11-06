@@ -38,8 +38,12 @@ function harness({ history = [], pending = [], failPush = false, onPull } = {}) 
   const transport = {
     async pull(id, since) {
       assert.equal(id, LIST);
-      if (onPull) return onPull(since);
-      return { latest: history.length, changes: history.filter(op => op.revision > since).map(op => ({
+      const page = onPull
+        ? onPull(since)
+        : { latest: history.length, changes: history.filter(op => op.revision > since) };
+      // The test double always serializes server entries as opaque envelopes,
+      // including custom pagination fixtures. This is not real encryption.
+      return { ...page, changes: page.changes?.map(op => ({
         ...op, ciphertext: "opaque:encrypted",
       })) };
     },
