@@ -46,6 +46,8 @@ async function setup() {
       listId===LIST && ownerId===owner.actorId && epoch===1 &&
       ownerPublicJwk.x===owner.publicKeyJwk.x &&
       ownerPublicJwk.y===owner.publicKeyJwk.y,
+    authorizeEnrollment: async ({listId,ownerId,epoch}) =>
+      listId===LIST && ownerId===owner.actorId && epoch===1,
   });
   async function request(memberId="newmember01", override={}) {
     const recipient = await generateSigningIdentity();
@@ -155,6 +157,7 @@ test("transaction rollback prevents partial membership on failure",async()=>{
   const registry=new QrInvitationRegistry({
     storage:failingStorage,now:()=>NOW+100,
     authOwner:async()=>true,
+    authorizeEnrollment:async()=>true,
   });
   const req=await f.request();
   await assert.rejects(registry.redeem(req),/disk abort/);
@@ -162,4 +165,16 @@ test("transaction rollback prevents partial membership on failure",async()=>{
   assert.equal(f.backend.get("invite:"+req.inviteId).status,"open");
   await registry.redeem(req);
   assert.equal(f.backend.get("invite:"+req.inviteId).status,"used");
+});
+
+test("revocation/epoch gate checked at consume time, including after valid issuance", async()=>{
+  const f=await setup();
+  await f.registry.createInvitation(f.serverRecord);
+  const request=await f.request();
+  f.registry.authorizeEnrollment=async()=>false; // member revoked or epoch advanced
+  await assert.rejects(f.registry.redeem(request),/current membership or epoch/);
+  assert.equal(f.backend.get("invite:"+request.inviteId).status,"open");
+  assert.equal(f.backend.get("member:"+request.memberId),undefined);
+  f.registry.authorizeEnrollment=undefined;
+  await assert.rejects(f.registry.redeem(request),/current membership or epoch/);
 });
