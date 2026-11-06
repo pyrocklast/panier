@@ -49,6 +49,8 @@ jobs:
         run: node --test test/v2-rekey.test.mjs
       - name: V2 authenticated rekey receipt tests
         run: node --test test/v2-rekey-receipt.test.mjs
+      - name: V2 durable rekey receipt forwarding tests
+        run: node --test test/v2-rekey-receipt-store.test.mjs
       - name: V2 atomic epoch publication and append fencing tests
         run: node --test test/v2-atomic-rotation.test.mjs
       - name: Start isolated v2 Durable Object locally
