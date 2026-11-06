@@ -33,6 +33,8 @@ jobs:
         run: node --test test/v2-sync.test.mjs
       - name: V2 trusted member/epoch sync tests
         run: node --test test/v2-trusted-sync.test.mjs
+      - name: V2 bounded nonce and API quota tests
+        run: node --test test/v2-do-quotas.test.mjs
       - name: V2 authenticated encryption tests
         run: node --test test/v2-crypto.test.mjs
       - name: V2 in-person QR key transfer tests
