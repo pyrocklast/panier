@@ -1,10 +1,13 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {generateSigningIdentity} from "../v2/crypto.mjs";
+import {generateRecipientAgreementKey,sealRotatedKeyPackages,
+  openRotatedKeyPackage} from "../v2/rekey.mjs";
 import {prepareQrInvitation,prepareQrRedemption} from "../v2/qr-pairing.mjs";
 import {QrInvitationRegistry,enrollmentStatement} from "../v2/qr-registry.mjs";
 import {signGenesis,signRotation,bootstrapLedger,rotateLedger,
-  ledgerAuthorizers,readMembershipEvents,verifyMembershipHistory} from "../v2/membership-ledger.mjs";
+  ledgerAuthorizers,readMembershipEvents,verifyMembershipHistory,
+  verifiedRekeyRecipients} from "../v2/membership-ledger.mjs";
 
 const LIST="household01",NOW=1_750_000_000_000;
 const clone=v=>structuredClone(v);
@@ -41,14 +44,17 @@ async function fixture() {
   const token=(await prepareQrRedemption(invitation.qr,NOW)).token;
   async function request(memberId="newmember01") {
     const recipient=await generateSigningIdentity();
+    const agreement=await generateRecipientAgreementKey();
     const nonce=Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
     const info={listId:LIST,inviteId:invitation.serverRecord.inviteId,
-      memberId,nonce,tokenHash:invitation.serverRecord.tokenHash};
+      memberId,nonce,tokenHash:invitation.serverRecord.tokenHash,
+      agreementPublicJwk:agreement.publicJwk};
     const proof=Buffer.from(await crypto.subtle.sign(
       {name:"ECDSA",hash:"SHA-256"},recipient.privateKey,
       new TextEncoder().encode(enrollmentStatement(info)))).toString("base64url");
     return {listId:LIST,inviteId:info.inviteId,memberId,nonce,token,
-      memberPublicJwk:recipient.publicKeyJwk,proof};
+      memberPublicJwk:recipient.publicKeyJwk,agreementPublicJwk:agreement.publicJwk,
+      proof};
   }
   return {owner,storage,registry,genesis,invitation,listSecret,request};
 }
@@ -80,6 +86,7 @@ test("QR redemption appends signed-grant / recipient proof to same membership ch
   assert.equal(state.members[1].memberId,recipient.memberId);
   assert.equal(state.members[1].role,"member");
   assert.equal(state.members[1].publicJwk.x,recipient.memberPublicJwk.x);
+  assert.equal(state.members[1].agreementPublicJwk.x,recipient.agreementPublicJwk.x);
   assert.equal(state.usedInvites[0],recipient.inviteId);
   assert.equal((await f.storage.get("membership:state")).head,state.head);
   assert.equal((await f.storage.get("invite:"+recipient.inviteId)).status,"used");
@@ -127,6 +134,7 @@ test("signed epoch rotation invalidates old invitations and cannot be forged",as
   await old.registry.createInvitation(secondInvite.serverRecord);
   const nextToken=(await prepareQrRedemption(secondInvite.qr,NOW)).token;
   const nextRecipient=await generateSigningIdentity();
+  const nextAgreement=await generateRecipientAgreementKey();
   const nextNonce=Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
   const nextProof=Buffer.from(await crypto.subtle.sign(
     {name:"ECDSA",hash:"SHA-256"},nextRecipient.privateKey,
@@ -134,10 +142,11 @@ test("signed epoch rotation invalidates old invitations and cannot be forged",as
       listId:LIST,inviteId:secondInvite.serverRecord.inviteId,
       memberId:"newmember02",nonce:nextNonce,
       tokenHash:secondInvite.serverRecord.tokenHash,
+      agreementPublicJwk:nextAgreement.publicJwk,
     })))).toString("base64url");
   const pending={listId:LIST,inviteId:secondInvite.serverRecord.inviteId,
     token:nextToken,memberId:"newmember02",memberPublicJwk:nextRecipient.publicKeyJwk,
-    nonce:nextNonce,proof:nextProof};
+    agreementPublicJwk:nextAgreement.publicJwk,nonce:nextNonce,proof:nextProof};
   await old.registry.redeem(await old.request("newmember01"));
   const previous=await old.storage.get("membership:state");
   const advance=await signRotation({listId:LIST,sequence:previous.sequence+1,
@@ -203,4 +212,73 @@ test("a transaction abort cannot partially commit membership evidence",async()=>
   assert.equal(await f.storage.get("member:"+r.memberId),undefined);
   await registry.redeem(r);
   assert.equal((await readMembershipEvents(f.storage)).length,2);
+});
+
+test("signed member history authenticates ECDH key and rejects substituted key",async()=>{
+  const f=await fixture();
+  await f.registry.createInvitation(f.invitation.serverRecord);
+  const recipient=await f.request();
+  await f.registry.redeem(recipient);
+  const chain=await readMembershipEvents(f.storage);
+  const substituted=await generateRecipientAgreementKey();
+  const forged=structuredClone(chain);
+  forged[1].agreementPublicJwk=substituted.publicJwk;
+  await assert.rejects(verifyMembershipHistory(forged,f.owner.publicKeyJwk),/recipient proof/);
+  const verified=await verifyMembershipHistory(chain,f.owner.publicKeyJwk);
+  assert.equal(verified.members[1].agreementPublicJwk.x,recipient.agreementPublicJwk.x);
+});
+
+test("verified surviving member keys can be used for rekey; revoked identity excluded",async()=>{
+  const f=await fixture();
+  await f.registry.createInvitation(f.invitation.serverRecord);
+  const a=await f.request("newmember01");
+  await f.registry.redeem(a);
+  const second=await prepareQrInvitation({listId:LIST,ownerId:f.owner.actorId,
+    epoch:1,listSecret:f.listSecret,ownerPrivateKey:f.owner.privateKey,
+    ownerPublicJwk:f.owner.publicKeyJwk,now:NOW});
+  await f.registry.createInvitation(second.serverRecord);
+  const agreement=await generateRecipientAgreementKey();
+  const signer=await generateSigningIdentity();
+  const nonce=Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
+  const token=(await prepareQrRedemption(second.qr,NOW)).token;
+  const memberId="newmember02";
+  const proof=Buffer.from(await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},
+    signer.privateKey,new TextEncoder().encode(enrollmentStatement({
+      listId:LIST,inviteId:second.serverRecord.inviteId,memberId,nonce,
+      tokenHash:second.serverRecord.tokenHash,agreementPublicJwk:agreement.publicJwk,
+    })))).toString("base64url");
+  await f.registry.redeem({listId:LIST,inviteId:second.serverRecord.inviteId,
+    memberId,nonce,token,memberPublicJwk:signer.publicKeyJwk,
+    agreementPublicJwk:agreement.publicJwk,proof});
+  const before=await f.storage.get("membership:state");
+  const rotate=await signRotation({listId:LIST,sequence:before.sequence+1,
+    previous:before.head,ownerId:f.owner.actorId,epoch:2,
+    removedMemberId:a.memberId,privateKey:f.owner.privateKey});
+  await rotateLedger(f.storage,rotate);
+  const verified=await verifyMembershipHistory(await readMembershipEvents(f.storage),
+    f.owner.publicKeyJwk);
+  const recipients=verifiedRekeyRecipients(verified,a.memberId);
+  assert.deepEqual(recipients,[{
+    memberId,agreementPublicJwk:{
+      kty:"EC",crv:"P-256",x:agreement.publicJwk.x,y:agreement.publicJwk.y,
+    },
+  }]);
+  const newSecret=crypto.getRandomValues(new Uint8Array(32));
+  const envelopes=await sealRotatedKeyPackages({listId:LIST,
+    ownerId:f.owner.actorId,epoch:2,rotationHead:verified.head,
+    ownerSigningKey:f.owner.privateKey,listSecret:newSecret,
+    trustedRecipients:recipients,removedMemberId:a.memberId});
+  assert.deepEqual(await openRotatedKeyPackage({
+    envelope:envelopes[0],listId:LIST,memberId,
+    currentEpoch:2,rotationHead:verified.head,
+    trustedOwnerSigningKey:f.owner.publicKey,
+    recipientAgreementPrivateKey:agreement.privateKey,
+  }),newSecret);
+  const outsider=await generateRecipientAgreementKey();
+  await assert.rejects(openRotatedKeyPackage({
+    envelope:envelopes[0],listId:LIST,memberId,
+    currentEpoch:2,rotationHead:verified.head,
+    trustedOwnerSigningKey:f.owner.publicKey,
+    recipientAgreementPrivateKey:outsider.privateKey,
+  }));
 });
