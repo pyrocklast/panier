@@ -33,6 +33,10 @@ jobs:
         run: node --test test/v2-sync.test.mjs
       - name: V2 authenticated encryption tests
         run: node --test test/v2-crypto.test.mjs
+      - name: V2 QR invitation package tests
+        run: node --test test/v2-qr-invitation.test.mjs
+      - name: V2 QR recipient signing proof tests
+        run: node --test test/v2-qr-enrollment-proof.test.mjs
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race ./...
