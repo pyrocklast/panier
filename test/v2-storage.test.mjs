@@ -686,7 +686,7 @@ test("Web Crypto rekey envelope round trip and wrong-recipient refusal in real b
       const revoked = await generateRecipientAgreementKey();
       const listSecret = crypto.getRandomValues(new Uint8Array(32));
       const rotationHead = btoa(String.fromCharCode(...new Uint8Array(32).fill(7)))
-        .replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+        .replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
       const packages = await sealRotatedKeyPackages({
         listId: "household01", ownerId: owner.actorId, epoch: 2,
         rotationHead, ownerSigningKey: owner.privateKey,
