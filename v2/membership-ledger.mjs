@@ -100,7 +100,10 @@ async function checkJoin(event,state) {
     validId(event.inviteId)&&validId(event.memberId)&&
     !state.members.some(m=>m.memberId===event.memberId)&&
     !state.usedInvites.includes(event.inviteId)&&
-    obj(event.grant)&&event.grant.listId===state.listId&&
+    exact(event.grant,["v","listId","inviteId","ownerId","epoch",
+      "expiresAt","tokenHash","fingerprint","nonce","ciphertext",
+      "ownerPublicJwk","signature"])&&event.grant.v===1&&
+    event.grant.listId===state.listId&&
     event.grant.inviteId===event.inviteId&&event.grant.ownerId===state.ownerId&&
     event.grant.epoch===state.epoch&&sameKey(event.grant.ownerPublicJwk,state.ownerPublicJwk),
     "invalid or replayed member enrollment");
@@ -152,6 +155,7 @@ export async function rotateLedger(storage,event) {
     ok(state,"membership ledger uninitialised");
     await checkRotation(event,state);
     const next=await applied(state,event);
+    ok(!await tx.get(eventKey(next.sequence)),"membership event sequence already exists");
     await tx.put(eventKey(next.sequence),event);
     await tx.put(ROOT,next);
     return next;
@@ -185,6 +189,7 @@ export function ledgerAuthorizers(storage) {
       memberPublicJwk,nonce,proof,grant:serverRecord});
     await checkJoin(body,state);
     const next=await applied(state,body);
+    ok(!await tx.get(eventKey(next.sequence)),"membership event sequence already exists");
     await tx.put(eventKey(next.sequence),body);
     await tx.put(ROOT,next);
     return next;
@@ -212,6 +217,8 @@ export async function verifyMembershipHistory(events,trustedOwnerPublicJwk) {
 export async function readMembershipEvents(storage) {
   const state=await storage.get(ROOT);
   if(!state)return [];
+  ok(Number.isSafeInteger(state.sequence)&&state.sequence>0&&
+    state.sequence<=10000,"invalid stored membership history length");
   const events=[];
   for(let sequence=1;sequence<=state.sequence;sequence++){
     const event=await storage.get(eventKey(sequence));
