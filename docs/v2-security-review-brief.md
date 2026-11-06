@@ -47,12 +47,19 @@ cryptographic protocols.
   invitation/redeem, signed membership history, atomic rekey and recipient
   retrieval, opaque signed mutation append with epoch fence and pull.
   First real Wrangler local-runtime integration tests.
+- PR #27 — local owner-before-network genesis pinning; independent owner root
+  binding from verified in-person QR on recipient devices; non-extractable
+  signing key persistence and race-safe IndexedDB membership checkpoints
+  rejecting any observed signed fork, shorter history or substituted root.
 
 ## Reviewer priorities
 
-1. **Hostile server/key substitution:** owner signing-key fingerprint pinned
-   into a physical QR; whether server-controlled membership lists, timestamps
-   or actor keys can bypass an otherwise valid signature check.
+1. **Hostile server/key substitution:** review PR #27's local owner genesis
+   pinning before first request and recipient root pinning from the physical
+   QR, along with what happens if an adversary wins the server's initial
+   first-write race. Confirm the protocol never silently trusts a server
+   genesis, and that locally persisted anchors cannot be overwritten by
+   a competing key. Evaluate browser storage loss and recovery handling.
 2. **QR bearer exposure:** an adversary may photograph a QR and derive the
    *current epoch list key*, even after cancellation or successful redemption.
    Consumption prevents additional membership, **not decryption of a leaked
@@ -61,12 +68,15 @@ cryptographic protocols.
 3. **Single-use race/failure handling:** token commitment, concurrent attempts,
    atomic member registration, expiry and cancellation, retry after response
    loss, owner revocation and epoch changes between issuing and redeeming.
-4. **Identity/authorization:** verify PR #21's owner-pinned genesis, signed
-   rotation, and join events made from a signed invitation plus recipient
-   proof. Challenge whether server-controlled ordering, withheld chain
-   suffixes, unpinned heads, or a stale materialized membership cache can
-   grant unauthorized writes or hide revocation. Check for cross-list replay,
-   role escalation and canonical encoding inconsistencies.
+4. **Identity/authorization and rollback:** review PR #21's signed
+   genesis/join/rotation records and PR #27's **persisted checkpoint
+   extension rule**, including two-tab races, valid signed same-sequence
+   forks, offline recovery and contradictory histories shown to separate
+   devices. A pinned head detects only observed rollback/forks; server
+   withholding of a newer unseen suffix is still possible. What authenticated
+   cross-device checkpoint sharing/transparency design is necessary to
+   detect server equivocation? Also review cross-list replay, role escalation,
+   old-epoch writes and canonical serialization.
 5. **Epoch rotation:** examine PR #22's per-member ECDH envelopes and
    PR #23's **signed ECDH public-key binding**, key separation, replacement
    of v1 enrollment statements by v2, and PR #24's owner-verifiable
@@ -117,6 +127,12 @@ This is **not** connected to the deployed Worker and does not establish
 trusted genesis bootstrap, client-pinned server freshness, durable receipts,
 owner recovery or production traffic/abuse protections.
 The separate QR-enrollment lost-response receipt protocol is still absent.
+
+PR #27 adds a **client-side** IndexedDB trust-anchor store and
+monotonic membership checkpoints, but no shipped PWA calls these functions
+yet. Locally saved roots and checkpoint comparisons cannot prove freshness
+beyond the last observed authenticated state, and private-browser-data
+eviction requires trusted recovery, not server-side TOFU.
 
 The implementation stores server-visible metadata and encrypted list-key
 packages, never a QR seed or plaintext list key. It does not prove that a
