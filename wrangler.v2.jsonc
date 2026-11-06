@@ -1,0 +1,14 @@
+// Isolated v2 only. DOES NOT replace production wrangler.jsonc.
+// Local dry-run: npx wrangler@4.151.2 dev --config wrangler.v2.jsonc
+{
+  "name": "panier-v2-protocol-sandbox",
+  "main": "v2/cloudflare-worker.mjs",
+  "compatibility_date": "2026-10-01",
+  "durable_objects": {
+    "bindings": [{ "name": "V2_LISTS", "class_name": "V2List" }]
+  },
+  "migrations": [{ "tag": "v2-sandbox-1", "new_sqlite_classes": ["V2List"] }],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false }
+}
