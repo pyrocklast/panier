@@ -15,6 +15,7 @@ const DOMAIN_SOURCE = readFileSync(fileURLToPath(new URL("../v2/domain.mjs", imp
 const SYNC_SOURCE = readFileSync(fileURLToPath(new URL("../v2/sync.mjs", import.meta.url)), "utf8");
 const CRYPTO_SOURCE = readFileSync(fileURLToPath(new URL("../v2/crypto.mjs", import.meta.url)), "utf8");
 const QR_SOURCE = readFileSync(fileURLToPath(new URL("../v2/qr-pairing.mjs", import.meta.url)), "utf8");
+const REKEY_SOURCE = readFileSync(fileURLToPath(new URL("../v2/rekey.mjs", import.meta.url)), "utf8");
 let browser, server, origin;
 
 before(async () => {
@@ -25,12 +26,13 @@ before(async () => {
       res.end("<title>V2 storage test</title>");
     } else if (path === "/v2/storage.mjs" || path === "/v2/domain.mjs" ||
         path === "/v2/sync.mjs" || path === "/v2/crypto.mjs" ||
-        path === "/v2/qr-pairing.mjs") {
+        path === "/v2/qr-pairing.mjs" || path === "/v2/rekey.mjs") {
       res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
       res.end(path === "/v2/storage.mjs" ? STORAGE_SOURCE :
         path === "/v2/domain.mjs" ? DOMAIN_SOURCE :
         path === "/v2/sync.mjs" ? SYNC_SOURCE :
-        path === "/v2/crypto.mjs" ? CRYPTO_SOURCE : QR_SOURCE);
+        path === "/v2/crypto.mjs" ? CRYPTO_SOURCE :
+        path === "/v2/qr-pairing.mjs" ? QR_SOURCE : REKEY_SOURCE);
     } else {
       res.writeHead(404); res.end("Not found");
     }
@@ -667,6 +669,49 @@ test("in-person QR owner-offline key transfer works in Chromium and Firefox Web 
     });
     assert.deepEqual(result, {
       sameKey: true, sameList: true, distinctToken: true, ownerKeyPrivate: true,
+    });
+  } finally { await context.close(); }
+});
+
+test("Web Crypto rekey envelope round trip and wrong-recipient refusal in real browsers", async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await pageWithModules(context);
+    const result = await evaluate(page, async () => {
+      const { generateSigningIdentity } = await import("/v2/crypto.mjs");
+      const { generateRecipientAgreementKey, sealRotatedKeyPackages,
+        openRotatedKeyPackage } = await import("/v2/rekey.mjs");
+      const owner = await generateSigningIdentity();
+      const remaining = await generateRecipientAgreementKey();
+      const revoked = await generateRecipientAgreementKey();
+      const listSecret = crypto.getRandomValues(new Uint8Array(32));
+      const rotationHead = btoa(String.fromCharCode(...new Uint8Array(32).fill(7)))
+        .replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+      const packages = await sealRotatedKeyPackages({
+        listId: "household01", ownerId: owner.actorId, epoch: 2,
+        rotationHead, ownerSigningKey: owner.privateKey,
+        listSecret, removedMemberId: "removed001",
+        trustedRecipients: [{ memberId: "memberAA01",
+          agreementPublicJwk: remaining.publicJwk }],
+      });
+      const args = {
+        envelope: packages[0], listId: "household01", memberId: "memberAA01",
+        currentEpoch: 2, rotationHead, trustedOwnerSigningKey: owner.publicKey,
+      };
+      const decrypted = await openRotatedKeyPackage({
+        ...args, recipientAgreementPrivateKey: remaining.privateKey,
+      });
+      let refused = false;
+      try {
+        await openRotatedKeyPackage({
+          ...args, recipientAgreementPrivateKey: revoked.privateKey,
+        });
+      } catch (_) { refused = true; }
+      return { sameKey: decrypted.every((byte, i) => byte === listSecret[i]),
+        refused, keyNotExtractable: remaining.privateKey.extractable === false };
+    });
+    assert.deepEqual(result, {
+      sameKey: true, refused: true, keyNotExtractable: true,
     });
   } finally { await context.close(); }
 });
