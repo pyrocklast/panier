@@ -28,6 +28,9 @@ cryptographic protocols.
 - PR #21 — experimental owner-pinned, hash-linked membership ledger:
   signed genesis/rotations and QR grant plus recipient proof for joins;
   full-chain verification and ledger-backed registration gates.
+- PR #22 — encrypted post-revocation key-envelope prototype: separate P-256
+  ECDH identities, recipient-specific AES-GCM key wraps and signed epoch-head
+  binding, plus explicit quarantine of stale offline mutations.
 
 ## Reviewer priorities
 
@@ -48,9 +51,12 @@ cryptographic protocols.
    suffixes, unpinned heads, or a stale materialized membership cache can
    grant unauthorized writes or hide revocation. Check for cross-list replay,
    role escalation and canonical encoding inconsistencies.
-5. **Epoch rotation:** revocation under offline edits and missing acknowledgements,
-   how new epoch keys reach remaining members and how to prevent old-epoch
-   writes from being silently accepted.
+5. **Epoch rotation:** examine PR #22's per-member ECDH envelopes, key
+   separation, owner-authenticated recipient ECDH bindings (not yet in signed
+   joins), race between signed rotation and package publication, absence of
+   packages for offline retained devices, and quarantine/rebasing of pending
+   old-epoch mutations after lost acknowledgements. Ensure old-epoch writes
+   cannot be silently accepted.
 6. **Owner recovery/transfer:** recovery-kit content, encryption, authority
    restoration, replay prevention, invalidation of previous owner kits, and
    recovery after device loss without granting server administrative recovery.
