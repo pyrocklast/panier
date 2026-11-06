@@ -62,6 +62,10 @@ cryptographic protocols.
 - PR #31 — single-use QR enrollment made safely retryable after ambiguous
   HTTP outcomes, restricted to the exact active member signing/ECDH identity;
   no second membership is granted, even with a photographed QR.
+- PR #32 — separate IndexedDB persistence of non-extractable recipient ECDSA
+  and ECDH private CryptoKeys, bound to the original physical-QR-pinned
+  owner root and signed membership record, with local signing/ECDH pair tests,
+  no silent key replacement, restart recovery and revocation rejection.
 
 ## Reviewer priorities
 
@@ -100,7 +104,8 @@ cryptographic protocols.
    Review PR #25's atomic rotation + complete package publication and
    membership-head prediction, including missing/forged recipient packages,
    concurrent rotations, epoch fences and recipient access after later joins.
-   Review the still-missing durable/idempotent receipts, verified append
+   Review PR #30's durable-but-not-owner-confirmed signed receipts, the
+   missing reviewed invalid-receipt replacement flow, verified append
    authorization, offline key history and quarantine/rebasing of old-epoch
    edits after lost acknowledgements.
    Ensure old-epoch writes cannot be silently accepted.
@@ -110,8 +115,11 @@ cryptographic protocols.
 7. **Wire-format consistency:** canonical JSON ordering, ECDSA signature
    representation, AES-GCM nonce uniqueness/AAD, HKDF domains, key separation,
    cross-browser test vectors and downgrade resistance.
-8. **Storage/browser threats:** non-extractable keys in IndexedDB, same-origin
-   malicious JavaScript, plaintext optimistic cache, local data eviction,
+8. **Storage/browser threats:** review PR #32's locally persisted
+   non-extractable ECDSA/ECDH CryptoKeys, recipient signed membership/root
+   checks, ECDH keypair self-test and behavior across browser restarts or
+   storage eviction. Non-extractability DOES NOT prevent malicious same-origin
+   JavaScript invoking the keys. Review plaintext optimistic cache,
    user-supplied crypto/IDB adapter behavior, CSP/supply chain controls.
 9. **Backend abuse and availability:** inspect the actual DO routes in
    PR #26, request-signature and accepted-mutation validation, and PR #29's
