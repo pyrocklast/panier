@@ -165,8 +165,10 @@ export async function rotateLedger(storage,event) {
  * ledger transition. This does not defend against server withholding history.
  */
 export function ledgerAuthorizers(storage) {
-  const authOwner=async({listId,ownerId,epoch,ownerPublicJwk})=>{
-    const state=await storage.get(ROOT);
+  const authOwner=async({tx,listId,ownerId,epoch,ownerPublicJwk})=>{
+    // When called inside QR registry's write transaction, read the SAME
+    // transactional snapshot. An external read reopens an issuance race.
+    const state=await (tx || storage).get(ROOT);
     return !!state&&state.listId===listId&&state.ownerId===ownerId&&
       state.epoch===epoch&&sameKey(state.ownerPublicJwk,ownerPublicJwk);
   };
