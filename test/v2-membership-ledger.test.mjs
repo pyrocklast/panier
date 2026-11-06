@@ -114,15 +114,15 @@ test("signed epoch rotation invalidates old invitations and cannot be forged",as
   const rotation=await signRotation({listId:LIST,sequence:current.sequence+1,
     previous:current.head,ownerId:f.owner.actorId,epoch:current.epoch+1,
     removedMemberId:recipient.memberId,privateKey:f.owner.privateKey});
-  const rotated=await rotateLedger(f.storage,rotation);
+  const rotated=await rotateLedger(f.storage,rotation,{testOnlyUnsafe:true});
   assert.equal(rotated.epoch,2);
   assert.equal(rotated.members.find(m=>m.memberId===recipient.memberId).active,false);
   assert.equal((await verifyMembershipHistory(await readMembershipEvents(f.storage),
     f.owner.publicKeyJwk)).head,rotated.head);
-  await assert.rejects(rotateLedger(f.storage,rotation),/stale/);
+  await assert.rejects(rotateLedger(f.storage,rotation,{testOnlyUnsafe:true}),/stale/);
   const wrong=structuredClone(rotation);wrong.epoch=3;wrong.sequence=rotated.sequence+1;
   wrong.previous=rotated.head;
-  await assert.rejects(rotateLedger(f.storage,wrong));
+  await assert.rejects(rotateLedger(f.storage,wrong,{testOnlyUnsafe:true}));
   // A DIFFERENT open QR from epoch 1 must fail after signed rotation,
   // even though its own single-use status is still "open".
   const old=await fixture();
@@ -153,7 +153,7 @@ test("signed epoch rotation invalidates old invitations and cannot be forged",as
   const advance=await signRotation({listId:LIST,sequence:previous.sequence+1,
     previous:previous.head,ownerId:old.owner.actorId,epoch:2,
     removedMemberId:"newmember01",privateKey:old.owner.privateKey});
-  await rotateLedger(old.storage,advance);
+  await rotateLedger(old.storage,advance,{testOnlyUnsafe:true});
   assert.equal((await old.storage.get("invite:"+pending.inviteId)).status,"open");
   await assert.rejects(old.registry.redeem(pending),/current membership or epoch/);
   assert.equal(await old.storage.get("member:newmember02"),undefined);
@@ -255,7 +255,7 @@ test("verified surviving member keys can be used for rekey; revoked identity exc
   const rotate=await signRotation({listId:LIST,sequence:before.sequence+1,
     previous:before.head,ownerId:f.owner.actorId,epoch:2,
     removedMemberId:a.memberId,privateKey:f.owner.privateKey});
-  await rotateLedger(f.storage,rotate);
+  await rotateLedger(f.storage,rotate,{testOnlyUnsafe:true});
   const verified=await verifyMembershipHistory(await readMembershipEvents(f.storage),
     f.owner.publicKeyJwk);
   const recipients=verifiedRekeyRecipients(verified,a.memberId);
