@@ -78,8 +78,13 @@ test("real SQLite DO: QR enrollment, signed reads, encrypted mutation, rotation 
   const b=await recipientEnroll({listId,prepared:second});
   await post(signedRequestPath(listId,"redeem"),{body:a.body},null,201);
   await post(signedRequestPath(listId,"redeem"),{body:b.body},null,201);
-  const duplicate=await post(signedRequestPath(listId,"redeem"),{body:a.body},null,409);
-  assert.match(duplicate.error,/unavailable|used|consumed/);
+  const duplicate=await post(signedRequestPath(listId,"redeem"),{body:a.body},null,201);
+  assert.equal(duplicate.alreadyUsed,true);
+  assert.equal(duplicate.memberId,a.member.id);
+  const intruder=await recipientEnroll({listId,prepared:first});
+  const stolen=await post(signedRequestPath(listId,"redeem"),
+    {body:intruder.body},null,403);
+  assert.match(stolen.error,/used by another device/);
 
   const headData=await signed({listId,member:owner,route:"history",body:{listId}});
   // The owner must have pinned this locally signed genesis BEFORE sending
@@ -167,6 +172,9 @@ test("real SQLite DO: QR enrollment, signed reads, encrypted mutation, rotation 
   const revoked=await signed({listId,member:a.member,route:"key-package",
     body:{listId},expected:403});
   assert.match(revoked.error,/authorized/);
+  const invalidRetry=await post(signedRequestPath(listId,"redeem"),
+    {body:a.body},null,403);
+  assert.match(invalidRetry.error,/no longer authorized/);
   const stale=await signed({listId,member:b.member,route:"mutations",
     body:sealed,expected:409});
   assert.match(stale.error,/stale/);
