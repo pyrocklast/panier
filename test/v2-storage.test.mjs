@@ -212,9 +212,26 @@ test("persistent storage reports capability without claiming durability", async 
     const page = await pageWithModules(context);
     const result = await page.evaluate(async () => {
       const { requestPersistentStorage } = await import("/v2/storage.mjs");
-      const outcome = await requestPersistentStorage();
-      return { supported: typeof outcome.supported, granted: typeof outcome.granted };
+      // Never invoke the browser's real persist() permission prompt in CI:
+      // Firefox can wait indefinitely for the user to respond.
+      Object.defineProperty(navigator, "storage", {
+        configurable: true, value: { persist: async () => false },
+      });
+      const denied = await requestPersistentStorage();
+      Object.defineProperty(navigator, "storage", {
+        configurable: true, value: { persist: async () => true },
+      });
+      const granted = await requestPersistentStorage();
+      Object.defineProperty(navigator, "storage", {
+        configurable: true, value: {},
+      });
+      const unsupported = await requestPersistentStorage();
+      return { denied, granted, unsupported };
     });
-    assert.deepEqual(result, { supported: "boolean", granted: "boolean" });
+    assert.deepEqual(result, {
+      denied: { supported: true, granted: false },
+      granted: { supported: true, granted: true },
+      unsupported: { supported: false, granted: false },
+    });
   } finally { await context.close(); }
 });
