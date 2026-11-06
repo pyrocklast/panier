@@ -32,6 +32,8 @@ const keyShape = k => record(k) && k.kty === "EC" && k.crv === "P-256" &&
   validB64(k.x, 50) && validB64(k.y, 50) &&
   b64data(k.x).length === 32 && b64data(k.y).length === 32;
 const jwkXY = k => ({kty:"EC",crv:"P-256",x:k.x,y:k.y});
+const samePublicKey = (a,b) => jwkXY(a).x === jwkXY(b).x &&
+  jwkXY(a).y === jwkXY(b).y;
 const fingerprint = async k =>
   b64(new Uint8Array(await crypto.subtle.digest("SHA-256", te.encode(JSON.stringify(jwkXY(k))))));
 async function publicKey(k) {
@@ -57,8 +59,13 @@ function validatePackage(r, now) {
     keyShape(r.ownerPublicJwk) && validB64(r.signature, 128),
     "invalid or expired owner invitation package");
 }
-function proofPayload({listId,inviteId,memberId,nonce,tokenHash}) {
-  return JSON.stringify({v:1,purpose:"panier-v2-qr-enroll",listId,inviteId,memberId,nonce,tokenHash});
+// Signing-key proof authenticates the separate ECDH public key. ECDH PRIVATE
+// key possession still needs a challenge/confirmation before activation.
+function proofPayload({listId,inviteId,memberId,nonce,tokenHash,agreementPublicJwk}) {
+  check(keyShape(agreementPublicJwk), "invalid recipient agreement public key");
+  return JSON.stringify({v:2,purpose:"panier-v2-qr-enroll+ecdh",
+    listId,inviteId,memberId,nonce,tokenHash,
+    agreementPublicJwk:jwkXY(agreementPublicJwk)});
 }
 function key(name, id) { return name + ":" + id; }
 
@@ -142,14 +149,21 @@ export class QrInvitationRegistry {
    * The recipient signs a deterministic enrollment statement with a fresh
    * signing key. This proves possession, NOT personal identity or proximity.
    */
-  async redeem({listId, inviteId, token, memberId, memberPublicJwk, nonce, proof}) {
+  async redeem({listId, inviteId, token, memberId, memberPublicJwk,
+    agreementPublicJwk, nonce, proof}) {
     check(validId(listId) && validId(inviteId) && validId(memberId) &&
       validB64(token, 50) && b64data(token).length === 32 &&
       validB64(nonce, 64) && b64data(nonce).length >= 16 &&
-      keyShape(memberPublicJwk), "invalid enrollment request");
+      keyShape(memberPublicJwk) && keyShape(agreementPublicJwk) &&
+      !samePublicKey(memberPublicJwk, agreementPublicJwk),
+      "invalid enrollment request");
+    // A well-formed JWK is not necessarily a valid P-256 curve point.
+    // Reject malformed ECDH agreement keys before membership enrollment.
+    await crypto.subtle.importKey("jwk", jwkXY(agreementPublicJwk),
+      {name:"ECDH",namedCurve:"P-256"},false,[]);
     const tokenHash = b64(new Uint8Array(await crypto.subtle.digest("SHA-256", b64data(token))));
     check(await signed(memberPublicJwk, proof, proofPayload({
-      listId, inviteId, memberId, nonce, tokenHash,
+      listId, inviteId, memberId, nonce, tokenHash, agreementPublicJwk,
     })), "recipient proof of possession failed");
     const now = this.now();
     return this.storage.transaction(async tx => {
@@ -171,10 +185,12 @@ export class QrInvitationRegistry {
         // The signed-invitation/recipient-proof ledger event must be appended
         // atomically with member registration and invite consumption.
         await this.registerMember({tx,listId,inviteId,memberId,
-          memberPublicJwk,nonce,proof,serverRecord:saved.serverRecord});
+          memberPublicJwk,agreementPublicJwk,nonce,proof,
+          serverRecord:saved.serverRecord});
       }
       await tx.put(key("member", memberId), {
         memberId, listId, publicJwk: jwkXY(memberPublicJwk),
+        agreementPublicJwk: jwkXY(agreementPublicJwk),
         invitedBy: saved.ownerId, invitationId: inviteId, epoch: saved.epoch,
       });
       saved.status = "used";

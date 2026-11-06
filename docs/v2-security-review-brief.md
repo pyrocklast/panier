@@ -31,6 +31,10 @@ cryptographic protocols.
 - PR #22 — encrypted post-revocation key-envelope prototype: separate P-256
   ECDH identities, recipient-specific AES-GCM key wraps and signed epoch-head
   binding, plus explicit quarantine of stale offline mutations.
+- PR #23 — QR enrollment v2 authenticates each recipient's separate ECDH
+  agreement public key in the signed enrollment proof and membership ledger,
+  and derives rekey recipients from the verified ledger rather than a
+  server-supplied list.
 
 ## Reviewer priorities
 
@@ -51,12 +55,13 @@ cryptographic protocols.
    suffixes, unpinned heads, or a stale materialized membership cache can
    grant unauthorized writes or hide revocation. Check for cross-list replay,
    role escalation and canonical encoding inconsistencies.
-5. **Epoch rotation:** examine PR #22's per-member ECDH envelopes, key
-   separation, owner-authenticated recipient ECDH bindings (not yet in signed
-   joins), race between signed rotation and package publication, absence of
-   packages for offline retained devices, and quarantine/rebasing of pending
-   old-epoch mutations after lost acknowledgements. Ensure old-epoch writes
-   cannot be silently accepted.
+5. **Epoch rotation:** examine PR #22's per-member ECDH envelopes and
+   PR #23's **signed ECDH public-key binding**, key separation, replacement
+   of v1 enrollment statements by v2, and the missing ECDH private-key
+   confirmation/receipt. Review the race between signed rotation and key
+   package publication, lack of delivery to offline retained devices, and
+   quarantine/rebasing of old-epoch edits after lost acknowledgements.
+   Ensure old-epoch writes cannot be silently accepted.
 6. **Owner recovery/transfer:** recovery-kit content, encryption, authority
    restoration, replay prevention, invalidation of previous owner kits, and
    recovery after device loss without granting server administrative recovery.

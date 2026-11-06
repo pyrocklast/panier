@@ -23,7 +23,10 @@ unchanged.
    `verifyMembershipHistory(events, trustedOwnerPublicJwk)`.
 3. **Join events** record the owner's signed, list/epoch-scoped QR invitation
    grant and the recipient's signed proof of possession of the new signing
-   key. A join cannot be replayed using the same invitation ID or member ID.
+   key. The enrollment statement (version 2) also **signs a separate P-256
+   ECDH agreement public key**. The ledger records both independently:
+   the signing public key and the recipient's authenticated ECDH public key.
+   A join cannot be replayed using the same invitation ID or member ID.
    The QR registry's `registerMember` hook writes this evidence and its
    derived state **inside the same transaction** as invite consumption and
    membership registration.
@@ -46,6 +49,11 @@ unchanged.
 - **Owner recovery/transfer is NOT implemented.** There is one owner key in
   this prototype; changing owner authority and invalidating old recovery
   kits will require a separately reviewed signed transition.
+- **ECDH authentication is not ECDH private-key proof.** A member's signing
+  key authenticates their chosen agreement public key; possession of the
+  corresponding agreement private key is only demonstrated by successfully
+  decrypting a recipient-specific key package. An explicit confirmation
+  handshake is still required before treating delivery as complete.
 - **Rotation is NOT rekeying.** The ledger can advance an epoch and revoke
   membership, but cannot itself distribute a new list secret or prevent a
   removed member from reading ciphertext already obtained. Never permit
@@ -80,7 +88,8 @@ unchanged.
 - join event with signed invitation grant and recipient proof;
 - two competing scans yielding one accepted membership history event;
 - signed epoch change, denied stale epochs and invalid rotation signatures;
-- detection of tampered grants, keys, chain ordering and replay;
+- detection of tampered grants, substituted ECDH agreement keys, chain
+  ordering and replay, and verified recipient selection for rekey;
 - transaction rollback without partial event, member or QR use.
 
 Existing reducer, cryptography, QR and IndexedDB browser tests continue to

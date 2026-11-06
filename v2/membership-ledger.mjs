@@ -55,9 +55,10 @@ const grantBody = g => ({
   fingerprint:g.fingerprint,nonce:g.nonce,ciphertext:g.ciphertext,
 });
 const joinBody = ({listId,sequence,previous,ownerId,epoch,inviteId,memberId,
-  memberPublicJwk,nonce,proof,grant}) => ({
-  v:1,kind:"join",listId,sequence,previous,ownerId,epoch,inviteId,
-  memberId,memberPublicJwk:publicJwk(memberPublicJwk),nonce,proof,grant,
+  memberPublicJwk,agreementPublicJwk,nonce,proof,grant}) => ({
+  v:2,kind:"join",listId,sequence,previous,ownerId,epoch,inviteId,
+  memberId,memberPublicJwk:publicJwk(memberPublicJwk),
+  agreementPublicJwk:publicJwk(agreementPublicJwk),nonce,proof,grant,
 });
 
 export async function signGenesis({listId,ownerId,ownerPublicJwk,privateKey}) {
@@ -93,8 +94,8 @@ async function checkRotation(event,state) {
 }
 async function checkJoin(event,state) {
   ok(exact(event,["v","kind","listId","sequence","previous","ownerId","epoch","inviteId",
-    "memberId","memberPublicJwk","nonce","proof","grant"])&&
-    event.v===1&&event.kind==="join"&&event.listId===state.listId&&
+    "memberId","memberPublicJwk","agreementPublicJwk","nonce","proof","grant"])&&
+    event.v===2&&event.kind==="join"&&event.listId===state.listId&&
     event.sequence===state.sequence+1&&event.previous===state.head&&
     event.ownerId===state.ownerId&&event.epoch===state.epoch&&
     validId(event.inviteId)&&validId(event.memberId)&&
@@ -112,6 +113,7 @@ async function checkJoin(event,state) {
   ok(await verify(event.memberPublicJwk,event.proof,enrollmentStatement({
     listId:event.listId,inviteId:event.inviteId,memberId:event.memberId,
     nonce:event.nonce,tokenHash:event.grant.tokenHash,
+    agreementPublicJwk:event.agreementPublicJwk,
   })), "invalid recipient proof");
 }
 async function applied(state,event) {
@@ -127,6 +129,7 @@ async function applied(state,event) {
   if(event.kind==="join")return {...state,sequence:event.sequence,head,
     members:[...state.members,{memberId:event.memberId,
       publicJwk:publicJwk(event.memberPublicJwk),
+      agreementPublicJwk:publicJwk(event.agreementPublicJwk),
       role:"member",active:true,joinedEpoch:state.epoch}],
     usedInvites:[...state.usedInvites,event.inviteId]};
   return {...state,sequence:event.sequence,head,epoch:event.epoch,
@@ -181,12 +184,13 @@ export function ledgerAuthorizers(storage) {
     return !!state&&state.listId===listId&&state.ownerId===ownerId&&
       state.epoch===epoch&&state.members.some(m=>m.memberId===ownerId&&m.active&&m.role==="owner");
   };
-  const registerMember=async({tx,listId,inviteId,memberId,memberPublicJwk,nonce,proof,serverRecord})=>{
+  const registerMember=async({tx,listId,inviteId,memberId,memberPublicJwk,
+    agreementPublicJwk,nonce,proof,serverRecord})=>{
     const state=await tx.get(ROOT);
     ok(state&&state.listId===listId,"membership ledger not initialised");
     const body=joinBody({listId,sequence:state.sequence+1,previous:state.head,
       ownerId:state.ownerId,epoch:state.epoch,inviteId,memberId,
-      memberPublicJwk,nonce,proof,grant:serverRecord});
+      memberPublicJwk,agreementPublicJwk,nonce,proof,grant:serverRecord});
     await checkJoin(body,state);
     const next=await applied(state,body);
     ok(!await tx.get(eventKey(next.sequence)),"membership event sequence already exists");
@@ -226,4 +230,26 @@ export async function readMembershipEvents(storage) {
     events.push(event);
   }
   return events;
+}
+
+
+/**
+ * Select recipient agreement keys only from a locally VERIFIED membership
+ * history, never an untrusted server-provided recipient list. The owner is
+ * excluded: owner creates the new epoch secret locally.
+ *
+ * CAUTION: callers must first verifyMembershipHistory() with a pinned
+ * genesis AND check a previously pinned/latest head for rollback attacks.
+ * A stale but valid chain is not proof of current membership.
+ */
+export function verifiedRekeyRecipients(verifiedState, removedMemberId) {
+  ok(obj(verifiedState) && validId(removedMemberId) &&
+    Array.isArray(verifiedState.members), "invalid verified membership state");
+  ok(verifiedState.members.some(m=>m.memberId===removedMemberId &&
+    m.role==="member"&&!m.active),"removed member must be revoked");
+  return verifiedState.members.filter(m=>m.active&&m.role==="member")
+    .map(m=>{
+      ok(m.agreementPublicJwk,"active member is missing authenticated ECDH binding");
+      return {memberId:m.memberId,agreementPublicJwk:publicJwk(m.agreementPublicJwk)};
+    });
 }
