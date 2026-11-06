@@ -55,7 +55,10 @@ export async function pullVerified({
     const cursor = local.accepted.revision;
     let page;
     try { page = await transport.pull(listId, cursor); }
-    catch (error) { throw new SyncFailure("network", "Unable to download changes", error); }
+    catch (error) {
+      if (error instanceof SyncFailure) throw error;
+      throw new SyncFailure("network", "Unable to download changes", error);
+    }
     if (!page || !validRevision(page.latest) || !Array.isArray(page.changes) ||
         page.changes.length > maxPageSize || page.latest < cursor) {
       fail("protocol", "Server returned an invalid revision page");
@@ -130,7 +133,10 @@ export async function syncOnce({
       fail("seal", "Missing or mismatched durable encrypted mutation");
     }
     try { await transport.push(listId, sealed); }
-    catch (error) { throw new SyncFailure("network", "Unable to upload encrypted mutation", error); }
+    catch (error) {
+      if (error instanceof SyncFailure) throw error;
+      throw new SyncFailure("network", "Unable to upload encrypted mutation", error);
+    }
     pushed++;
   }
   const second = await pullVerified({ db, listId, storage, transport, security, maxPages });
