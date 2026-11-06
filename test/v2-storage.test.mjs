@@ -13,6 +13,7 @@ const browserType = require("playwright")[process.env.BROWSER || "chromium"];
 const STORAGE_SOURCE = readFileSync(fileURLToPath(new URL("../v2/storage.mjs", import.meta.url)), "utf8");
 const DOMAIN_SOURCE = readFileSync(fileURLToPath(new URL("../v2/domain.mjs", import.meta.url)), "utf8");
 const SYNC_SOURCE = readFileSync(fileURLToPath(new URL("../v2/sync.mjs", import.meta.url)), "utf8");
+const CRYPTO_SOURCE = readFileSync(fileURLToPath(new URL("../v2/crypto.mjs", import.meta.url)), "utf8");
 let browser, server, origin;
 
 before(async () => {
@@ -21,10 +22,12 @@ before(async () => {
     if (path === "/") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end("<title>V2 storage test</title>");
-    } else if (path === "/v2/storage.mjs" || path === "/v2/domain.mjs" || path === "/v2/sync.mjs") {
+    } else if (path === "/v2/storage.mjs" || path === "/v2/domain.mjs" ||
+        path === "/v2/sync.mjs" || path === "/v2/crypto.mjs") {
       res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
       res.end(path === "/v2/storage.mjs" ? STORAGE_SOURCE :
-        path === "/v2/domain.mjs" ? DOMAIN_SOURCE : SYNC_SOURCE);
+        path === "/v2/domain.mjs" ? DOMAIN_SOURCE :
+        path === "/v2/sync.mjs" ? SYNC_SOURCE : CRYPTO_SOURCE);
     } else {
       res.writeHead(404); res.end("Not found");
     }
@@ -583,6 +586,51 @@ test("experimental v2 unsealed entries survive schema upgrade but cannot be uplo
     assert.deepEqual(result, {
       pending: 1, denied: true, schema: 2,
       v1: "original-v1-data-must-survive",
+    });
+  } finally { await context.close(); }
+});
+
+test("WebCrypto signed mutation round-trips through durable IndexedDB in Chromium and Firefox", async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await pageWithModules(context);
+    const result = await evaluate(page, async name => {
+      const storage = await import("/v2/storage.mjs");
+      const crypt = await import("/v2/crypto.mjs");
+      const identity = await crypt.generateSigningIdentity();
+      const listSecret = crypto.getRandomValues(new Uint8Array(32));
+      const draft = { listId: "household01", id: "mutation01", type: "item.add",
+        payload: { id: "itemAA001", name: "Milk", position: "a" } };
+      const sealed = await crypt.sealMutation({
+        draft, epoch: 1, actorId: identity.actorId,
+        privateKey: identity.privateKey, listSecret,
+      });
+      let db = await storage.openPanierDatabase({ name });
+      await storage.createLocalList(db, draft.listId);
+      await storage.commitSealedLocalMutation(db, draft, sealed);
+      db.close();
+      db = await storage.openPanierDatabase({ name });
+      const restored = await storage.loadSealedMutation(db, draft.listId, draft.id);
+      const trusted = await crypt.importMemberPublicKey(identity.publicKeyJwk);
+      const accepted = await crypt.openMutation({
+        listId: draft.listId,
+        opaque: { id: draft.id, revision: 1, ciphertext: restored.ciphertext },
+        resolveMember: async ({ listId, actorId, epoch }) =>
+          listId === draft.listId && actorId === identity.actorId && epoch === 1 ? trusted : null,
+        resolveListSecret: async ({ listId, epoch }) =>
+          listId === draft.listId && epoch === 1 ? listSecret : null,
+      });
+      await storage.acceptRemoteOperations(db, draft.listId, [accepted]);
+      const state = await storage.readLocalList(db, draft.listId);
+      const gone = await storage.loadSealedMutation(db, draft.listId, draft.id);
+      db.close();
+      return { item: state.accepted.items.itemAA001.name, cursor: state.accepted.revision,
+        pending: state.pending.length, ciphertextIdentical: sealed.ciphertext === restored.ciphertext,
+        acknowledged: gone === null, nonExtractable: identity.privateKey.extractable === false };
+    }, dbName());
+    assert.deepEqual(result, {
+      item: "Milk", cursor: 1, pending: 0, ciphertextIdentical: true,
+      acknowledged: true, nonExtractable: true,
     });
   } finally { await context.close(); }
 });
