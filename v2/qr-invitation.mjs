@@ -55,7 +55,12 @@ export function parseInvitationQr(qrText) {
   const decoded = decoder.decode(unb64(qrText.slice(QR_PREFIX.length), 600));
   const qr = JSON.parse(decoded);
   assert(canonical(qr) === decoded, "noncanonical QR payload");
-  return validateQr(qr);
+  validateQr(qr);
+  assert(decoded === canonical({
+    v: qr.v, invitationId: qr.invitationId, listId: qr.listId,
+    key: qr.key, redeem: qr.redeem, ownerFingerprint: qr.ownerFingerprint,
+  }), "noncanonical QR field order");
+  return qr;
 }
 
 // The QR does not include the owner public JWK. Fetch it alongside the
@@ -145,6 +150,13 @@ export async function openQrInvitation({
   assert(positiveTime(now), "invalid clock");
   assert(exact(record, ["header", "nonce", "ciphertext", "signature", "ownerPublicJwk"]) &&
     publicFormat(record.ownerPublicJwk), "invalid invitation record");
+  // Require the specified wire ordering, not merely valid JSON. This avoids
+  // multiple serialized representations of the same signed package.
+  assert(canonical(record) === canonical({
+    header: record.header, nonce: record.nonce,
+    ciphertext: record.ciphertext, signature: record.signature,
+    ownerPublicJwk: record.ownerPublicJwk,
+  }), "noncanonical invitation record");
   const h = record.header;
   assert(exact(h, ["v", "listId", "invitationId", "issuerId", "epoch", "expiresAt", "commitment"]) &&
     h.v === 1 && h.listId === qr.listId && h.invitationId === qr.invitationId &&
