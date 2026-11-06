@@ -20,6 +20,15 @@ owner identity and signed genesis hash in the dedicated
 successfully commits** may the caller POST the signed genesis to the v2 API.
 If the network fails, preserve the locally pinned root and retry/reconcile
 with a verified history; never replace it with a server-provided key.
+The original **signed genesis bytes** and genesis hash are persisted
+alongside the non-extractable signing key. Use
+`readPinnedOwnerGenesis(db,listId)` to retry the EXACT event after an
+uncertain response: re-signing with ECDSA may produce different bytes and
+therefore a different genesis checkpoint hash. The isolated Cloudflare
+bootstrap endpoint accepts byte-identical genesis retries idempotently,
+but rejects conflicting owner keys, signatures or genesis events.
+After receiving a bootstrap response, fetch authenticated membership history
+and advance the pinned checkpoint; the response alone is not a trust proof.
 
 **In-person recipient:** scan the owner's physical QR. The QR contains an
 owner public-key fingerprint, a random encryption-capability seed and
