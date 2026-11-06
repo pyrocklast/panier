@@ -80,7 +80,9 @@ test("valid owner creates and recipient binds public signing key on one-use rede
   assert.equal(f.backend.get("member:"+req.memberId).agreementPublicJwk.x,
     req.agreementPublicJwk.x);
   assert.equal(JSON.stringify(f.backend.get("invite:"+req.inviteId)).includes(f.qr),false);
-  await assert.rejects(f.registry.redeem(req),/unavailable/);
+  // A bare registry without an authenticated membership cache cannot
+  // claim a retry succeeded, even when the QR was used by this key.
+  await assert.rejects(f.registry.redeem(req),/no longer authorized/);
 });
 
 test("two simultaneous correct redemptions grant exactly one membership",async()=>{
@@ -145,7 +147,7 @@ test("used or revoked QR does not create a second member even with same token",a
   const f=await setup();
   await f.registry.createInvitation(f.serverRecord);
   await f.registry.redeem(await f.request("newmember01"));
-  await assert.rejects(f.registry.redeem(await f.request("newmember02")),/unavailable/);
+  await assert.rejects(f.registry.redeem(await f.request("newmember02")),/used|unavailable/);
   assert.equal(f.backend.get("member:newmember02"),undefined);
 });
 
@@ -251,4 +253,27 @@ test("at most five outstanding QR invitations per list; redemption frees one",as
   await f.registry.createInvitation(excess);
   const active=f.backend.get("invite:active-index");
   assert.equal(active.length,5);
+});
+
+test("same signed device safely recovers enrollment after lost response",async()=>{
+  const f=await setup();
+  await f.registry.createInvitation(f.serverRecord);
+  const req=await f.request();
+  const first=await f.registry.redeem(req);
+  assert.equal(first.alreadyUsed,false);
+  await f.backend.transaction(tx=>tx.put("membership:state",{
+    listId:LIST,epoch:1,members:[{memberId:req.memberId,active:true,
+      publicJwk:req.memberPublicJwk,
+      agreementPublicJwk:req.agreementPublicJwk}],
+  }));
+  const snapshot=f.backend.get("invite:"+req.inviteId);
+  const retry=await f.registry.redeem(req);
+  assert.equal(retry.alreadyUsed,true);
+  assert.equal(retry.currentEpoch,1);
+  assert.equal(retry.memberId,req.memberId);
+  assert.deepEqual(f.backend.get("invite:"+req.inviteId),snapshot);
+  const swapped=await f.request(req.memberId);
+  await assert.rejects(f.registry.redeem(swapped),/no longer authorized/);
+  await assert.rejects(f.registry.redeem(await f.request("anotherAA01")),
+    /used by another device/);
 });
