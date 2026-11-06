@@ -67,11 +67,15 @@ be copied into the browser application.**
 
 ## Blocking items before enabling uploads
 
-- **Durable sealed outbox:** the current #3 implementation persists plaintext
-  local mutations. A separate atomic preparation/encryption step must persist
-  sealed envelopes (or seal before the original transaction), bind them to the
-  same mutation IDs, and guarantee retry byte identity. Until then, the
-  coordinator's `loadSealed` dependency cannot be satisfied securely.
+- **Durable sealed outbox (storage boundary now implemented in stacked PR):**
+  `commitSealedLocalMutation` atomically stores local edits with a preprepared
+  immutable envelope, and `loadSealedMutation` retrieves the same bytes after
+  restart. The crypto protocol still must implement `sealAndSign` and verify
+  the envelope before storage; tests use inert placeholders, not cryptography.
+  The transport is **not ready for production** until reviewed E2EE/signing,
+  identity, epoch fencing and the actual backend exist.
+  Existing experimental v2 outbox entries lacking sealed bytes are NOT sent
+  and require an explicit reviewed re-encryption migration.
 - **Protocol/security (#2, #4–#7):** final signed canonical envelope format,
   anonymous member proof-of-possession, key-epoch fencing and revocation
   rules, and idempotent server acknowledgement.
