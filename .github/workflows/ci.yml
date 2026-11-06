@@ -39,6 +39,8 @@ jobs:
         run: node --test test/v2-qr-registry.test.mjs
       - name: V2 signed membership ledger tests
         run: node --test test/v2-membership-ledger.test.mjs
+      - name: V2 trusted bootstrap and rollback verification tests
+        run: node --test test/v2-trust.test.mjs
       - name: V2 post-revocation key envelope tests
         run: node --test test/v2-rekey.test.mjs
       - name: V2 authenticated rekey receipt tests

@@ -16,6 +16,9 @@ const SYNC_SOURCE = readFileSync(fileURLToPath(new URL("../v2/sync.mjs", import.
 const CRYPTO_SOURCE = readFileSync(fileURLToPath(new URL("../v2/crypto.mjs", import.meta.url)), "utf8");
 const QR_SOURCE = readFileSync(fileURLToPath(new URL("../v2/qr-pairing.mjs", import.meta.url)), "utf8");
 const REKEY_SOURCE = readFileSync(fileURLToPath(new URL("../v2/rekey.mjs", import.meta.url)), "utf8");
+const TRUST_SOURCE = readFileSync(fileURLToPath(new URL("../v2/trust.mjs", import.meta.url)), "utf8");
+const LEDGER_SOURCE = readFileSync(fileURLToPath(new URL("../v2/membership-ledger.mjs", import.meta.url)), "utf8");
+const REGISTRY_SOURCE = readFileSync(fileURLToPath(new URL("../v2/qr-registry.mjs", import.meta.url)), "utf8");
 let browser, server, origin;
 
 before(async () => {
@@ -26,13 +29,18 @@ before(async () => {
       res.end("<title>V2 storage test</title>");
     } else if (path === "/v2/storage.mjs" || path === "/v2/domain.mjs" ||
         path === "/v2/sync.mjs" || path === "/v2/crypto.mjs" ||
-        path === "/v2/qr-pairing.mjs" || path === "/v2/rekey.mjs") {
+        path === "/v2/qr-pairing.mjs" || path === "/v2/rekey.mjs" ||
+        path === "/v2/trust.mjs" || path === "/v2/membership-ledger.mjs" ||
+        path === "/v2/qr-registry.mjs") {
       res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
       res.end(path === "/v2/storage.mjs" ? STORAGE_SOURCE :
         path === "/v2/domain.mjs" ? DOMAIN_SOURCE :
         path === "/v2/sync.mjs" ? SYNC_SOURCE :
         path === "/v2/crypto.mjs" ? CRYPTO_SOURCE :
-        path === "/v2/qr-pairing.mjs" ? QR_SOURCE : REKEY_SOURCE);
+        path === "/v2/qr-pairing.mjs" ? QR_SOURCE :
+        path === "/v2/rekey.mjs" ? REKEY_SOURCE :
+        path === "/v2/trust.mjs" ? TRUST_SOURCE :
+        path === "/v2/membership-ledger.mjs" ? LEDGER_SOURCE : REGISTRY_SOURCE);
     } else {
       res.writeHead(404); res.end("Not found");
     }
@@ -714,4 +722,165 @@ test("Web Crypto rekey envelope round trip and wrong-recipient refusal in real b
       sameKey: true, refused: true, keyNotExtractable: true,
     });
   } finally { await context.close(); }
+});
+
+test("trusted owner genesis and non-extractable private signing key survive browser restart",async()=>{
+  const context=await browser.newContext();
+  try{
+    const page=await pageWithModules(context);
+    const result=await evaluate(page,async name=>{
+      const trust=await import("/v2/trust.mjs");
+      const {generateSigningIdentity}=await import("/v2/crypto.mjs");
+      const identity=await generateSigningIdentity();
+      let db=await trust.openTrustDatabase({name});
+      const prepared=await trust.pinNewOwnerBeforeBootstrap(db,{
+        listId:"household01",identity});
+      const before=await trust.readPinnedTrust(db,"household01");
+      db.close();
+      db=await trust.openTrustDatabase({name});
+      const recovered=await trust.readPinnedTrust(db,"household01");
+      const originalSigned=await trust.readPinnedOwnerGenesis(db,"household01");
+      const key=await trust.readLocalOwnerSigningKey(db,"household01");
+      const data=new TextEncoder().encode("owner key persisted, no server trust");
+      const signature=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},key,data);
+      const good=await crypto.subtle.verify({name:"ECDSA",hash:"SHA-256"},
+        identity.publicKey,signature,data);
+      let denied=false;
+      try{await trust.pinNewOwnerBeforeBootstrap(db,{listId:"household01",
+        identity:await generateSigningIdentity()});}
+      catch(e){denied=/already pinned/.test(e.message);}
+      await trust.advancePinnedMembership(db,"household01",[prepared.event]);
+      const after=await trust.readPinnedTrust(db,"household01");
+      db.close();
+      return {sameRoot:before.ownerPublicJwk.x===recovered.ownerPublicJwk.x,
+        sameHead:after.checkpoint.head===before.checkpoint.head,
+        exactGenesis:JSON.stringify(originalSigned)===JSON.stringify(prepared.event),
+        durableKey:good,nonExtractable:key.extractable===false,
+        duplicateRefused:denied,source:recovered.source};
+    },dbName());
+    assert.deepEqual(result,{sameRoot:true,sameHead:true,exactGenesis:true,
+      durableKey:true,nonExtractable:true,duplicateRefused:true,
+      source:"owner-local"});
+  }finally{await context.close();}
+});
+
+test("recipient trusts owner only through scanned physical QR, not server-provided genesis",async()=>{
+  const context=await browser.newContext();
+  try{
+    const page=await pageWithModules(context);
+    const result=await evaluate(page,async name=>{
+      const trust=await import("/v2/trust.mjs");
+      const {generateSigningIdentity}=await import("/v2/crypto.mjs");
+      const {signGenesis}=await import("/v2/membership-ledger.mjs");
+      const {prepareQrInvitation}=await import("/v2/qr-pairing.mjs");
+      const owner=await generateSigningIdentity();
+      const genesis=await signGenesis({listId:"household01",
+        ownerId:owner.actorId,ownerPublicJwk:owner.publicKeyJwk,
+        privateKey:owner.privateKey});
+      const secret=crypto.getRandomValues(new Uint8Array(32));
+      const now=Date.now();
+      const {qr,serverRecord}=await prepareQrInvitation({
+        listId:"household01",ownerId:owner.actorId,epoch:1,listSecret:secret,
+        ownerPrivateKey:owner.privateKey,ownerPublicJwk:owner.publicKeyJwk,now});
+      const attacker=await generateSigningIdentity();
+      const swapped=await signGenesis({listId:"household01",
+        ownerId:attacker.actorId,ownerPublicJwk:attacker.publicKeyJwk,
+        privateKey:attacker.privateKey});
+      const db=await trust.openTrustDatabase({name});
+      let rejected=false;
+      try{await trust.pinOwnerFromScannedQr(db,{
+        qr,serverRecord,events:[swapped],now:now+100});}
+      catch(e){rejected=true;}
+      const empty=await trust.readPinnedTrust(db,"household01");
+      const accepted=await trust.pinOwnerFromScannedQr(db,{
+        qr,serverRecord,events:[genesis],now:now+100});
+      const pinned=await trust.readPinnedTrust(db,"household01");
+      const wrong=await trust.readLocalOwnerSigningKey(db,"household01")
+        .then(()=>false,()=>true);
+      db.close();
+      return {rejected,empty:empty===null,
+        sameSecret:accepted.listSecret.every((v,i)=>v===secret[i]),
+        pinnedOwner:accepted.trust.ownerId===owner.actorId,
+        rootMatches:pinned.ownerPublicJwk.x===owner.publicKeyJwk.x,
+        noPrivateKey:wrong,source:pinned.source};
+    },dbName());
+    assert.deepEqual(result,{rejected:true,empty:true,sameSecret:true,
+      pinnedOwner:true,rootMatches:true,noPrivateKey:true,source:"physical-qr"});
+  }finally{await context.close();}
+});
+
+test("two tabs cannot persist different valid membership forks over the same checkpoint",async()=>{
+  const context=await browser.newContext();
+  try{
+    const a=await pageWithModules(context),b=await pageWithModules(context);
+    const name=dbName();
+    const histories=await evaluate(a,async name=>{
+      const trust=await import("/v2/trust.mjs");
+      const {generateSigningIdentity}=await import("/v2/crypto.mjs");
+      const {generateRecipientAgreementKey}=await import("/v2/rekey.mjs");
+      const {prepareQrInvitation}=await import("/v2/qr-pairing.mjs");
+      const {enrollmentStatement}=await import("/v2/qr-registry.mjs");
+      const owner=await generateSigningIdentity();
+      const db=await trust.openTrustDatabase({name});
+      const {event}=await trust.pinNewOwnerBeforeBootstrap(db,{
+        listId:"household01",identity:owner});
+      const pinned=await trust.readPinnedTrust(db,"household01");
+      db.close();
+      const make=async memberId=>{
+        const signer=await generateSigningIdentity();
+        const agreement=await generateRecipientAgreementKey();
+        const {serverRecord}=await prepareQrInvitation({
+          listId:"household01",ownerId:owner.actorId,epoch:1,
+          listSecret:crypto.getRandomValues(new Uint8Array(32)),
+          ownerPublicJwk:owner.publicKeyJwk,
+          ownerPrivateKey:owner.privateKey});
+        const nonce=btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
+          .replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"");
+        const proof=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},
+          signer.privateKey,new TextEncoder().encode(enrollmentStatement({
+            listId:"household01",inviteId:serverRecord.inviteId,memberId,nonce,
+            tokenHash:serverRecord.tokenHash,agreementPublicJwk:agreement.publicJwk,
+          })));
+        const encoded=btoa(String.fromCharCode(...new Uint8Array(proof)))
+          .replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"");
+        return {v:2,kind:"join",listId:"household01",sequence:2,
+          previous:pinned.checkpoint.head,ownerId:owner.actorId,epoch:1,
+          inviteId:serverRecord.inviteId,memberId,
+          memberPublicJwk:{kty:"EC",crv:"P-256",
+            x:signer.publicKeyJwk.x,y:signer.publicKeyJwk.y},
+          agreementPublicJwk:agreement.publicJwk,nonce,proof:encoded,grant:serverRecord};
+      };
+      return {name,first:[event,await make("newmember01")],
+        second:[event,await make("newmember02")]};
+    },name);
+    const attempt=(page,events)=>evaluate(page,async({name,events})=>{
+      const trust=await import("/v2/trust.mjs");
+      const db=await trust.openTrustDatabase({name});
+      try{
+        return (await trust.advancePinnedMembership(db,"household01",events))
+          .checkpoint.head;
+      }finally{db.close();}
+    },{name,events});
+    const outcome=await Promise.allSettled([
+      attempt(a,histories.first),attempt(b,histories.second)]);
+    assert.equal(outcome.filter(x=>x.status==="fulfilled").length,1);
+    assert.equal(outcome.filter(x=>x.status==="rejected").length,1);
+    const persisted=await evaluate(a,async name=>{
+      const trust=await import("/v2/trust.mjs");
+      const db=await trust.openTrustDatabase({name});
+      const value=await trust.readPinnedTrust(db,"household01");
+      db.close();
+      return value.checkpoint;
+    },name);
+    assert.equal(persisted.sequence,2);
+    assert.equal(persisted.head,outcome.find(x=>x.status==="fulfilled").value);
+    const stale=await evaluate(b,async({name,events})=>{
+      const trust=await import("/v2/trust.mjs");
+      const db=await trust.openTrustDatabase({name});
+      try{await trust.advancePinnedMembership(db,"household01",events);
+        return false;}catch(e){return /rollback/.test(e.message);}
+      finally{db.close();}
+    },{name,events:[histories.first[0]]});
+    assert.equal(stale,true);
+  }finally{await context.close();}
 });
