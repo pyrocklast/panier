@@ -45,6 +45,19 @@ async function pageWithModules(context) {
   return page;
 }
 
+// Fail individual tests promptly rather than leaving CI hung on an unresolved
+// IndexedDB request or a browser permission prompt. Closing the test context
+// cancels any underlying browser evaluation after this timeout.
+function evaluate(page, fn, arg) {
+  let timer;
+  return Promise.race([
+    page.evaluate(fn, arg),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Browser evaluation timed out after 15s")), 15000);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 const dbName = () => "panier-v2-test-" + crypto.randomUUID();
 const LIST = "household01";
 const ITEM = "itemAA001";
@@ -57,7 +70,7 @@ test("offline mutation survives database reopen with matching optimistic state a
   const context = await browser.newContext();
   try {
     const page = await pageWithModules(context);
-    const result = await page.evaluate(async ({ name, mutation }) => {
+    const result = await evaluate(page, async ({ name, mutation }) => {
       const s = await import("/v2/storage.mjs");
       let db = await s.openPanierDatabase({ name });
       await s.createLocalList(db, mutation.listId);
@@ -79,7 +92,7 @@ test("accepted revisions and outbox acknowledgments commit together; remote edit
   const context = await browser.newContext();
   try {
     const page = await pageWithModules(context);
-    const result = await page.evaluate(async ({ name, local, remote, ack }) => {
+    const result = await evaluate(page, async ({ name, local, remote, ack }) => {
       const s = await import("/v2/storage.mjs");
       const db = await s.openPanierDatabase({ name });
       await s.createLocalList(db, local.listId);
@@ -106,12 +119,12 @@ test("concurrent writes from two tabs do not overwrite one another", async () =>
   try {
     const a = await pageWithModules(context), b = await pageWithModules(context);
     const name = dbName();
-    await a.evaluate(async name => {
+    await evaluate(a, async name => {
       const s = await import("/v2/storage.mjs");
       const db = await s.openPanierDatabase({ name });
       await s.createLocalList(db, "household01"); db.close();
     }, name);
-    const write = (page, id, itemId) => page.evaluate(async ({ name, id, itemId }) => {
+    const write = (page, id, itemId) => evaluate(page, async ({ name, id, itemId }) => {
       const s = await import("/v2/storage.mjs");
       const db = await s.openPanierDatabase({ name });
       await s.commitLocalMutation(db, { listId: "household01", id, type: "item.add",
@@ -119,7 +132,7 @@ test("concurrent writes from two tabs do not overwrite one another", async () =>
       db.close();
     }, { name, id, itemId });
     await Promise.all([write(a, "mutation01", "itemAA001"), write(b, "mutation02", "itemBB002")]);
-    const value = await a.evaluate(async name => {
+    const value = await evaluate(a, async name => {
       const s = await import("/v2/storage.mjs");
       const db = await s.openPanierDatabase({ name });
       const result = await s.readLocalList(db, "household01"); db.close();
@@ -134,7 +147,7 @@ test("duplicate IDs and invalid mutations fail without partial writes", async ()
   const context = await browser.newContext();
   try {
     const page = await pageWithModules(context);
-    const value = await page.evaluate(async name => {
+    const value = await evaluate(page, async name => {
       const s = await import("/v2/storage.mjs");
       const db = await s.openPanierDatabase({ name });
       await s.createLocalList(db, "household01");
@@ -161,7 +174,7 @@ test("closed or unavailable database rejects a save; caller must not show saved"
   const context = await browser.newContext();
   try {
     const page = await pageWithModules(context);
-    const result = await page.evaluate(async name => {
+    const result = await evaluate(page, async name => {
       const s = await import("/v2/storage.mjs");
       const db = await s.openPanierDatabase({ name });
       await s.createLocalList(db, "household01");
@@ -184,7 +197,7 @@ test("list isolation and versionchange notification; existing data preserved", a
   const context = await browser.newContext();
   try {
     const page = await pageWithModules(context);
-    const result = await page.evaluate(async name => {
+    const result = await evaluate(page, async name => {
       const s = await import("/v2/storage.mjs");
       let changed = 0;
       const db = await s.openPanierDatabase({ name, onVersionChange: () => changed++ });
@@ -210,7 +223,7 @@ test("persistent storage reports capability without claiming durability", async 
   const context = await browser.newContext();
   try {
     const page = await pageWithModules(context);
-    const result = await page.evaluate(async () => {
+    const result = await evaluate(page, async () => {
       const { requestPersistentStorage } = await import("/v2/storage.mjs");
       // Never invoke the browser's real persist() permission prompt in CI:
       // Firefox can wait indefinitely for the user to respond.
