@@ -180,3 +180,21 @@ test("atomic key publication rejects incomplete packages in real Durable Object 
   const after=await signed({listId,member:owner,route:"history",body:{listId}});
   assert.equal(after.events.length,h.events.length);
 });
+
+test("exact signed owner bootstrap retry is idempotent; substituted owner key cannot replace it",async()=>{
+  const {listId,owner,event}=await bootstrap();
+  const path=signedRequestPath(listId,"bootstrap");
+  const again=await post(path,{event},null,201);
+  const originalHash=await membershipEventHash(event);
+  assert.equal(again.head,originalHash);
+  const attacker=await generateSigningIdentity();
+  const counterfeit=await signGenesis({listId,ownerId:attacker.actorId,
+    ownerPublicJwk:attacker.publicKeyJwk,privateKey:attacker.privateKey});
+  const refused=await post(path,{event:counterfeit},null,409);
+  assert.match(refused.error,/already initialised/);
+  const history=await signed({listId,member:owner,route:"history",body:{listId}});
+  const anchor={listId,ownerId:owner.id,ownerPublicJwk:owner.keys.publicKeyJwk,
+    checkpoint:{sequence:1,head:originalHash,epoch:1}};
+  const trusted=await verifyTrustedHistory(anchor,history.events);
+  assert.equal(trusted.ownerId,owner.id);
+});
