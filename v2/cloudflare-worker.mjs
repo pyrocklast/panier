@@ -9,6 +9,7 @@ import {bootstrapLedger,ledgerAuthorizers,readMembershipEvents} from "./membersh
 import {QrInvitationRegistry} from "./qr-registry.mjs";
 import {publishAtomicRotation,readCurrentKeyPackage,assertCurrentEpochAppend} from "./atomic-rotation.mjs";
 import {authorizeV2Request,signedRequestPath} from "./api-auth.mjs";
+import {consumePublicAttempt} from "./do-quotas.mjs";
 
 const ID=/^[A-Za-z0-9_-]{8,64}$/;
 const HEADERS={"Content-Type":"application/json; charset=utf-8",
@@ -96,12 +97,14 @@ async function route(storage,request,listId,routeName,path){
   if(routeName==="bootstrap"){
     if(!exact(input,["event"])||input.event.listId!==listId)
       throw Error("invalid list genesis");
+    await consumePublicAttempt(storage,{kind:"bootstrap"});
     const state=await bootstrapLedger(storage,input.event,input.event.ownerPublicJwk,
       {idempotent:true});
     return reply(201,{listId,head:state.head,epoch:state.epoch});
   }
   if(routeName==="redeem"){
     if(!exact(input,["body"])||input.body.listId!==listId)throw Error("invalid redemption request");
+    await consumePublicAttempt(storage,{kind:"redeem"});
     const registry=new QrInvitationRegistry({storage,...ledgerAuthorizers(storage)});
     return reply(201,await registry.redeem(input.body));
   }
@@ -184,7 +187,8 @@ export class V2List extends DurableObject {
     catch(error){
       // Do not return details of signed keys, raw bodies, or storage state.
       const message=String(error?.message||"rejected");
-      const code=/already|replay|collision|stale|future|rotation|incomplete|revoked|unavailable/.test(message)?409:403;
+      const code=/rate limit|quota exceeded/i.test(message)?429:
+        /already|replay|collision|stale|future|rotation|incomplete|revoked|unavailable/.test(message)?409:403;
       return reply(code,{error:message.slice(0,180)});
     }
   }

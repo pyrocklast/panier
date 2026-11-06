@@ -1,3 +1,4 @@
+import { consumeMemberSignedRequest } from "./do-quotas.mjs";
 // Isolated Panier v2 HTTP request authentication.
 // DO NOT reuse the v1 bearer token. Every request carries a new signed
 // nonce; server checks current list membership and consumes nonce durably.
@@ -8,7 +9,6 @@ const ID=/^[A-Za-z0-9_-]{8,64}$/;
 const b64=x=>{const u=x instanceof Uint8Array?x:new Uint8Array(x);let s="";for(let i=0;i<u.length;i+=4096)s+=String.fromCharCode(...u.subarray(i,i+4096));return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");};
 function raw64(x,size){if(typeof x!=="string"||!(/^[A-Za-z0-9_-]+$/).test(x)||x.length>128)throw new Error("invalid signature encoding");const v=Uint8Array.from(atob(x.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));if(v.length!==size||b64(v)!==x)throw new Error("invalid signature encoding");return v;}
 const valid=x=>typeof x==="string"&&ID.test(x);
-const keyOf=(memberId,nonce)=>"v2:auth:"+memberId+":"+nonce;
 const statement=({listId,memberId,method,path,nonce,issuedAt,bodyHash})=>JSON.stringify({
   v:1,purpose:"panier/v2/api/request/1",listId,memberId,method,path,nonce,issuedAt,bodyHash,
 });
@@ -41,9 +41,8 @@ export async function authorizeV2Request(storage,{auth,body,method,path,now=Date
     if(!await crypto.subtle.verify({name:"ECDSA",hash:"SHA-256"},
       await key(member.publicJwk),sig,enc.encode(statement(auth))))
       throw new Error("invalid member signature");
-    const nkey=keyOf(auth.memberId,auth.nonce);
-    if(await tx.get(nkey))throw new Error("replayed signed request");
-    await tx.put(nkey,{issuedAt:auth.issuedAt});
+    await consumeMemberSignedRequest(tx,{memberId:auth.memberId,
+      nonce:auth.nonce,issuedAt:auth.issuedAt,now});
     return {listId:auth.listId,memberId:auth.memberId,epoch:state.epoch,head:state.head};
   });
 }
