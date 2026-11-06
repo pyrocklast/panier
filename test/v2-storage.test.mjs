@@ -16,6 +16,9 @@ const SYNC_SOURCE = readFileSync(fileURLToPath(new URL("../v2/sync.mjs", import.
 const CRYPTO_SOURCE = readFileSync(fileURLToPath(new URL("../v2/crypto.mjs", import.meta.url)), "utf8");
 const QR_SOURCE = readFileSync(fileURLToPath(new URL("../v2/qr-pairing.mjs", import.meta.url)), "utf8");
 const REKEY_SOURCE = readFileSync(fileURLToPath(new URL("../v2/rekey.mjs", import.meta.url)), "utf8");
+const TRUST_SOURCE = readFileSync(fileURLToPath(new URL("../v2/trust.mjs", import.meta.url)), "utf8");
+const LEDGER_SOURCE = readFileSync(fileURLToPath(new URL("../v2/membership-ledger.mjs", import.meta.url)), "utf8");
+const REGISTRY_SOURCE = readFileSync(fileURLToPath(new URL("../v2/qr-registry.mjs", import.meta.url)), "utf8");
 let browser, server, origin;
 
 before(async () => {
@@ -26,13 +29,18 @@ before(async () => {
       res.end("<title>V2 storage test</title>");
     } else if (path === "/v2/storage.mjs" || path === "/v2/domain.mjs" ||
         path === "/v2/sync.mjs" || path === "/v2/crypto.mjs" ||
-        path === "/v2/qr-pairing.mjs" || path === "/v2/rekey.mjs") {
+        path === "/v2/qr-pairing.mjs" || path === "/v2/rekey.mjs" ||
+        path === "/v2/trust.mjs" || path === "/v2/membership-ledger.mjs" ||
+        path === "/v2/qr-registry.mjs") {
       res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
       res.end(path === "/v2/storage.mjs" ? STORAGE_SOURCE :
         path === "/v2/domain.mjs" ? DOMAIN_SOURCE :
         path === "/v2/sync.mjs" ? SYNC_SOURCE :
         path === "/v2/crypto.mjs" ? CRYPTO_SOURCE :
-        path === "/v2/qr-pairing.mjs" ? QR_SOURCE : REKEY_SOURCE);
+        path === "/v2/qr-pairing.mjs" ? QR_SOURCE :
+        path === "/v2/rekey.mjs" ? REKEY_SOURCE :
+        path === "/v2/trust.mjs" ? TRUST_SOURCE :
+        path === "/v2/membership-ledger.mjs" ? LEDGER_SOURCE : REGISTRY_SOURCE);
     } else {
       res.writeHead(404); res.end("Not found");
     }
