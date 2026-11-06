@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 const browserType = require("playwright")[process.env.BROWSER || "chromium"];
 const STORAGE_SOURCE = readFileSync(fileURLToPath(new URL("../v2/storage.mjs", import.meta.url)), "utf8");
 const DOMAIN_SOURCE = readFileSync(fileURLToPath(new URL("../v2/domain.mjs", import.meta.url)), "utf8");
+const SYNC_SOURCE = readFileSync(fileURLToPath(new URL("../v2/sync.mjs", import.meta.url)), "utf8");
 let browser, server, origin;
 
 before(async () => {
@@ -20,9 +21,10 @@ before(async () => {
     if (path === "/") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end("<title>V2 storage test</title>");
-    } else if (path === "/v2/storage.mjs" || path === "/v2/domain.mjs") {
+    } else if (path === "/v2/storage.mjs" || path === "/v2/domain.mjs" || path === "/v2/sync.mjs") {
       res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
-      res.end(path === "/v2/storage.mjs" ? STORAGE_SOURCE : DOMAIN_SOURCE);
+      res.end(path === "/v2/storage.mjs" ? STORAGE_SOURCE :
+        path === "/v2/domain.mjs" ? DOMAIN_SOURCE : SYNC_SOURCE);
     } else {
       res.writeHead(404); res.end("Not found");
     }
@@ -293,6 +295,165 @@ test("persistent storage reports capability without claiming durability", async 
       denied: { supported: true, granted: false },
       granted: { supported: true, granted: true },
       unsupported: { supported: false, granted: false },
+    });
+  } finally { await context.close(); }
+});
+
+test("sealed envelope survives restart byte-for-byte with local mutation and can be loaded", async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await pageWithModules(context);
+    const result = await evaluate(page, async name => {
+      const storage = await import("/v2/storage.mjs");
+      const m = { listId: "household01", id: "mutation01", type: "item.add",
+        payload: { id: "itemAA001", name: "Milk", position: "a" } };
+      const encrypted = { listId: m.listId, id: m.id,
+        ciphertext: "v2-opaque-signed-payload.AQID___same-bytes-on-retry" };
+      let db = await storage.openPanierDatabase({ name });
+      await storage.createLocalList(db, m.listId);
+      await storage.commitSealedLocalMutation(db, m, encrypted);
+      db.close();
+      db = await storage.openPanierDatabase({ name });
+      const persisted = await storage.loadSealedMutation(db, m.listId, m.id);
+      const snapshot = await storage.readLocalList(db, m.listId);
+      db.close();
+      return { persisted, optimistic: snapshot.local.items.itemAA001.name,
+        pending: snapshot.pending.length, cursor: snapshot.accepted.revision };
+    }, dbName());
+    assert.deepEqual(result, {
+      persisted: { listId: LIST, id: "mutation01",
+        ciphertext: "v2-opaque-signed-payload.AQID___same-bytes-on-retry" },
+      optimistic: "Milk", pending: 1, cursor: 0,
+    });
+  } finally { await context.close(); }
+});
+
+test("mismatched, plaintext-shaped or missing sealed envelopes fail without saving the edit", async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await pageWithModules(context);
+    const result = await evaluate(page, async name => {
+      const storage = await import("/v2/storage.mjs");
+      const db = await storage.openPanierDatabase({ name });
+      await storage.createLocalList(db, "household01");
+      const draft = { listId: "household01", id: "mutation01", type: "item.add",
+        payload: { id: "itemAA001", name: "Milk", position: "a" } };
+      const bad = [
+        null,
+        { listId: "household01", id: "different01", ciphertext: "opaque" },
+        { listId: "household01", id: "mutation01", ciphertext: "opaque", name: "Milk" },
+        { listId: "household01", id: "mutation01", ciphertext: "" },
+      ];
+      let failures = 0;
+      for (const envelope of bad) {
+        try { await storage.commitSealedLocalMutation(db, draft, envelope); }
+        catch (_) { failures++; }
+      }
+      const result = await storage.readLocalList(db, "household01");
+      const missing = await storage.loadSealedMutation(db, "household01", "mutation01");
+      db.close();
+      return { failures, pending: result.pending.length, localItems: Object.keys(result.local.items).length, missing };
+    }, dbName());
+    assert.deepEqual(result, { failures: 4, pending: 0, localItems: 0, missing: null });
+  } finally { await context.close(); }
+});
+
+test("duplicate mutation ID cannot replace sealed bytes or local state", async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await pageWithModules(context);
+    const result = await evaluate(page, async name => {
+      const storage = await import("/v2/storage.mjs");
+      const db = await storage.openPanierDatabase({ name });
+      await storage.createLocalList(db, "household01");
+      const m = { listId: "household01", id: "mutation01", type: "item.add",
+        payload: { id: "itemAA001", name: "Milk", position: "a" } };
+      await storage.commitSealedLocalMutation(db, m,
+        { listId: m.listId, id: m.id, ciphertext: "first-envelope" });
+      let rejected = false;
+      try { await storage.commitSealedLocalMutation(db, { ...m, payload: { ...m.payload, name: "Eggs" } },
+        { listId: m.listId, id: m.id, ciphertext: "second-envelope" }); }
+      catch (_) { rejected = true; }
+      const saved = await storage.loadSealedMutation(db, m.listId, m.id);
+      const state = await storage.readLocalList(db, m.listId);
+      db.close();
+      return { rejected, ciphertext: saved.ciphertext, name: state.local.items.itemAA001.name,
+        pending: state.pending.length };
+    }, dbName());
+    assert.deepEqual(result, { rejected: true, ciphertext: "first-envelope", name: "Milk", pending: 1 });
+  } finally { await context.close(); }
+});
+
+test("forged acknowledgement with the same mutation ID but different contents preserves pending edit", async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await pageWithModules(context);
+    const result = await evaluate(page, async name => {
+      const storage = await import("/v2/storage.mjs");
+      const db = await storage.openPanierDatabase({ name });
+      await storage.createLocalList(db, "household01");
+      const m = { listId: "household01", id: "mutation01", type: "item.add",
+        payload: { id: "itemAA001", name: "Milk", position: "a" } };
+      await storage.commitSealedLocalMutation(db, m,
+        { listId: m.listId, id: m.id, ciphertext: "first-envelope" });
+      let rejected = false;
+      try { await storage.acceptRemoteOperations(db, "household01", [{
+        ...m, revision: 1, payload: { ...m.payload, name: "Eggs" },
+      }]); } catch (_) { rejected = true; }
+      const state = await storage.readLocalList(db, "household01");
+      const saved = await storage.loadSealedMutation(db, m.listId, m.id);
+      db.close();
+      return { rejected, pending: state.pending.length, cursor: state.accepted.revision,
+        name: state.local.items.itemAA001.name, ciphertext: saved.ciphertext };
+    }, dbName());
+    assert.deepEqual(result, {
+      rejected: true, pending: 1, cursor: 0, name: "Milk", ciphertext: "first-envelope",
+    });
+  } finally { await context.close(); }
+});
+
+test("sync coordinator uploads exactly persisted bytes after reopen; only verified pull acknowledges", async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await pageWithModules(context);
+    const result = await evaluate(page, async name => {
+      const storage = await import("/v2/storage.mjs");
+      const { syncOnce } = await import("/v2/sync.mjs");
+      let db = await storage.openPanierDatabase({ name });
+      await storage.createLocalList(db, "household01");
+      const m = { listId: "household01", id: "mutation01", type: "item.add",
+        payload: { id: "itemAA001", name: "Milk", position: "a" } };
+      await storage.commitSealedLocalMutation(db, m,
+        { listId: m.listId, id: m.id, ciphertext: "persisted-signed-envelope-byte-sequence" });
+      db.close();
+      db = await storage.openPanierDatabase({ name });
+      const sent = [];
+      let history = [];
+      // Test doubles are intentionally not real cryptography or an HTTP API.
+      const transport = {
+        pull: async (_list, since) => ({
+          latest: history.length, changes: history.filter(op => op.revision > since),
+        }),
+        push: async (_list, envelope) => {
+          sent.push(envelope.ciphertext);
+          if (!history.length) history = [{ ...m, revision: 1, ciphertext: envelope.ciphertext }];
+        },
+      };
+      const security = {
+        loadSealed: (listId, id) => storage.loadSealedMutation(db, listId, id),
+        decodeAndVerify: async (_list, opaque) => {
+          const { ciphertext, ...plaintextTestOperation } = opaque;
+          return plaintextTestOperation;
+        },
+      };
+      const outcome = await syncOnce({ db, listId: m.listId, storage, transport, security });
+      const empty = await storage.loadSealedMutation(db, m.listId, m.id);
+      db.close();
+      return { outcome, sent, empty };
+    }, dbName());
+    assert.deepEqual(result, {
+      outcome: { revision: 1, pending: 0, pushed: 1, pulled: 1, synced: true },
+      sent: ["persisted-signed-envelope-byte-sequence"], empty: null,
     });
   } finally { await context.close(); }
 });
