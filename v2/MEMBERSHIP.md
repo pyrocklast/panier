@@ -35,8 +35,11 @@ unchanged.
    redemption transaction.
 5. `ledgerAuthorizers(storage)` supplies QR registry's `authOwner`,
    `authorizeEnrollment`, and `registerMember` callbacks. Owner checks
-   happen both before and during invite registration; consume-time checks
-   run inside the same DO transaction.
+   happen both before and during invite registration, reading the **same DO
+   transaction snapshot**; consume-time checks run inside the same transaction.
+   Cancelling an invitation also requires an **owner-signed cancellation
+   statement**. A public signing key or owner ID alone does not confer
+   cancellation authority.
 
 ## Important limitations — these are hard security gates
 
