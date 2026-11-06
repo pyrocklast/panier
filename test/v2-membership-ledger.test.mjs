@@ -50,7 +50,7 @@ async function fixture() {
     return {listId:LIST,inviteId:info.inviteId,memberId,nonce,token,
       memberPublicJwk:recipient.publicKeyJwk,proof};
   }
-  return {owner,storage,registry,genesis,invitation,request};
+  return {owner,storage,registry,genesis,invitation,listSecret,request};
 }
 
 test("pinned owner genesis verifies and cannot be substituted or replayed",async()=>{
@@ -115,18 +115,38 @@ test("signed epoch rotation invalidates old invitations and cannot be forged",as
   const wrong=structuredClone(rotation);wrong.epoch=3;wrong.sequence=rotated.sequence+1;
   wrong.previous=rotated.head;
   await assert.rejects(rotateLedger(f.storage,wrong));
-  // Previously issued but not redeemed grants from epoch 1 cannot join.
+  // A DIFFERENT open QR from epoch 1 must fail after signed rotation,
+  // even though its own single-use status is still "open".
   const old=await fixture();
   await old.registry.createInvitation(old.invitation.serverRecord);
-  const next=await old.request("newmember02");
-  // Simulate list epoch advanced by a previously valid signed rotation:
+  const secondInvite=await prepareQrInvitation({
+    listId:LIST,ownerId:old.owner.actorId,epoch:1,
+    listSecret:old.listSecret,ownerPrivateKey:old.owner.privateKey,
+    ownerPublicJwk:old.owner.publicKeyJwk,now:NOW,
+  });
+  await old.registry.createInvitation(secondInvite.serverRecord);
+  const nextToken=(await prepareQrRedemption(secondInvite.qr,NOW)).token;
+  const nextRecipient=await generateSigningIdentity();
+  const nextNonce=Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
+  const nextProof=Buffer.from(await crypto.subtle.sign(
+    {name:"ECDSA",hash:"SHA-256"},nextRecipient.privateKey,
+    new TextEncoder().encode(enrollmentStatement({
+      listId:LIST,inviteId:secondInvite.serverRecord.inviteId,
+      memberId:"newmember02",nonce:nextNonce,
+      tokenHash:secondInvite.serverRecord.tokenHash,
+    })))).toString("base64url");
+  const pending={listId:LIST,inviteId:secondInvite.serverRecord.inviteId,
+    token:nextToken,memberId:"newmember02",memberPublicJwk:nextRecipient.publicKeyJwk,
+    nonce:nextNonce,proof:nextProof};
   await old.registry.redeem(await old.request("newmember01"));
   const previous=await old.storage.get("membership:state");
   const advance=await signRotation({listId:LIST,sequence:previous.sequence+1,
     previous:previous.head,ownerId:old.owner.actorId,epoch:2,
     removedMemberId:"newmember01",privateKey:old.owner.privateKey});
   await rotateLedger(old.storage,advance);
-  await assert.rejects(old.registry.redeem(next),/unavailable/);
+  assert.equal((await old.storage.get("invite:"+pending.inviteId)).status,"open");
+  await assert.rejects(old.registry.redeem(pending),/current membership or epoch/);
+  assert.equal(await old.storage.get("member:newmember02"),undefined);
 });
 
 test("membership ledger detects tampered invite, joined key and missing events",async()=>{
@@ -138,7 +158,8 @@ test("membership ledger detects tampered invite, joined key and missing events",
   bad[1].memberPublicJwk.x="A".repeat(43);
   await assert.rejects(verifyMembershipHistory(bad,f.owner.publicKeyJwk));
   const badGrant=structuredClone(chain);
-  badGrant[1].grant.ciphertext="A"+badGrant[1].grant.ciphertext.slice(1);
+  badGrant[1].grant.ciphertext=(badGrant[1].grant.ciphertext[0]==="A"?"B":"A")+
+    badGrant[1].grant.ciphertext.slice(1);
   await assert.rejects(verifyMembershipHistory(badGrant,f.owner.publicKeyJwk));
   const skipped=[chain[0],chain[1],chain[1]];
   await assert.rejects(verifyMembershipHistory(skipped,f.owner.publicKeyJwk));
