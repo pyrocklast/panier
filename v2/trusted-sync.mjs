@@ -6,6 +6,7 @@ import { syncOnce, pullVerified, SyncFailure } from "./sync.mjs";
 import * as storage from "./storage.mjs";
 import { createSyncSecurity, importMemberPublicKey } from "./crypto.mjs";
 import { readPinnedTrust, advancePinnedMembership } from "./trust.mjs";
+import { verifyMembershipHistory } from "./membership-ledger.mjs";
 import { signV2Request, signedRequestPath } from "./api-auth.mjs";
 import { sealedMutationEpoch } from "./rekey.mjs";
 
@@ -123,8 +124,7 @@ export function createTrustedSync({
     catch(error){
       throw new SyncFailure("verification","Membership history contradicts pinned trust",error);
     }
-    const state=await import("./membership-ledger.mjs").then(
-      ({verifyMembershipHistory})=>verifyMembershipHistory(result.events,updated.ownerPublicJwk));
+    const state=await verifyMembershipHistory(result.events,updated.ownerPublicJwk);
     if(state.head!==updated.checkpoint.head||state.sequence!==updated.checkpoint.sequence)
       throw new SyncFailure("verification","Membership checkpoint changed during verification");
     verified={state,events:result.events,checkpoint:updated.checkpoint};
