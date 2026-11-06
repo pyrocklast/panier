@@ -149,17 +149,9 @@ export async function verifyRekeyReceipt({
   check(await crypto.subtle.verify({name:"ECDSA",hash:"SHA-256"},publicKey,
     decode64(receipt.signature,64),encoded(signed)),
     "invalid recipient receipt signature");
-  const expectedProof = await knowledgeProof(ownerListSecret,expected);
-  // Checking a keyed MAC as well as signature binds receipt to possession
-  // of the fresh epoch secret without putting that secret in the receipt.
-  const expectedBytes=decode64(expectedProof,32);
+  // Web Crypto HMAC verification checks the exact tag without a
+  // handwritten secret-dependent byte comparison.
   const providedBytes=decode64(receipt.proof,32);
-  const macKey=await crypto.subtle.importKey("raw",expectedBytes,"HMAC",false,["verify"]);
-  check(await crypto.subtle.verify("HMAC",macKey,
-    providedBytes,te.encode("panier/v2/rekey/receipt/compare/1")) === false,
-    "unexpected proof comparison"); // The actual constant-time check is below.
-  // Web Crypto HMAC verify avoids JS byte-by-byte timing differences. Use
-  // the derived confirmation key to check the exact canonical tag.
   const key=await receiptKey(ownerListSecret,expected);
   check(await crypto.subtle.verify("HMAC",key,providedBytes,
     te.encode("panier/v2/rekey/receipt/proof/1")),
