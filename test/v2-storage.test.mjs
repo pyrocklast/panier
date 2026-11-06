@@ -638,11 +638,12 @@ test("WebCrypto signed mutation round-trips through durable IndexedDB in Chromiu
   } finally { await context.close(); }
 });
 
-test("QR package can be created on one browser and scanned offline-owner on another", async () => {
-  const context = await browser.newContext();
+test("QR package can be created in one installation and scanned after owner disconnects", async () => {
+  const ownerContext = await browser.newContext();
+  const recipientContext = await browser.newContext();
   try {
-    const owner = await pageWithModules(context);
-    const scanner = await pageWithModules(context);
+    const owner = await pageWithModules(ownerContext);
+    const scanner = await pageWithModules(recipientContext);
     const payload = await evaluate(owner, async () => {
       const { prepareQrInvitation } = await import("/v2/qr-invitation.mjs");
       const pair = await crypto.subtle.generateKey(
@@ -671,5 +672,8 @@ test("QR package can be created on one browser and scanned offline-owner on anot
     assert.deepEqual(scanned.bytes, payload.expected);
     assert.equal(scanned.listId, "household01");
     assert.equal(typeof scanned.invitationId, "string");
-  } finally { await context.close(); }
+  } finally {
+    await ownerContext.close();
+    await recipientContext.close();
+  }
 });
