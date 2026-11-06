@@ -47,7 +47,7 @@ export function newId() {
 /** @returns {ListState} */
 export function emptyList(listId) {
   assert(id(listId), "invalid list id");
-  return { listId, revision: 0, items: {}, sections: {} };
+  return { listId, revision: 0, items: Object.create(null), sections: Object.create(null) };
 }
 
 /** Validate the plaintext operation *after* the crypto layer authenticates it. */
@@ -104,7 +104,8 @@ export function applyOperation(state, op) {
   assert(record(state) && state.listId === op.listId && Number.isSafeInteger(state.revision), "wrong list or state");
   if (op.revision <= state.revision) return state;
   assert(op.revision === state.revision + 1, "missing prior revision");
-  const items = { ...state.items }, sections = { ...state.sections };
+  const items = Object.assign(Object.create(null), state.items);
+  const sections = Object.assign(Object.create(null), state.sections);
   const p = op.payload;
   switch (op.type) {
     case "item.add":
