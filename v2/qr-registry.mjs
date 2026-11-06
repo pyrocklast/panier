@@ -183,9 +183,28 @@ export class QrInvitationRegistry {
     const now = this.now();
     return this.storage.transaction(async tx => {
       const saved = await tx.get(key("invite", inviteId));
-      check(saved && saved.listId === listId && saved.status === "open" &&
-        saved.expiresAt > now && saved.tokenHash === tokenHash,
-        "invitation unavailable, expired, consumed or invalid");
+      check(saved && saved.listId===listId && saved.tokenHash===tokenHash,
+        "invitation unavailable or invalid");
+      if(saved.status==="used"){
+        // An HTTP timeout after successful enrollment is recoverable only by
+        // the SAME authenticated signing+ECDH identity. No second membership.
+        check(saved.memberId===memberId,"invitation used by another device");
+        const enrolled=await tx.get(key("member",memberId));
+        const state=await tx.get("membership:state");
+        const active=state?.members?.find(m=>m.memberId===memberId&&m.active);
+        check(enrolled&&enrolled.listId===listId&&
+          enrolled.invitationId===inviteId&&
+          samePublicKey(enrolled.publicJwk,memberPublicJwk)&&
+          samePublicKey(enrolled.agreementPublicJwk,agreementPublicJwk)&&
+          active&&samePublicKey(active.publicJwk,memberPublicJwk)&&
+          samePublicKey(active.agreementPublicJwk,agreementPublicJwk),
+          "previous enrollment no longer authorized");
+        return {listId,inviteId,memberId,epoch:saved.epoch,
+          currentEpoch:state.epoch,serverRecord:saved.serverRecord,
+          alreadyUsed:true};
+      }
+      check(saved.status==="open"&&saved.expiresAt>now,
+        "invitation unavailable, expired, consumed or revoked");
       // Same DO transaction must check current owner membership, unchanged
       // list epoch, and invitation issuance authority. Do not trust stale
       // authentication from invitation creation or a separate remote read.
@@ -214,7 +233,8 @@ export class QrInvitationRegistry {
       const indexed=await tx.get(ACTIVE_INVITES)||[];
       await tx.put(ACTIVE_INVITES,indexed.filter(inv=>inv.inviteId!==inviteId));
       return {listId, inviteId, memberId, epoch: saved.epoch,
-        serverRecord: saved.serverRecord};
+        currentEpoch:saved.epoch,serverRecord:saved.serverRecord,
+        alreadyUsed:false};
     });
   }
 }
