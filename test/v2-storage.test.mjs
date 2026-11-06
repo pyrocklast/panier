@@ -22,6 +22,7 @@ const REGISTRY_SOURCE = readFileSync(fileURLToPath(new URL("../v2/qr-registry.mj
 const AUTH_SOURCE = readFileSync(fileURLToPath(new URL("../v2/api-auth.mjs", import.meta.url)), "utf8");
 const QUOTAS_SOURCE = readFileSync(fileURLToPath(new URL("../v2/do-quotas.mjs", import.meta.url)), "utf8");
 const TRUSTED_SYNC_SOURCE = readFileSync(fileURLToPath(new URL("../v2/trusted-sync.mjs", import.meta.url)), "utf8");
+const MEMBER_KEYS_SOURCE = readFileSync(fileURLToPath(new URL("../v2/member-keys.mjs", import.meta.url)), "utf8");
 let browser, server, origin;
 
 before(async () => {
@@ -35,7 +36,8 @@ before(async () => {
         path === "/v2/qr-pairing.mjs" || path === "/v2/rekey.mjs" ||
         path === "/v2/trust.mjs" || path === "/v2/membership-ledger.mjs" ||
         path === "/v2/qr-registry.mjs" || path === "/v2/api-auth.mjs" ||
-        path === "/v2/trusted-sync.mjs" || path === "/v2/do-quotas.mjs") {
+        path === "/v2/trusted-sync.mjs" || path === "/v2/do-quotas.mjs" ||
+        path === "/v2/member-keys.mjs") {
       res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
       res.end(path === "/v2/storage.mjs" ? STORAGE_SOURCE :
         path === "/v2/domain.mjs" ? DOMAIN_SOURCE :
@@ -47,7 +49,8 @@ before(async () => {
         path === "/v2/membership-ledger.mjs" ? LEDGER_SOURCE :
         path === "/v2/qr-registry.mjs" ? REGISTRY_SOURCE :
         path === "/v2/api-auth.mjs" ? AUTH_SOURCE :
-        path === "/v2/trusted-sync.mjs" ? TRUSTED_SYNC_SOURCE : QUOTAS_SOURCE);
+        path === "/v2/trusted-sync.mjs" ? TRUSTED_SYNC_SOURCE :
+        path === "/v2/do-quotas.mjs" ? QUOTAS_SOURCE : MEMBER_KEYS_SOURCE);
     } else {
       res.writeHead(404); res.end("Not found");
     }
