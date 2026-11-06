@@ -9,6 +9,7 @@ import {verifyTrustedHistory} from "../v2/trust.mjs";
 import {prepareQrInvitation,prepareQrRedemption} from "../v2/qr-pairing.mjs";
 import {enrollmentStatement} from "../v2/qr-registry.mjs";
 import {signV2Request,signedRequestPath} from "../v2/api-auth.mjs";
+import {receiveAndConfirmRekey,verifyRekeyReceipt} from "../v2/rekey-receipt.mjs";
 
 const BASE=process.env.V2_BASE;
 if(!BASE)throw Error("V2_BASE required; start isolated Wrangler dev first");
@@ -128,6 +129,41 @@ test("real SQLite DO: QR enrollment, signed reads, encrypted mutation, rotation 
     rotationHead:future.head,trustedOwnerSigningKey:owner.keys.publicKey,
     recipientAgreementPrivateKey:b.member.agreement.privateKey,
   }),fresh);
+  // The server stores only a member-signed claim. It cannot verify the
+  // secret-derived proof; the owner must do that independently.
+  const afterRotation=await signed({listId,member:owner,route:"history",
+    body:{listId}});
+  const verifiedAfter=await verifyMembershipHistory(afterRotation.events,
+    owner.keys.publicKeyJwk);
+  const {receipt}=await receiveAndConfirmRekey({
+    envelope:offline.envelope,verifiedMembership:verifiedAfter,
+    recipientAgreementPrivateKey:b.member.agreement.privateKey,
+    recipientSigningPrivateKey:b.member.keys.privateKey,
+    trustedOwnerSigningKey:owner.keys.publicKey,
+  });
+  const firstReceipt=await signed({listId,member:b.member,
+    route:"rekey-receipt",body:{listId,receipt}});
+  assert.equal(firstReceipt.stored,true);
+  assert.equal(firstReceipt.verifiedByOwner,false);
+  assert.equal(firstReceipt.duplicate,false);
+  const retried=await signed({listId,member:b.member,
+    route:"rekey-receipt",body:{listId,receipt}});
+  assert.equal(retried.duplicate,true);
+  const savedReceipts=await signed({listId,member:owner,
+    route:"rekey-receipts",body:{listId}});
+  assert.equal(savedReceipts.receipts.length,1);
+  assert.equal(savedReceipts.verifiedByOwner,false);
+  assert.deepEqual(await verifyRekeyReceipt({
+    receipt:savedReceipts.receipts[0],envelope:offline.envelope,
+    verifiedMembership:verifiedAfter,ownerListSecret:fresh,
+  }),{
+    listId,epoch:2,rotationHead:future.head,memberId:b.member.id,
+    packageHash:receipt.packageHash,confirmed:true,
+  });
+  const forged={...receipt,proof:"A".repeat(43)};
+  const rejected=await signed({listId,member:b.member,route:"rekey-receipt",
+    body:{listId,receipt:forged},expected:403});
+  assert.match(rejected.error,/signature/);
   const revoked=await signed({listId,member:a.member,route:"key-package",
     body:{listId},expected:403});
   assert.match(revoked.error,/authorized/);
