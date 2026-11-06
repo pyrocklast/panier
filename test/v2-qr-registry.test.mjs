@@ -235,3 +235,20 @@ test("invalid P-256 agreement point cannot be registered even with valid signing
     memberPublicJwk:recipient.publicKeyJwk,agreementPublicJwk,proof}));
   assert.equal(f.backend.get("invite:"+f.serverRecord.inviteId).status,"open");
 });
+
+test("at most five outstanding QR invitations per list; redemption frees one",async()=>{
+  const f=await setup();
+  await f.registry.createInvitation(f.serverRecord);
+  const extra=async()=>prepareQrInvitation({listId:LIST,
+    ownerId:f.owner.actorId,epoch:1,listSecret:f.listSecret,
+    ownerPrivateKey:f.owner.privateKey,
+    ownerPublicJwk:f.owner.publicKeyJwk,now:NOW});
+  for(let i=0;i<4;i++)
+    await f.registry.createInvitation((await extra()).serverRecord);
+  const excess=(await extra()).serverRecord;
+  await assert.rejects(f.registry.createInvitation(excess),/invitation quota/);
+  await f.registry.redeem(await f.request());
+  await f.registry.createInvitation(excess);
+  const active=f.backend.get("invite:active-index");
+  assert.equal(active.length,5);
+});
