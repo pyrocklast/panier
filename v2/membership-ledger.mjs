@@ -31,6 +31,12 @@ function unb64(value) {
 async function digest(event) {
   return b64(await crypto.subtle.digest("SHA-256",te.encode(serialize(event))));
 }
+
+// Exactly the hash committed as the membership head. Used by client-pinned
+// checkpoints to verify prefix consistency; never hash parsed/reordered data.
+export async function membershipEventHash(event) {
+  return digest(event);
+}
 async function verify(jwk,signature,bytes) {
   const key=await crypto.subtle.importKey("jwk",publicJwk(jwk),{name:"ECDSA",namedCurve:"P-256"},false,["verify"]);
   return crypto.subtle.verify({name:"ECDSA",hash:"SHA-256"},key,unb64(signature),te.encode(bytes));
