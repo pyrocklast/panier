@@ -112,9 +112,14 @@ export class QrInvitationRegistry {
     });
   }
 
-  async revokeInvitation({listId, inviteId, ownerId, epoch, ownerPublicJwk}) {
+  async revokeInvitation({listId, inviteId, ownerId, epoch, ownerPublicJwk, proof}) {
     check(validId(listId) && validId(inviteId) && validId(ownerId) &&
       validEpoch(epoch), "invalid revocation");
+    // The owner's public key is PUBLIC. Merely sending it does not establish
+    // ownership; require proof of possession before cancelling anything.
+    check(await signed(ownerPublicJwk, proof, revocationStatement({
+      listId, inviteId, ownerId, epoch,
+    })), "owner revocation signature invalid");
     check(typeof this.authOwner === "function" &&
       await this.authOwner({listId, ownerId, epoch, ownerPublicJwk}),
       "owner authorization unavailable or denied");
@@ -185,4 +190,11 @@ export class QrInvitationRegistry {
 // This statement must eventually be frozen as a reviewed canonical wire format.
 export function enrollmentStatement(details) {
   return proofPayload(details);
+}
+
+// Canonical owner-signed cancellation statement (one-way and replay-safe).
+// Old-epoch attempts are additionally rejected by current ledger authority.
+export function revocationStatement({listId,inviteId,ownerId,epoch}) {
+  return JSON.stringify({v:1,purpose:"panier-v2-qr-revoke",
+    listId,inviteId,ownerId,epoch});
 }
