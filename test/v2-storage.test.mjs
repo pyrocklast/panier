@@ -457,3 +457,82 @@ test("sync coordinator uploads exactly persisted bytes after reopen; only verifi
     });
   } finally { await context.close(); }
 });
+
+test("accepted mutation matches queued payload despite different object key order", async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await pageWithModules(context);
+    const result = await evaluate(page, async name => {
+      const storage = await import("/v2/storage.mjs");
+      const db = await storage.openPanierDatabase({ name });
+      await storage.createLocalList(db, "household01");
+      const m = { listId: "household01", id: "mutation01", type: "item.add",
+        payload: { id: "itemAA001", name: "Milk", position: "a", checked: true } };
+      await storage.commitSealedLocalMutation(db, m,
+        { listId: m.listId, id: m.id, ciphertext: "same-valid-signed-envelope" });
+      const accepted = await storage.acceptRemoteOperations(db, m.listId, [{
+        listId: m.listId, id: m.id, revision: 1, type: m.type,
+        payload: { checked: true, position: "a", name: "Milk", id: "itemAA001" },
+      }]);
+      db.close();
+      return { revision: accepted.accepted.revision, pending: accepted.pendingCount,
+        name: accepted.local.items.itemAA001.name };
+    }, dbName());
+    assert.deepEqual(result, { revision: 1, pending: 0, name: "Milk" });
+  } finally { await context.close(); }
+});
+
+test("interrupted write transaction rolls back both sealed outbox and optimistic state", async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await pageWithModules(context);
+    const result = await evaluate(page, async name => {
+      const storage = await import("/v2/storage.mjs");
+      const db = await storage.openPanierDatabase({ name });
+      await storage.createLocalList(db, "household01");
+      const fault = {
+        transaction(stores, mode) {
+          const tx = db.transaction(stores, mode);
+          return new Proxy(tx, {
+            get(target, field) {
+              if (field !== "objectStore") {
+                const value = Reflect.get(target, field, target);
+                return typeof value === "function" ? value.bind(target) : value;
+              }
+              return storeName => {
+                const store = target.objectStore(storeName);
+                if (storeName !== "lists") return store;
+                return new Proxy(store, {
+                  get(base, property) {
+                    if (property === "put") return value => {
+                      const request = base.put(value);
+                      target.abort(); // simulated browser crash / transaction abort
+                      return request;
+                    };
+                    const value = Reflect.get(base, property, base);
+                    return typeof value === "function" ? value.bind(base) : value;
+                  },
+                });
+              };
+            },
+          });
+        },
+      };
+      const draft = { listId: "household01", id: "mutation01", type: "item.add",
+        payload: { id: "itemAA001", name: "Milk", position: "a" } };
+      let rejected = false;
+      try {
+        await storage.commitSealedLocalMutation(fault, draft,
+          { listId: draft.listId, id: draft.id, ciphertext: "must-not-survive" });
+      } catch (_) { rejected = true; }
+      const remaining = await storage.readLocalList(db, draft.listId);
+      const envelope = await storage.loadSealedMutation(db, draft.listId, draft.id);
+      db.close();
+      return { rejected, pending: remaining.pending.length,
+        cursor: remaining.accepted.revision,
+        itemCount: Object.keys(remaining.local.items).length, envelope };
+    }, dbName());
+    assert.deepEqual(result, { rejected: true, pending: 0,
+      cursor: 0, itemCount: 0, envelope: null });
+  } finally { await context.close(); }
+});
