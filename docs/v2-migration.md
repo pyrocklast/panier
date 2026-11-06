@@ -47,8 +47,9 @@ server-side conversion, or bidirectional bridge is permitted.
 7. Keep v1 untouched and available. Show the new v2 list independently.
    Explain that v1 and v2 no longer synchronise with one another; any future
    v1 changes must be explicitly copied again or users must stop using v1.
-8. Offer invitation and recovery export from the new v2 list. Do not assume
-   the old v1 bearer secret grants v2 membership.
+8. Offer **in-person QR-only pairing** and a separate recovery-kit export
+   from the new v2 list. Never offer copy/share/send-link or remote invitation
+   flows; old v1 bearer secrets do not grant v2 membership.
 
 This is a **copy**, not a live bridge. Avoid two-way syncing across distinct
 security models: that doubles conflict and revocation complexity.
@@ -95,6 +96,9 @@ or v1 master key in network requests, logs, telemetry or GitHub Actions output.
 3. Test interrupted import at each boundary: before local commit, after
    commit, before upload, after upload and before acknowledgement.
 4. Verify v1 links still open v1 and do not accidentally enroll a v2 member.
+   A v2 pairing QR may encode an application URL for camera compatibility,
+   but must use a distinct versioned route/fragment and be issued only through
+   the in-person Members → Add someone flow.
 5. Validate in a staging Cloudflare account with a disposable test dataset.
 6. Roll out v2 behind a distinct URL or explicit user-controlled upgrade
    action. Do **not** replace the v1 production UI automatically.
@@ -121,6 +125,8 @@ or v1 master key in network requests, logs, telemetry or GitHub Actions output.
 - [ ] Threat model and invitation/key epoch protocol reviewed (#2, #5, #6).
 - [ ] v2 IndexedDB schema plus crash-safe migration mechanism tested (#3).
 - [ ] Multiple independent lists and members work (#4, #10).
+- [ ] Only QR display/scan is available for v2 invitations; no remote sharing
+      or copy-link controls exist (#5, #10).
 - [ ] Mutation idempotency and offline convergence tests pass on Cloudflare
       Durable Objects (#7, #8, #9, #11).
 - [ ] Recovery export and re-import tested on a clean browser (#10, #11).
