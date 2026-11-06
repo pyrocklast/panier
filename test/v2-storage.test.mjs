@@ -14,6 +14,7 @@ const STORAGE_SOURCE = readFileSync(fileURLToPath(new URL("../v2/storage.mjs", i
 const DOMAIN_SOURCE = readFileSync(fileURLToPath(new URL("../v2/domain.mjs", import.meta.url)), "utf8");
 const SYNC_SOURCE = readFileSync(fileURLToPath(new URL("../v2/sync.mjs", import.meta.url)), "utf8");
 const CRYPTO_SOURCE = readFileSync(fileURLToPath(new URL("../v2/crypto.mjs", import.meta.url)), "utf8");
+const QR_SOURCE = readFileSync(fileURLToPath(new URL("../v2/qr-invitation.mjs", import.meta.url)), "utf8");
 let browser, server, origin;
 
 before(async () => {
@@ -23,11 +24,13 @@ before(async () => {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end("<title>V2 storage test</title>");
     } else if (path === "/v2/storage.mjs" || path === "/v2/domain.mjs" ||
-        path === "/v2/sync.mjs" || path === "/v2/crypto.mjs") {
+        path === "/v2/sync.mjs" || path === "/v2/crypto.mjs" ||
+        path === "/v2/qr-invitation.mjs") {
       res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
       res.end(path === "/v2/storage.mjs" ? STORAGE_SOURCE :
         path === "/v2/domain.mjs" ? DOMAIN_SOURCE :
-        path === "/v2/sync.mjs" ? SYNC_SOURCE : CRYPTO_SOURCE);
+        path === "/v2/sync.mjs" ? SYNC_SOURCE :
+        path === "/v2/crypto.mjs" ? CRYPTO_SOURCE : QR_SOURCE);
     } else {
       res.writeHead(404); res.end("Not found");
     }
@@ -632,5 +635,41 @@ test("WebCrypto signed mutation round-trips through durable IndexedDB in Chromiu
       item: "Milk", cursor: 1, pending: 0, ciphertextIdentical: true,
       acknowledged: true, nonExtractable: true,
     });
+  } finally { await context.close(); }
+});
+
+test("QR package can be created on one browser and scanned offline-owner on another", async () => {
+  const context = await browser.newContext();
+  try {
+    const owner = await pageWithModules(context);
+    const scanner = await pageWithModules(context);
+    const payload = await evaluate(owner, async () => {
+      const { prepareQrInvitation } = await import("/v2/qr-invitation.mjs");
+      const pair = await crypto.subtle.generateKey(
+        { name: "ECDSA", namedCurve: "P-256" }, false, ["sign", "verify"]);
+      const listSecret = crypto.getRandomValues(new Uint8Array(32));
+      const prepared = await prepareQrInvitation({
+        listId: "household01", epoch: 1, issuerId: "memberAA01",
+        listSecret, ownerPrivateKey: pair.privateKey,
+        ownerPublicKey: pair.publicKey, now: 1700000000000,
+      });
+      return { qrText: prepared.qrText, record: prepared.record,
+        expected: Array.from(listSecret) };
+    });
+    // The owner can close before the recipient verifies and decrypts.
+    await owner.close();
+    const scanned = await evaluate(scanner, async payload => {
+      const { openQrInvitation, deriveRedemption } = await import("/v2/qr-invitation.mjs");
+      const redemption = await deriveRedemption(payload.qrText);
+      const joined = await openQrInvitation({
+        qrText: payload.qrText, record: payload.record,
+        now: 1700000001000, claimConfirmed: true, // test fixture only
+      });
+      return { bytes: Array.from(joined.listSecret),
+        listId: joined.listId, invitationId: redemption.invitationId };
+    }, payload);
+    assert.deepEqual(scanned.bytes, payload.expected);
+    assert.equal(scanned.listId, "household01");
+    assert.equal(typeof scanned.invitationId, "string");
   } finally { await context.close(); }
 });
