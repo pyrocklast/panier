@@ -45,6 +45,13 @@ jobs:
         run: node --test test/v2-rekey-receipt.test.mjs
       - name: V2 atomic epoch publication and append fencing tests
         run: node --test test/v2-atomic-rotation.test.mjs
+      - name: Start isolated v2 Durable Object locally
+        run: |
+          npx --yes "$WRANGLER" dev --config wrangler.v2.jsonc --ip 127.0.0.1 --port 8799 --persist-to "$RUNNER_TEMP/v2-protocol" > "$RUNNER_TEMP/v2-worker.log" 2>&1 &
+          for i in $(seq 90); do curl -sf http://127.0.0.1:8799/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:8799/health
+      - name: V2 real Cloudflare local-runtime API tests
+        run: V2_BASE=http://127.0.0.1:8799 node --test test/v2-worker-api.test.mjs
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race ./...
@@ -56,6 +63,7 @@ jobs:
         run: |
           timeout 120s node --test test/v2-storage.test.mjs
           timeout 120s env BROWSER=firefox node --test test/v2-storage.test.mjs
+
       - name: Start the Go server
         run: |
           go build -o panier .
