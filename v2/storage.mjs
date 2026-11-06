@@ -5,7 +5,7 @@
 import { applyOperation, emptyList, replay, validateOperation } from "./domain.mjs";
 
 export const DATABASE_NAME = "panier-v2";
-export const DATABASE_VERSION = 1;
+export const DATABASE_VERSION = 2; // Enforce immutable sealed envelopes for new edits.
 
 export class StorageFailure extends Error {
   constructor(message, cause) {
@@ -49,6 +49,18 @@ async function transaction(db, mode, callback) {
   }
 }
 
+// Compare validated plaintext payloads semantically; object key insertion
+// order can differ after decrypting a canonical wire representation.
+function sameContent(a, b) {
+  if (Object.is(a, b)) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object" ||
+      Array.isArray(a) !== Array.isArray(b)) return false;
+  const ak = Object.keys(a).sort();
+  const bk = Object.keys(b).sort();
+  return ak.length === bk.length && ak.every((k, i) =>
+    k === bk[i] && sameContent(a[k], b[k]));
+}
+
 function pendingInOrder(entries) {
   return entries.sort((a, b) => a.localSeq - b.localSeq || a.id.localeCompare(b.id));
 }
@@ -69,6 +81,21 @@ function validateDraft(draft) {
   }
   validateOperation({ ...draft, revision: 1 });
   return { listId: draft.listId, id: draft.id, type: draft.type, payload: draft.payload };
+}
+
+// The opaque ciphertext is a PRE-ENCODED signed/encrypted wire message.
+// Cryptographic validity is the responsibility of the caller's protocol layer.
+// This module only preserves the exact wire bytes and enforces binding to the
+// local mutation identifier. Never accept plaintext fields as envelope keys.
+function validateSealed(draft, sealed) {
+  if (!sealed || typeof sealed !== "object" || Array.isArray(sealed) ||
+      Object.keys(sealed).sort().join(",") !== "ciphertext,id,listId" ||
+      sealed.listId !== draft.listId || sealed.id !== draft.id ||
+      typeof sealed.ciphertext !== "string" ||
+      sealed.ciphertext.length < 1 || sealed.ciphertext.length > 24 * 1024) {
+    throw new TypeError("invalid or mismatched sealed mutation envelope");
+  }
+  return { listId: sealed.listId, id: sealed.id, ciphertext: sealed.ciphertext };
 }
 
 function pendingFor(store, listId) {
@@ -147,12 +174,17 @@ export async function readLocalList(db, listId) {
 }
 
 /**
- * Persist an optimistic mutation and its outbox entry IN ONE transaction.
- * No caller should report "saved locally" until this promise resolves.
- * A second tab using the same DB serialises through the write transaction.
+ * Persist a prepared encrypted mutation together with its optimistic projection
+ * and pending outbox entry in ONE transaction. The cryptographic caller MUST
+ * prepare and authenticate the envelope BEFORE invoking this function.
+ *
+ * A successful return means the exact ciphertext is durable in IndexedDB.
+ * Failed transactions cannot leave an edit without its ciphertext (or vice
+ * versa). Neither saving nor loading the envelope performs encryption.
  */
-export async function commitLocalMutation(db, draft) {
+export async function commitSealedLocalMutation(db, draft, sealed) {
   const entry = validateDraft(draft);
+  const envelope = validateSealed(entry, sealed);
   return transaction(db, "readwrite", async (lists, outbox) => {
     const recordReq = request(lists.get(entry.listId));
     const pendingReq = pendingFor(outbox, entry.listId);
@@ -161,15 +193,35 @@ export async function commitLocalMutation(db, draft) {
     if (pending.some(p => p.id === entry.id)) throw new Error("duplicate local mutation id");
     const localSeq = record.nextLocalSeq + 1;
     if (!Number.isSafeInteger(localSeq)) throw new Error("local sequence exhausted");
-    const prepared = { ...entry, localSeq };
+    const prepared = { ...entry, localSeq, sealed: envelope };
     const local = localProjection(record.accepted, pendingInOrder([...pending, prepared]));
-    // Both writes either commit together, or both roll back.
+    // State, outbox and ciphertext commit together. No network operation here.
     outbox.add(prepared);
     lists.put({ ...record, local, nextLocalSeq: localSeq });
     return { local, pendingCount: pending.length + 1 };
   });
 }
 
+/** Read EXACTLY the envelope bytes previously committed, never re-encrypt. */
+export async function loadSealedMutation(db, listId, mutationId) {
+  if (typeof listId !== "string" || typeof mutationId !== "string") {
+    throw new TypeError("invalid mutation lookup");
+  }
+  return transaction(db, "readonly", async (_lists, outbox) => {
+    const entry = await request(outbox.get([listId, mutationId]));
+    if (!entry) return null;
+    if (!entry.sealed) throw new StorageFailure(
+      "Pending legacy mutation has no encrypted envelope; do not upload it");
+    return validateSealed(entry, entry.sealed);
+  });
+}
+
+/**
+ * WARNING: older in-progress v2 prototype builds could store unsealed outbox
+ * entries. Those entries remain local after an IndexedDB version upgrade, but
+ * loadSealedMutation refuses to send them. A future reviewed re-encryption
+ * migration must explicitly repair them without silently dropping edits.
+ */
 /**
  * Atomically apply authenticated/decrypted accepted operations, advance the
  * cursor and remove only matching outbox mutation IDs. Callers MUST verify
@@ -184,6 +236,18 @@ export async function acceptRemoteOperations(db, listId, operations) {
     if (!record) throw new Error("list does not exist");
     // replay validates list IDs, contiguous revisions, data shape and ordering.
     const accepted = replay(record.accepted, operations);
+    // An accepted mutation ID MUST refer to the same locally queued action.
+    // Otherwise a malicious/misconfigured server could clear work using an
+    // unrelated payload with a colliding ID. Auth/signature verification is
+    // additionally required by the caller before reaching this method.
+    const byId = new Map(pending.map(entry => [entry.id, entry]));
+    for (const op of operations) {
+      const queued = byId.get(op.id);
+      if (queued && (queued.type !== op.type ||
+          !sameContent(queued.payload, op.payload))) {
+        throw new Error("accepted mutation does not match queued content");
+      }
+    }
     const acknowledged = new Set(operations.map(op => op.id));
     const remaining = pending.filter(p => !acknowledged.has(p.id));
     const local = localProjection(accepted, pendingInOrder(remaining));
