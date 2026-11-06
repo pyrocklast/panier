@@ -49,6 +49,18 @@ async function transaction(db, mode, callback) {
   }
 }
 
+// Compare validated plaintext payloads semantically; object key insertion
+// order can differ after decrypting a canonical wire representation.
+function sameContent(a, b) {
+  if (Object.is(a, b)) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object" ||
+      Array.isArray(a) !== Array.isArray(b)) return false;
+  const ak = Object.keys(a).sort();
+  const bk = Object.keys(b).sort();
+  return ak.length === bk.length && ak.every((k, i) =>
+    k === bk[i] && sameContent(a[k], b[k]));
+}
+
 function pendingInOrder(entries) {
   return entries.sort((a, b) => a.localSeq - b.localSeq || a.id.localeCompare(b.id));
 }
@@ -232,7 +244,7 @@ export async function acceptRemoteOperations(db, listId, operations) {
     for (const op of operations) {
       const queued = byId.get(op.id);
       if (queued && (queued.type !== op.type ||
-          JSON.stringify(queued.payload) !== JSON.stringify(op.payload))) {
+          !sameContent(queued.payload, op.payload))) {
         throw new Error("accepted mutation does not match queued content");
       }
     }
