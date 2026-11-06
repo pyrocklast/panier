@@ -38,8 +38,8 @@ jobs:
           npx playwright install --with-deps chromium firefox
       - name: V2 IndexedDB persistence tests (real browsers)
         run: |
-          node --test test/v2-storage.test.mjs
-          BROWSER=firefox node --test test/v2-storage.test.mjs
+          timeout 120s node --test test/v2-storage.test.mjs
+          timeout 120s env BROWSER=firefox node --test test/v2-storage.test.mjs
       - name: Start the Go server
         run: |
           go build -o panier .
