@@ -85,7 +85,8 @@ export async function publishAtomicRotation(storage,{event,envelopes}) {
       memberIds,status:"published", // NOT delivery confirmation
     });
     // Append endpoints MUST check this fence inside their append transaction.
-    await tx.put(FENCE,{listId:state.listId,epoch:next.epoch,head:next.head});
+    await tx.put(FENCE,{listId:state.listId,epoch:next.epoch,
+      head:next.head,sequence:next.sequence});
     return {listId:state.listId,epoch:next.epoch,head:next.head,
       recipients:memberIds,publication:"published"};
   });
@@ -105,14 +106,21 @@ export async function readCurrentKeyPackage(storage,{listId,memberId}) {
   const member=state.members.find(m=>m.memberId===memberId);
   requireThat(member&&member.active&&member.role==="member",
     "requester is not an active member");
-  const manifest=await storage.get(manifestKey(state.head));
+  // New members may join AFTER an epoch was published, advancing the
+  // membership log head. Ciphertexts must remain pinned to the original
+  // rotation head, not to the newest join event's hash.
+  const fence=await storage.get(FENCE);
+  requireThat(fence&&fence.listId===listId&&fence.epoch===state.epoch&&
+    Number.isSafeInteger(fence.sequence)&&fence.sequence<=state.sequence,
+    "current epoch publication fence unavailable");
+  const manifest=await storage.get(manifestKey(fence.head));
   requireThat(manifest&&manifest.listId===listId&&
-    manifest.epoch===state.epoch&&
+    manifest.epoch===state.epoch&&manifest.sequence===fence.sequence&&
     manifest.memberIds.includes(memberId),
     "current epoch package unavailable");
   const envelope=await storage.get(packageKey(state.epoch,memberId));
   requireThat(envelope&&envelope.memberId===memberId&&
-    envelope.rotationHead===state.head,
+    envelope.rotationHead===fence.head,
     "current epoch key package missing");
   return {envelope,manifest};
 }
@@ -135,7 +143,9 @@ export async function assertCurrentEpochAppend(tx,{listId,memberId,epoch}) {
   if(epoch>1){
     const fence=await tx.get(FENCE);
     requireThat(fence&&fence.listId===listId&&fence.epoch===epoch&&
-      fence.head===state.head,"new epoch was not fully published");
+      Number.isSafeInteger(fence.sequence)&&fence.sequence<=state.sequence&&
+      await tx.get(manifestKey(fence.head)),
+      "new epoch was not fully published");
   }
   return {epoch,head:state.head};
 }
