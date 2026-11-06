@@ -42,6 +42,11 @@ cryptographic protocols.
   authenticated rekey envelope version 2 (signed recipient agreement-key
   binding), persistent offline-retrievable packages and same-transaction
   append-epoch fencing.
+- PR #26 — **separate locally runnable Cloudflare Worker/Durable Object API**:
+  member-signed requests and durable nonce replay protection, authenticated
+  invitation/redeem, signed membership history, atomic rekey and recipient
+  retrieval, opaque signed mutation append with epoch fence and pull.
+  First real Wrangler local-runtime integration tests.
 
 ## Reviewer priorities
 
@@ -84,9 +89,13 @@ cryptographic protocols.
 8. **Storage/browser threats:** non-extractable keys in IndexedDB, same-origin
    malicious JavaScript, plaintext optimistic cache, local data eviction,
    user-supplied crypto/IDB adapter behavior, CSP/supply chain controls.
-9. **Backend abuse and availability:** rate limiting, invitation quota/garbage
-   collection, persistent receipt semantics, per-list DO routing, clock and
-   network manipulation, withheld data, stale snapshots.
+9. **Backend abuse and availability:** assess PR #26's actual DO routes,
+   P-256 request authentication, nonce replay storage growth, bootstrap
+   owner-key pinning, signed ciphertext append validation, epoch fences,
+   bounded request parsing, authenticated member key retrieval, and safe
+   retry/idempotency semantics. Still missing: rate limiting, invitation
+   quota/garbage collection, persistent receipts, clock manipulation,
+   withholding/rollback, stale snapshots and production abuse controls.
 
 ## Explicit unresolved integration dependencies
 
@@ -101,9 +110,12 @@ server/client agreement on the latest membership head, signed ownership
 transfer and production-level durable/idempotent receipt storage
 remain absent. PR #24 implements a **client-side key-delivery receipt
 prototype**, without transport, retry/freshness rules or delivery assurance.
-PR #25 now implements **isolated, transaction-level key-epoch publication**
-and offline-recipient package retrieval, but it is not connected to a real
-Durable Object runtime or an authenticated mutation append endpoint.
+PR #25 implements **transaction-level key-epoch publication**.
+PR #26 now connects it to an isolated **real local Cloudflare Durable Object**
+with signed HTTP authorization and encrypted mutation append/pull.
+This is **not** connected to the deployed Worker and does not establish
+trusted genesis bootstrap, client-pinned server freshness, durable receipts,
+owner recovery or production traffic/abuse protections.
 The separate QR-enrollment lost-response receipt protocol is still absent.
 
 The implementation stores server-visible metadata and encrypted list-key
