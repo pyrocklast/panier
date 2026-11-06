@@ -22,9 +22,12 @@ cryptographic protocols.
 - PR #16 — durable immutable encrypted outbox.
 - PR #17 — ECDSA P-256 signing, HKDF and AES-256-GCM mutation envelopes.
 - PR #19 — QR owner-prepared signed encrypted key package and token derivation.
-- Current stacked PR — Durable Object invitation registry: atomic first-use
+- PR #20 — Durable Object invitation registry: atomic first-use
   enrollment, in-transaction current-owner/epoch authorization and recipient
   proof-of-possession checks.
+- PR #21 — experimental owner-pinned, hash-linked membership ledger:
+  signed genesis/rotations and QR grant plus recipient proof for joins;
+  full-chain verification and ledger-backed registration gates.
 
 ## Reviewer priorities
 
@@ -39,9 +42,12 @@ cryptographic protocols.
 3. **Single-use race/failure handling:** token commitment, concurrent attempts,
    atomic member registration, expiry and cancellation, retry after response
    loss, owner revocation and epoch changes between issuing and redeeming.
-4. **Identity/authorization:** list-scoped member public keys and immutable
-   signed role transitions; whether a recipient proof-of-possession plus a
-   stolen QR permits any unauthorized downgrade, replay or role escalation.
+4. **Identity/authorization:** verify PR #21's owner-pinned genesis, signed
+   rotation, and join events made from a signed invitation plus recipient
+   proof. Challenge whether server-controlled ordering, withheld chain
+   suffixes, unpinned heads, or a stale materialized membership cache can
+   grant unauthorized writes or hide revocation. Check for cross-list replay,
+   role escalation and canonical encoding inconsistencies.
 5. **Epoch rotation:** revocation under offline edits and missing acknowledgements,
    how new epoch keys reach remaining members and how to prevent old-epoch
    writes from being silently accepted.
@@ -64,8 +70,12 @@ The QR registry prototype has **no deployed endpoints or production bindings**.
 Its `authOwner` callback must consult an authenticated list-owner credential,
 and `authorizeEnrollment({tx,...})` must check the current signed owner
 authority and epoch inside the same Durable Object transaction. Without
-these adapters, the prototype fails closed. The membership ledger and
-recipient challenge/receipt protocol have not been implemented.
+these adapters, the prototype fails closed. The **experimental** membership-ledger prototype is now in PR #21,
+with `ledgerAuthorizers` callbacks, a pinned owner genesis and
+transactional join evidence. However, authenticated production bootstrap,
+server/client agreement on the latest membership head, signed ownership
+transfer, retry receipts and reviewed key-epoch distribution are still absent.
+The recipient challenge/receipt protocol is not yet implemented.
 
 The implementation stores server-visible metadata and encrypted list-key
 packages, never a QR seed or plaintext list key. It does not prove that a
