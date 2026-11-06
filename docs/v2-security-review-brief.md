@@ -59,6 +59,9 @@ cryptographic protocols.
 - PR #30 — durable member-signed key-delivery receipts and owner-only
   retrieval. The server validates member identity/package binding but
   explicitly cannot validate secret-derived HMAC confirmations.
+- PR #31 — single-use QR enrollment made safely retryable after ambiguous
+  HTTP outcomes, restricted to the exact active member signing/ECDH identity;
+  no second membership is granted, even with a photographed QR.
 
 ## Reviewer priorities
 
@@ -73,9 +76,12 @@ cryptographic protocols.
    Consumption prevents additional membership, **not decryption of a leaked
    package**. Is this product trade-off acceptable, or should the handshake
    use a different authenticated ephemeral-key exchange requiring owner presence?
-3. **Single-use race/failure handling:** token commitment, concurrent attempts,
-   atomic member registration, expiry and cancellation, retry after response
-   loss, owner revocation and epoch changes between issuing and redeeming.
+3. **Single-use race/failure handling:** review PR #31's idempotent
+   same-device claim recovery, including token commitment, signed recipient
+   proof, BOTH registered keys, current active membership, expiry policy,
+   concurrent competing scans, and revocation after issuance or redemption.
+   An HTTP replay may recover the original signed grant, but MUST NOT grant
+   a second membership or recover a removed device.
 4. **Identity/authorization and rollback:** review PR #21's signed
    genesis/join/rotation records and PR #27's **persisted checkpoint
    extension rule**, including two-tab races, valid signed same-sequence
