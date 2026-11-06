@@ -8,18 +8,22 @@ endpoint, realtime connection or account implementation here.
 
 ```js
 import {
-  openPanierDatabase, createLocalList, commitLocalMutation,
-  readLocalList, acceptRemoteOperations, requestPersistentStorage,
+  openPanierDatabase, createLocalList, commitSealedLocalMutation,
+  readLocalList, acceptRemoteOperations, loadSealedMutation, requestPersistentStorage,
 } from "./storage.mjs";
 
 const db = await openPanierDatabase();
 await createLocalList(db, "your-random-list-id");
-await commitLocalMutation(db, {
+const draft = {
   listId: "your-random-list-id",
   id: "your-random-mutation-id",
   type: "item.add",
   payload: { id: "your-random-item-id", name: "Milk", position: "a" },
-});
+};
+// 'sealAndSign' must come from the reviewed cryptographic protocol.
+// It prepares ONE authenticated encrypted wire envelope before this transaction.
+const sealed = await sealAndSign(draft);
+await commitSealedLocalMutation(db, draft, sealed);
 // Only now may the UI say "Saved locally".
 ```
 
@@ -33,8 +37,13 @@ sufficient randomness (see `newId` in `domain.mjs`).
 - `pending`: locally ordered unsent/unacknowledged operations;
 - `nextLocalSeq`: monotonic local counter for ordering pending work.
 
-`commitLocalMutation` writes a new mutation and a newly derived `local`
-projection in the **same IndexedDB readwrite transaction**. The transaction
+`commitSealedLocalMutation` requires a **prepared, already encrypted and
+signed** opaque envelope `{ listId, id, ciphertext }`. The ciphertext string
+is the complete, immutable wire representation (its exact encoding is not yet
+defined). The function validates its envelope shape and list/mutation binding;
+**it does not perform or verify cryptography**. It writes the encrypted envelope,
+the pending mutation and a newly derived `local` projection in the **same
+IndexedDB readwrite transaction**. The transaction
 is awaited through `oncomplete`, not request-level `onsuccess`. If a
 quota, blocked, closed database or validation failure occurs, the promise
 **rejects**; the caller must not claim that the edit was saved.
@@ -54,6 +63,21 @@ optimistic replay. IndexedDB readwrite transactions serialize writes across
 tabs sharing the same browser origin; future `BroadcastChannel`/Web Locks
 are useful for UI notifications and reducing duplicate network uploads,
 but are not required for atomic database writes.
+
+
+`loadSealedMutation(db, listId, mutationId)` returns the exact stored
+envelope string after restart. A duplicate mutation ID cannot replace it.
+Legacy v2 prototype outbox rows without encrypted envelopes remain local
+but cannot be uploaded: the loader fails explicitly and a reviewed repair
+procedure is required. Version 2 of the IndexedDB schema does not modify the
+existing v1 `localStorage["panier"]` data.
+
+The accepted-operation transaction also verifies that an acknowledgement for
+a locally pending mutation ID has matching operation type and payload. This
+prevents clearing pending edits on a mismatched accepted item; it **does not**
+substitute for full signed envelope verification. The pending plaintext payload
+still exists in local IndexedDB for optimistic editing and is not a secure
+at-rest cache.
 
 ## Failure behaviour and error handling
 
@@ -85,7 +109,7 @@ but are not required for atomic database writes.
 - Pending operations are removed only when their authenticated accepted-log
   counterparts are applied. This avoids temporarily making edits disappear
   when an upload succeeds but the remote log has not been downloaded.
-- The new schema is v1 of **`panier-v2`**, distinct from v1's existing
+- The current schema is v2 of **`panier-v2`**, distinct from v1's existing
   `localStorage["panier"]`. Future IndexedDB migrations require version
   increments and explicit tests; this PR does not import v1 data.
 - Snapshot/restore, encrypted queued payloads, multi-tab notifications,
