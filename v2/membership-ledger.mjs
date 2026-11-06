@@ -155,14 +155,26 @@ export async function previewSignedRotation(state,event) {
 }
 
 /** First genesis can only be trusted if its public key is pinned out of band. */
-export async function bootstrapLedger(storage, event, trustedOwnerPublicJwk) {
+export async function bootstrapLedger(storage, event, trustedOwnerPublicJwk,
+  {idempotent=false}={}) {
   await checkGenesis(event,trustedOwnerPublicJwk);
+  const genesis=await applied(null,event);
   return storage.transaction(async tx=>{
-    ok(!await tx.get(ROOT),"membership ledger already initialised");
-    const state=await applied(null,event);
+    const existing=await tx.get(ROOT);
+    if(existing){
+      if(idempotent && existing.listId===genesis.listId &&
+        existing.ownerId===genesis.ownerId &&
+        sameKey(existing.ownerPublicJwk,genesis.ownerPublicJwk)){
+        const saved=await tx.get(eventKey(1));
+        // Require EXACT original signed bytes. Equivalent re-signing with a
+        // new ECDSA signature is a different genesis hash and is rejected.
+        if(serialize(saved)===serialize(event))return existing;
+      }
+      throw new Error("membership ledger already initialised with another genesis");
+    }
     await tx.put(eventKey(1),event);
-    await tx.put(ROOT,state);
-    return state;
+    await tx.put(ROOT,genesis);
+    return genesis;
   });
 }
 
