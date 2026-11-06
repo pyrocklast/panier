@@ -172,6 +172,9 @@ test("real SQLite DO: QR enrollment, signed reads, encrypted mutation, rotation 
   const revoked=await signed({listId,member:a.member,route:"key-package",
     body:{listId},expected:403});
   assert.match(revoked.error,/authorized/);
+  const invalidRetry=await post(signedRequestPath(listId,"redeem"),
+    {body:a.body},null,409);
+  assert.match(invalidRetry.error,/no longer authorized/);
   const stale=await signed({listId,member:b.member,route:"mutations",
     body:sealed,expected:409});
   assert.match(stale.error,/stale/);
