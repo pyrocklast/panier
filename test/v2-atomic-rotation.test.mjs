@@ -231,3 +231,41 @@ test("failed or repeated signed rotation never overwrites a published envelope",
   await assert.rejects(publishAtomicRotation(f.storage,prepared),/rotation/);
   assert.deepEqual(f.storage.snapshot(),snapshot);
 });
+
+test("later QR enrollment in the same epoch does not break offline key retrieval or append fence",async()=>{
+  const f=await setup();
+  const prepared=await f.prepare();
+  const published=await publishAtomicRotation(f.storage,prepared);
+  const newMemberId="newmember02";
+  const signed=await generateSigningIdentity();
+  const agreement=await generateRecipientAgreementKey();
+  const {qr,serverRecord}=await prepareQrInvitation({
+    listId:LIST,ownerId:f.owner.actorId,epoch:2,
+    listSecret:prepared.secret,ownerPrivateKey:f.owner.privateKey,
+    ownerPublicJwk:f.owner.publicKeyJwk,now:NOW,
+  });
+  await f.registry.createInvitation(serverRecord);
+  const token=(await prepareQrRedemption(qr,NOW)).token;
+  const nonce=Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
+  const statement=enrollmentStatement({listId:LIST,
+    inviteId:serverRecord.inviteId,memberId:newMemberId,nonce,
+    tokenHash:serverRecord.tokenHash,agreementPublicJwk:agreement.publicJwk});
+  const proof=Buffer.from(await crypto.subtle.sign({
+    name:"ECDSA",hash:"SHA-256"},signed.privateKey,
+    new TextEncoder().encode(statement))).toString("base64url");
+  await f.registry.redeem({listId:LIST,inviteId:serverRecord.inviteId,
+    memberId:newMemberId,nonce,token,memberPublicJwk:signed.publicKeyJwk,
+    agreementPublicJwk:agreement.publicJwk,proof});
+  const current=await f.storage.get("membership:state");
+  assert.notEqual(current.head,published.head);
+  assert.equal(current.epoch,2);
+  const result=await readCurrentKeyPackage(f.storage,{listId:LIST,memberId:ACTIVE});
+  assert.equal(result.envelope.rotationHead,published.head);
+  assert.deepEqual(result.envelope,prepared.envelopes[0]);
+  assert.deepEqual(await f.storage.transaction(tx=>assertCurrentEpochAppend(tx,{
+    listId:LIST,memberId:ACTIVE,epoch:2})),{
+    epoch:2,head:current.head,
+  });
+  await assert.rejects(readCurrentKeyPackage(f.storage,{
+    listId:LIST,memberId:newMemberId}),/package unavailable/);
+});
