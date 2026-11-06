@@ -164,7 +164,11 @@ export async function bootstrapLedger(storage, event, trustedOwnerPublicJwk) {
  * Persist a signed owner-rotation event. A new epoch does NOT distribute its
  * key; encryption/key-envelope rotation remains a separate unresolved gate.
  */
-export async function rotateLedger(storage,event) {
+export async function rotateLedger(storage,event,{testOnlyUnsafe=false}={}) {
+  // Historic isolated unit tests can exercise bare ledger transitions.
+  // Production must never rotate without publishing recipient ciphertexts.
+  ok(testOnlyUnsafe===true,
+    "bare epoch rotation forbidden; use publishAtomicRotation");
   return storage.transaction(async tx=>{
     const state=await tx.get(ROOT);
     ok(state,"membership ledger uninitialised");
