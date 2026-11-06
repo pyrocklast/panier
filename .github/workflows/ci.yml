@@ -29,6 +29,8 @@ jobs:
           node-version: 22
       - name: V2 domain reducer tests
         run: node --test test/v2-domain.test.mjs
+      - name: V2 sync coordinator tests
+        run: node --test test/v2-sync.test.mjs
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race ./...
