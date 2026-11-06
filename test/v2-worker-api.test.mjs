@@ -198,3 +198,31 @@ test("exact signed owner bootstrap retry is idempotent; substituted owner key ca
   const trusted=await verifyTrustedHistory(anchor,history.events);
   assert.equal(trusted.ownerId,owner.id);
 });
+
+test("real Durable Object enforces bounded concurrent QR invitations and frees redeemed slots",async()=>{
+  const {listId,owner}=await bootstrap();
+  const secret=crypto.getRandomValues(new Uint8Array(32));
+  const prepared=[];
+  for(let i=0;i<5;i++)prepared.push(await invite({listId,owner,secret}));
+  const sixth=await prepareQrInvitation({listId,ownerId:owner.id,
+    epoch:1,listSecret:secret,ownerPrivateKey:owner.keys.privateKey,
+    ownerPublicJwk:owner.keys.publicKeyJwk});
+  const denied=await signed({listId,member:owner,route:"invitations",
+    body:sixth.serverRecord,expected:429});
+  assert.match(denied.error,/invitation quota/);
+  const newMember=await recipientEnroll({listId,prepared:prepared[0]});
+  await post(signedRequestPath(listId,"redeem"),{body:newMember.body},null,201);
+  assert.equal((await signed({listId,member:owner,route:"invitations",
+    body:sixth.serverRecord,expected:201})).inviteId,sixth.serverRecord.inviteId);
+});
+
+test("real Durable Object enforces member request rate without storing unlimited nonce rows",async()=>{
+  const {listId,owner}=await bootstrap();
+  const body={listId};
+  for(let i=0;i<60;i++){
+    const response=await signed({listId,member:owner,route:"history",body});
+    assert.equal(response.events.length,1);
+  }
+  const denied=await signed({listId,member:owner,route:"history",body,expected:429});
+  assert.match(denied.error,/rate limit/);
+});
