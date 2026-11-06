@@ -23,12 +23,14 @@ response; no cross-origin browser integration is enabled.
 
 | Action | Authentication | Scope |
 |---|---|---|
-| `bootstrap` | Owner-signed genesis (self-signed first-write) | Create initial owner ledger |
+| `bootstrap` | Locally generated owner-signed genesis (self-signed first-write) | Create initial owner ledger; exact signed-byte retry is idempotent |
 | `invitations` | Signed owner device request + signed invitation | Register physical-QR invitation |
-| `redeem` | Single-use QR-derived token + recipient PoP | Atomically enroll a member |
+| `redeem` | QR-derived token + recipient signing/ECDH binding | Atomically enroll one member; the same active device can recover a lost response without enrolling again |
 | `history` | Signed active member request | Fetch owner-signed membership events |
 | `rotate` | Signed owner request + signed rotation | Atomically publish epoch and encrypted packages |
 | `key-package` | Signed active member request | Retrieve own current encrypted key |
+| `rekey-receipt` | Signed active recipient request + inner receipt signature | Store recipient receipt for exact new-epoch ciphertext (NOT owner-confirmed) |
+| `rekey-receipts` | Signed owner request | Fetch member-signed receipts for local secret-derived HMAC verification |
 | `mutations` | Signed active member request + signed mutation envelope | Append ciphertext with idempotent mutation ID and epoch fence |
 | `pull` | Signed active member request | Fetch ordered encrypted mutation log |
 
@@ -37,7 +39,10 @@ Requests bind list ID, member ID, method, exact path, SHA-256 of JSON request
 body, 128-bit random nonce and issued-at timestamp (±120 seconds) into
 ECDSA P-256 signature. The Durable Object reads current membership,
 verifies the registered signing public key, and consumes the nonce in
-durable storage. Replaying the same signed request is rejected.
+six rotating minute slots per member. Replaying the same signed request
+is rejected within its timestamp validity window. List/member/unsigned
+claim budgets and the five-active-QR limit are experimental and enforced
+in the isolated DO; see `v2/BOUNDED-API.md`.
 
 Mutation uploads additionally verify the immutable, client-signed
 versioned ciphertext envelope (including actor, list, ID and epoch).
@@ -56,12 +61,17 @@ verify accepted revisions before acknowledging their outbox.
 2. **Server freshness/equivocation:** signed membership history can be
    withheld, replayed, or forked. Clients need verified pinned-head
    checkpoints and a consistency policy before production.
-3. **Nonce retention and abuse:** replay nonces are stored durably but have
-   no pruning, quotas or rate limits yet. Service must impose account-less
-   abuse limits without linking users across lists.
-4. **Unfinished end-to-end protocol:** membership recovery/transfer, durable
-   receipt submission and retry, offline conflict rebase, encrypted snapshot
-   compaction, multi-rotation key history and genuine client UI remain open.
+3. **Nonce retention and abuse:** a bounded nonce ring and per-list/request
+   quotas now exist, but **global** edge controls against random new list IDs,
+   abuse monitoring, storage retention and cost protection do not. These
+   local budgets are not a production denial-of-service perimeter.
+4. **Unfinished end-to-end protocol:** member-signed rekey receipts are now
+   stored durably but Cloudflare cannot verify the secret-derived HMAC.
+   Only the owner can determine successful key delivery. Same-device QR
+   redemption retry after lost HTTP response is supported, but owner
+   recovery/transfer, invalid signed receipt replacement, offline conflict
+   rebase, encrypted snapshots, multi-rotation key history and client UI
+   remain unresolved.
 5. **Cloudflare API hardening:** HTTP authorization is preliminary. It
    requires security review, body/ciphertext size and operation volume
    quotas, authentication challenge/clock drift policy, canonical test
