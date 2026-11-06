@@ -217,6 +217,10 @@ test("real Durable Object enforces bounded concurrent QR invitations and frees r
 });
 
 test("real Durable Object enforces member request rate without storing unlimited nonce rows",async()=>{
+  // Avoid depending on the CI runner starting immediately before a minute
+  // boundary, since rate buckets intentionally rotate on server wall clock.
+  const remaining=60000-(Date.now()%60000);
+  if(remaining<15000)await new Promise(resolve=>setTimeout(resolve,remaining+250));
   const {listId,owner}=await bootstrap();
   const body={listId};
   for(let i=0;i<60;i++){
