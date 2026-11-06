@@ -739,6 +739,7 @@ test("trusted owner genesis and non-extractable private signing key survive brow
       db.close();
       db=await trust.openTrustDatabase({name});
       const recovered=await trust.readPinnedTrust(db,"household01");
+      const originalSigned=await trust.readPinnedOwnerGenesis(db,"household01");
       const key=await trust.readLocalOwnerSigningKey(db,"household01");
       const data=new TextEncoder().encode("owner key persisted, no server trust");
       const signature=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},key,data);
@@ -753,11 +754,13 @@ test("trusted owner genesis and non-extractable private signing key survive brow
       db.close();
       return {sameRoot:before.ownerPublicJwk.x===recovered.ownerPublicJwk.x,
         sameHead:after.checkpoint.head===before.checkpoint.head,
+        exactGenesis:JSON.stringify(originalSigned)===JSON.stringify(prepared.event),
         durableKey:good,nonExtractable:key.extractable===false,
         duplicateRefused:denied,source:recovered.source};
     },dbName());
-    assert.deepEqual(result,{sameRoot:true,sameHead:true,durableKey:true,
-      nonExtractable:true,duplicateRefused:true,source:"owner-local"});
+    assert.deepEqual(result,{sameRoot:true,sameHead:true,exactGenesis:true,
+      durableKey:true,nonExtractable:true,duplicateRefused:true,
+      source:"owner-local"});
   }finally{await context.close();}
 });
 
