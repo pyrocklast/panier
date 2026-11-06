@@ -35,18 +35,26 @@ The `rotationHead` is supplied externally; this module does NOT itself
 verify the membership chain. It must be derived from an already verified
 signed rotation event, never accepted as a server assertion.
 
-## Critical unresolved identity binding
+## Authenticated agreement keys (new stacked integration)
 
-**Existing PR #21 member records currently authenticate only P-256 *signing*
-keys. They do not yet bind ECDH public agreement keys to member identities.**
-A future protocol revision must bind each ECDH key to a recipient's signing
-key in its signed proof-of-possession and append the ECDH key to the owner-
-authenticated membership history.
+The updated experimental QR enrollment statement (v2) binds the recipient's
+P-256 **ECDH agreement public key** to its authenticated P-256 signing key.
+The member join event includes the same signed binding. A client that verifies
+the entire membership history against a pinned owner signing key can use
+`verifiedRekeyRecipients(verifiedState, removedMemberId)` to obtain the
+surviving member keys. The helper excludes the owner (who locally generated
+the new list secret), inactive members and the removed device.
 
-Without that binding, a malicious server could substitute an ECDH key to
-receive the new secret. This module therefore requires
-`trustedRecipients` to originate from a verified key binding and must
-not be activated by the current membership registry.
+This blocks an unauthenticated server from *substituting* an agreement key
+while the client verifies the signed join transcript.
+
+**Not fully solved:** the signature proves possession of the *signing*
+private key, not the ECDH private key. A recipient must demonstrate the
+ability to decrypt an owner-signed key package before the sender treats
+distribution as completed. An authenticated key-confirmation receipt,
+freshness/pinned-head checks and server withholding safeguards still need
+protocol design and security review. Neither receiving a key nor reading
+the materialized server membership state alone proves this.
 
 ## Offline mutations across epochs
 
@@ -73,7 +81,8 @@ stand in for signature, role, epoch or list-binding checks before upload.
 
 ## What is *not* solved
 
-- Client-side independent verified ECDH public-key registration/binding.
+- Verified ECDH public-key binding now exists in signed joins, but recipient
+  **private-key confirmation and authenticated delivery receipts** are missing.
 - Server enforcement that all required surviving recipients can obtain
   packages before an epoch cutover; safe handling of temporarily offline
   members; atomic publication of signed rotation and key packages.
