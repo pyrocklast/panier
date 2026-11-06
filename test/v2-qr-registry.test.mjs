@@ -271,9 +271,19 @@ test("same signed device safely recovers enrollment after lost response",async()
   assert.equal(retry.alreadyUsed,true);
   assert.equal(retry.currentEpoch,1);
   assert.equal(retry.memberId,req.memberId);
+  // Expiration prevents unused enrollment, but cannot undo an enrollment
+  // that already committed. Same authenticated device may recover the reply.
+  f.registry.now=()=>NOW+600001;
+  assert.equal((await f.registry.redeem(req)).alreadyUsed,true);
   assert.deepEqual(f.backend.get("invite:"+req.inviteId),snapshot);
   const swapped=await f.request(req.memberId);
   await assert.rejects(f.registry.redeem(swapped),/no longer authorized/);
   await assert.rejects(f.registry.redeem(await f.request("anotherAA01")),
     /used by another device/);
+  await f.backend.transaction(async tx=>{
+    const state=await tx.get("membership:state");
+    state.members[0].active=false;
+    await tx.put("membership:state",state);
+  });
+  await assert.rejects(f.registry.redeem(req),/no longer authorized/);
 });
