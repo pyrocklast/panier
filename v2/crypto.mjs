@@ -156,6 +156,11 @@ export async function openMutation({ listId, opaque, resolveMember, resolveListS
     envelope.v === VERSION && envelope.listId === listId &&
     envelope.id === opaque.id && validEpoch(envelope.epoch) &&
     validId(envelope.actorId), "wrong list, ID or envelope version");
+  // Reject re-ordered or otherwise non-canonical envelopes, not just
+  // duplicate/extra JSON keys. This byte representation is the v1 wire format.
+  check(JSON.stringify(envelope) === JSON.stringify({
+    ...unsigned(envelope), sig: envelope.sig,
+  }), "noncanonical signed envelope order");
   const nonce = unbase64url(envelope.nonce, 64);
   check(nonce.length === 12, "invalid nonce length");
   const ciphertext = unbase64url(envelope.data);
