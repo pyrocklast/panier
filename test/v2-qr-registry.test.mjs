@@ -1,6 +1,7 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {generateSigningIdentity} from "../v2/crypto.mjs";
+import {generateRecipientAgreementKey} from "../v2/rekey.mjs";
 import {prepareQrInvitation, prepareQrRedemption} from "../v2/qr-pairing.mjs";
 import {QrInvitationRegistry, enrollmentStatement, revocationStatement} from "../v2/qr-registry.mjs";
 
@@ -51,6 +52,7 @@ async function setup() {
   });
   async function request(memberId="newmember01", override={}) {
     const recipient = await generateSigningIdentity();
+    const agreement = await generateRecipientAgreementKey();
     const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
     const payload = {listId:LIST,inviteId:serverRecord.inviteId,
       token,memberId,nonce};
@@ -58,8 +60,10 @@ async function setup() {
       {name:"ECDSA",hash:"SHA-256"},recipient.privateKey,
       new TextEncoder().encode(enrollmentStatement({
         ...payload, tokenHash:serverRecord.tokenHash,
+        agreementPublicJwk:agreement.publicJwk,
       })))).toString("base64url");
-    return {...payload,memberPublicJwk:recipient.publicKeyJwk,proof,...override};
+    return {...payload,memberPublicJwk:recipient.publicKeyJwk,
+      agreementPublicJwk:agreement.publicJwk,proof,...override};
   }
   return {owner,listSecret,qr,serverRecord,token,backend,registry,request};
 }
@@ -73,6 +77,8 @@ test("valid owner creates and recipient binds public signing key on one-use rede
   assert.deepEqual(out.serverRecord,f.serverRecord);
   assert.equal(f.backend.get("invite:"+req.inviteId).status,"used");
   assert.equal(f.backend.get("member:"+req.memberId).publicJwk.x,req.memberPublicJwk.x);
+  assert.equal(f.backend.get("member:"+req.memberId).agreementPublicJwk.x,
+    req.agreementPublicJwk.x);
   assert.equal(JSON.stringify(f.backend.get("invite:"+req.inviteId)).includes(f.qr),false);
   await assert.rejects(f.registry.redeem(req),/unavailable/);
 });
@@ -96,6 +102,9 @@ test("stolen token / altered signature / substitute device identity cannot regis
   await assert.rejects(f.registry.redeem({...r,memberId:"newmember02"}),/proof/);
   const foreign=await generateSigningIdentity();
   await assert.rejects(f.registry.redeem({...r,memberPublicJwk:foreign.publicKeyJwk}),/proof/);
+  const substituted=await generateRecipientAgreementKey();
+  await assert.rejects(f.registry.redeem({...r,
+    agreementPublicJwk:substituted.publicJwk}),/proof/);
   assert.equal(f.backend.get("invite:"+r.inviteId).status,"open");
   await f.registry.redeem(r);
 });
@@ -195,4 +204,13 @@ test("public owner signing key alone cannot cancel an invitation",async()=>{
   await assert.rejects(f.registry.revokeInvitation({...cancel,proof:forged}),/signature/);
   assert.equal(f.backend.get("invite:"+req.inviteId).status,"open");
   await f.registry.redeem(req);
+});
+
+test("enrollment without a signed ECDH binding is rejected",async()=>{
+  const f=await setup();
+  await f.registry.createInvitation(f.serverRecord);
+  const req=await f.request();
+  const {agreementPublicJwk,...missing}=req;
+  await assert.rejects(f.registry.redeem(missing),/invalid enrollment request/);
+  assert.equal(f.backend.get("invite:"+req.inviteId).status,"open");
 });
