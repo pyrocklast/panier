@@ -35,6 +35,8 @@ jobs:
         run: node --test test/v2-crypto.test.mjs
       - name: V2 in-person QR key transfer tests
         run: node --test test/v2-qr-pairing.test.mjs
+      - name: V2 atomic QR redemption tests
+        run: node --test test/v2-qr-registry.test.mjs
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race ./...
