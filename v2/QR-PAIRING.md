@@ -96,12 +96,31 @@ The P-256 owner signing key is not a QR-exclusive key. The future protocol
 must bind the issuer to a *trusted list owner role* and forbid a normal member
 from issuing invitations.
 
+## Recipient key proof-of-possession (client prototype)
+
+`v2/qr-enrollment-proof.mjs` now implements the **client's half** of
+proof-of-possession: a new anonymous P-256 identity signs a domain-separated
+transcript covering list ID, invitation ID, fresh 256-bit server challenge,
+actor ID and canonical public signing key. The pure verifier rejects
+substituted list/invitation/challenge context, invalid keys and signatures.
+
+**This does not create a member or establish single-use redemption.** A
+correctly signed proof can be replayed unless the Cloudflare DO issues an
+unpredictable challenge, binds it to an invitation, enforces expiration,
+and **consumes it atomically with the membership grant**. Tests deliberately
+show that repeated cryptographic verification succeeds in the absence of
+server-side replay tracking. Challenge issuance, public key registration,
+authorization and receipts remain security gates.
+
+Run `node --test test/v2-qr-enrollment-proof.test.mjs`.
+
 ## Security/ship blockers
 
 - [ ] Server-side owner-authenticated, expiring, revocable, **atomic**
       invitation creation/claim, enforcing single use and epoch fencing
-- [ ] Challenge-based new-member key proof-of-possession and verified
-      binding of a **membership receipt** to the recipient's public key
+- [x] Client-side challenge-bound recipient key proof-of-possession prototype
+- [ ] Server-side unique challenge issuance/consumption and verified binding
+      of a **membership receipt** to the recipient's public key
 - [ ] Security-reviewed envelope serialization and cross-browser vectors,
       including QR capacity/accessibility and robust QR generation/scanning
 - [ ] Encrypted recovery kit and owner transfer (security gate S1)
