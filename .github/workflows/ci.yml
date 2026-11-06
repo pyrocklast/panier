@@ -31,6 +31,8 @@ jobs:
         run: node --test test/v2-domain.test.mjs
       - name: V2 sync coordinator tests
         run: node --test test/v2-sync.test.mjs
+      - name: V2 trusted member/epoch sync tests
+        run: node --test test/v2-trusted-sync.test.mjs
       - name: V2 authenticated encryption tests
         run: node --test test/v2-crypto.test.mjs
       - name: V2 in-person QR key transfer tests
