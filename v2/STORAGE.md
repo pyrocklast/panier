@@ -102,7 +102,7 @@ node --test test/v2-storage.test.mjs
 BROWSER=firefox node --test test/v2-storage.test.mjs
 ```
 
-Storage tests run against genuine browser IndexedDB at a synthetic origin.
+Storage tests run against genuine browser IndexedDB on a local loopback HTTP origin, using an ephemeral static server.
 They verify reload, concurrent-tab writes, atomic accepted/optimistic/outbox
 transitions, rollback on duplicate/invalid/missing revisions, quota/unavailable
 error reporting, independent lists, versionchange and persistence capability.
