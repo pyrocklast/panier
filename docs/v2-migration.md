@@ -1,6 +1,6 @@
 # Panier v1 → v2 migration and rollout plan
 
-Status: **Proposed; no migration code is authorised by this document.**  
+Status: **Explicit v1 → v2 copy approved (2026-11-06); implementation and rollout remain unapproved pending verification.**  
 Tracks [#2](https://github.com/pyrocklast/panier/issues/2). Read with [ADR-0001](./adr/0001-panier-v2.md).
 
 ## Existing data and compatibility boundaries
@@ -20,10 +20,13 @@ pairing key or decrypted contents to the server during migration.
 The Go/Raspberry Pi implementation is out of scope. Do not silently migrate
 or delete its data, and do not claim Go installations can join v2 lists.
 
-## Migration choice
+## Migration choice — approved
 
-**Prefer parallel v2 lists and an explicit client-side import**, not a silent
-in-place server schema upgrade.
+**Use parallel v2 lists and an explicit client-side copy**, not a silent
+in-place server schema upgrade. This is an approved product decision.
+A user must intentionally trigger each copy and must be informed that the
+original and copied lists do not remain synchronised. No automatic upgrade,
+server-side conversion, or bidirectional bridge is permitted.
 
 1. A v1 installation keeps functioning while a separate v2 app/protocol is
    developed and tested. Distinct API paths, cache names, storage namespaces,
@@ -99,6 +102,19 @@ or v1 master key in network requests, logs, telemetry or GitHub Actions output.
    new v2 list can be restored from recovery material on a clean browser.
 8. Communicate that losing all keys and all recovery copies makes anonymous
    E2EE data unrecoverable.
+
+## Copy-flow decisions
+
+- A v1 list remains accessible after copying, independently of the new v2 list.
+- A copied list receives a fresh list ID and cryptographic key; existing v1
+  pairing links do not confer membership or access to the v2 copy.
+- The action is labelled **Copy**, not Move or Upgrade; the UI must make clear
+  that changes to the original do not propagate to its copy.
+- Never silently consume or discard unsent v1 edits. If the original is not
+  fully synchronised, clearly distinguish copying the available local state
+  from copying the latest state across all devices.
+- Preserve v1 storage and server data for rollback; a later deliberate removal
+  of v1 is a separate release decision.
 
 ## Launch gates
 
