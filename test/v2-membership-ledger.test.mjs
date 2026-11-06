@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {generateSigningIdentity} from "../v2/crypto.mjs";
 import {generateRecipientAgreementKey,sealRotatedKeyPackages,
   openRotatedKeyPackage} from "../v2/rekey.mjs";
+import {receiveAndConfirmRekey,verifyRekeyReceipt} from "../v2/rekey-receipt.mjs";
 import {prepareQrInvitation,prepareQrRedemption} from "../v2/qr-pairing.mjs";
 import {QrInvitationRegistry,enrollmentStatement} from "../v2/qr-registry.mjs";
 import {signGenesis,signRotation,bootstrapLedger,rotateLedger,
@@ -274,11 +275,30 @@ test("verified surviving member keys can be used for rekey; revoked identity exc
     trustedOwnerSigningKey:f.owner.publicKey,
     recipientAgreementPrivateKey:agreement.privateKey,
   }),newSecret);
+  const {receipt,listSecret:confirmedSecret}=await receiveAndConfirmRekey({
+    envelope:envelopes[0],verifiedMembership:verified,
+    trustedOwnerSigningKey:f.owner.publicKey,
+    recipientAgreementPrivateKey:agreement.privateKey,
+    recipientSigningPrivateKey:signer.privateKey,
+  });
+  assert.deepEqual(confirmedSecret,newSecret);
+  const confirmation=await verifyRekeyReceipt({
+    receipt,envelope:envelopes[0],verifiedMembership:verified,
+    ownerListSecret:newSecret,
+  });
+  assert.equal(confirmation.confirmed,true);
+  assert.equal(confirmation.memberId,memberId);
   const outsider=await generateRecipientAgreementKey();
   await assert.rejects(openRotatedKeyPackage({
     envelope:envelopes[0],listId:LIST,memberId,
     currentEpoch:2,rotationHead:verified.head,
     trustedOwnerSigningKey:f.owner.publicKey,
     recipientAgreementPrivateKey:outsider.privateKey,
+  }));
+  await assert.rejects(receiveAndConfirmRekey({
+    envelope:envelopes[0],verifiedMembership:verified,
+    trustedOwnerSigningKey:f.owner.publicKey,
+    recipientAgreementPrivateKey:outsider.privateKey,
+    recipientSigningPrivateKey:signer.privateKey,
   }));
 });
