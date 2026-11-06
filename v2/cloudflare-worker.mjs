@@ -58,9 +58,26 @@ function pathOf(request) {
 }
 async function parse(req){
   if(req.method!=="POST")throw Error("method not allowed");
-  if(Number(req.headers.get("Content-Length"))>42000)throw Error("request too large");
-  const data=await req.text();
-  if(data.length>42000)throw Error("request too large");
+  const max=42000;
+  if(Number(req.headers.get("Content-Length"))>max)throw Error("request too large");
+  if(!req.body)throw Error("empty request");
+  const reader=req.body.getReader();
+  const chunks=[];let size=0;
+  try{
+    for(;;){
+      const {value,done}=await reader.read();
+      if(done)break;
+      size+=value.byteLength;
+      if(size>max)throw Error("request too large");
+      chunks.push(value);
+    }
+  }catch(error){
+    await reader.cancel().catch(()=>{});
+    throw error;
+  }
+  const bytes=new Uint8Array(size);let at=0;
+  for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.byteLength;}
+  const data=new TextDecoder("utf-8",{fatal:true}).decode(bytes);
   const value=JSON.parse(data);
   if(!value||typeof value!=="object"||Array.isArray(value))throw Error("invalid JSON request");
   return value;
