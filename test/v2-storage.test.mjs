@@ -71,7 +71,13 @@ test("offline mutation survives database reopen with matching optimistic state a
   try {
     const page = await pageWithModules(context);
     const result = await evaluate(page, async ({ name, mutation }) => {
-      const s = await import("/v2/storage.mjs");
+      const real = await import("/v2/storage.mjs");
+      // This suite exercises storage, NOT encryption. Supply an inert
+      // preprepared envelope through the new sealed-only commit API.
+      const s = { ...real, commitLocalMutation: (db, draft) =>
+        real.commitSealedLocalMutation(db, draft, {
+          listId: draft.listId, id: draft.id, ciphertext: "test-opaque:" + draft.id,
+        }) };
       let db = await s.openPanierDatabase({ name });
       await s.createLocalList(db, mutation.listId);
       const saved = await s.commitLocalMutation(db, mutation);
@@ -93,7 +99,13 @@ test("accepted revisions and outbox acknowledgments commit together; remote edit
   try {
     const page = await pageWithModules(context);
     const result = await evaluate(page, async ({ name, local, remote, ack }) => {
-      const s = await import("/v2/storage.mjs");
+      const real = await import("/v2/storage.mjs");
+      // This suite exercises storage, NOT encryption. Supply an inert
+      // preprepared envelope through the new sealed-only commit API.
+      const s = { ...real, commitLocalMutation: (db, draft) =>
+        real.commitSealedLocalMutation(db, draft, {
+          listId: draft.listId, id: draft.id, ciphertext: "test-opaque:" + draft.id,
+        }) };
       const db = await s.openPanierDatabase({ name });
       await s.createLocalList(db, local.listId);
       await s.commitLocalMutation(db, local);
@@ -120,12 +132,24 @@ test("concurrent writes from two tabs do not overwrite one another", async () =>
     const a = await pageWithModules(context), b = await pageWithModules(context);
     const name = dbName();
     await evaluate(a, async name => {
-      const s = await import("/v2/storage.mjs");
+      const real = await import("/v2/storage.mjs");
+      // This suite exercises storage, NOT encryption. Supply an inert
+      // preprepared envelope through the new sealed-only commit API.
+      const s = { ...real, commitLocalMutation: (db, draft) =>
+        real.commitSealedLocalMutation(db, draft, {
+          listId: draft.listId, id: draft.id, ciphertext: "test-opaque:" + draft.id,
+        }) };
       const db = await s.openPanierDatabase({ name });
       await s.createLocalList(db, "household01"); db.close();
     }, name);
     const write = (page, id, itemId) => evaluate(page, async ({ name, id, itemId }) => {
-      const s = await import("/v2/storage.mjs");
+      const real = await import("/v2/storage.mjs");
+      // This suite exercises storage, NOT encryption. Supply an inert
+      // preprepared envelope through the new sealed-only commit API.
+      const s = { ...real, commitLocalMutation: (db, draft) =>
+        real.commitSealedLocalMutation(db, draft, {
+          listId: draft.listId, id: draft.id, ciphertext: "test-opaque:" + draft.id,
+        }) };
       const db = await s.openPanierDatabase({ name });
       await s.commitLocalMutation(db, { listId: "household01", id, type: "item.add",
         payload: { id: itemId, name: id, position: "a" } });
@@ -133,7 +157,13 @@ test("concurrent writes from two tabs do not overwrite one another", async () =>
     }, { name, id, itemId });
     await Promise.all([write(a, "mutation01", "itemAA001"), write(b, "mutation02", "itemBB002")]);
     const value = await evaluate(a, async name => {
-      const s = await import("/v2/storage.mjs");
+      const real = await import("/v2/storage.mjs");
+      // This suite exercises storage, NOT encryption. Supply an inert
+      // preprepared envelope through the new sealed-only commit API.
+      const s = { ...real, commitLocalMutation: (db, draft) =>
+        real.commitSealedLocalMutation(db, draft, {
+          listId: draft.listId, id: draft.id, ciphertext: "test-opaque:" + draft.id,
+        }) };
       const db = await s.openPanierDatabase({ name });
       const result = await s.readLocalList(db, "household01"); db.close();
       return { count: result.pending.length, seq: result.nextLocalSeq,
@@ -148,7 +178,13 @@ test("duplicate IDs and invalid mutations fail without partial writes", async ()
   try {
     const page = await pageWithModules(context);
     const value = await evaluate(page, async name => {
-      const s = await import("/v2/storage.mjs");
+      const real = await import("/v2/storage.mjs");
+      // This suite exercises storage, NOT encryption. Supply an inert
+      // preprepared envelope through the new sealed-only commit API.
+      const s = { ...real, commitLocalMutation: (db, draft) =>
+        real.commitSealedLocalMutation(db, draft, {
+          listId: draft.listId, id: draft.id, ciphertext: "test-opaque:" + draft.id,
+        }) };
       const db = await s.openPanierDatabase({ name });
       await s.createLocalList(db, "household01");
       const valid = { listId: "household01", id: "mutation01", type: "item.add",
@@ -175,7 +211,13 @@ test("closed or unavailable database rejects a save; caller must not show saved"
   try {
     const page = await pageWithModules(context);
     const result = await evaluate(page, async name => {
-      const s = await import("/v2/storage.mjs");
+      const real = await import("/v2/storage.mjs");
+      // This suite exercises storage, NOT encryption. Supply an inert
+      // preprepared envelope through the new sealed-only commit API.
+      const s = { ...real, commitLocalMutation: (db, draft) =>
+        real.commitSealedLocalMutation(db, draft, {
+          listId: draft.listId, id: draft.id, ciphertext: "test-opaque:" + draft.id,
+        }) };
       const db = await s.openPanierDatabase({ name });
       await s.createLocalList(db, "household01");
       db.close();
@@ -198,7 +240,13 @@ test("list isolation and versionchange notification; existing data preserved", a
   try {
     const page = await pageWithModules(context);
     const result = await evaluate(page, async name => {
-      const s = await import("/v2/storage.mjs");
+      const real = await import("/v2/storage.mjs");
+      // This suite exercises storage, NOT encryption. Supply an inert
+      // preprepared envelope through the new sealed-only commit API.
+      const s = { ...real, commitLocalMutation: (db, draft) =>
+        real.commitSealedLocalMutation(db, draft, {
+          listId: draft.listId, id: draft.id, ciphertext: "test-opaque:" + draft.id,
+        }) };
       let changed = 0;
       const db = await s.openPanierDatabase({ name, onVersionChange: () => changed++ });
       await s.createLocalList(db, "household01");
