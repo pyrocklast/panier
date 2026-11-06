@@ -96,7 +96,8 @@ async function route(storage,request,listId,routeName,path){
   if(routeName==="bootstrap"){
     if(!exact(input,["event"])||input.event.listId!==listId)
       throw Error("invalid list genesis");
-    const state=await bootstrapLedger(storage,input.event,input.event.ownerPublicJwk);
+    const state=await bootstrapLedger(storage,input.event,input.event.ownerPublicJwk,
+      {idempotent:true});
     return reply(201,{listId,head:state.head,epoch:state.epoch});
   }
   if(routeName==="redeem"){
