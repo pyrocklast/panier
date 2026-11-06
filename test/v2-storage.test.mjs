@@ -1,32 +1,47 @@
-// Browser-real IndexedDB tests: no server, build tools, app state or v1 data.
-// Runs in Chromium/Firefox via Playwright. The secure synthetic origin is routed
-// to the v2 modules, avoiding any actual network requests.
+// Browser-real IndexedDB tests: no application backend or v1 state.
+// Runs in Chromium/Firefox with a local loopback static HTTP server that serves
+// the v2 modules. This avoids synthetic DNS, external network and TLS problems.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const browserType = require("playwright")[process.env.BROWSER || "chromium"];
 const STORAGE_SOURCE = readFileSync(fileURLToPath(new URL("../v2/storage.mjs", import.meta.url)), "utf8");
 const DOMAIN_SOURCE = readFileSync(fileURLToPath(new URL("../v2/domain.mjs", import.meta.url)), "utf8");
-const ORIGIN = "https://panier-v2.test";
-let browser;
+let browser, server, origin;
 
-before(async () => { browser = await browserType.launch(); });
-after(async () => { await browser.close(); });
+before(async () => {
+  server = createServer((req, res) => {
+    const path = new URL(req.url, "http://127.0.0.1").pathname;
+    if (path === "/") {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end("<title>V2 storage test</title>");
+    } else if (path === "/v2/storage.mjs" || path === "/v2/domain.mjs") {
+      res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
+      res.end(path === "/v2/storage.mjs" ? STORAGE_SOURCE : DOMAIN_SOURCE);
+    } else {
+      res.writeHead(404); res.end("Not found");
+    }
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  origin = "http://127.0.0.1:" + server.address().port;
+  browser = await browserType.launch();
+});
+after(async () => {
+  if (browser) await browser.close();
+  if (server?.listening) await new Promise(resolve => server.close(resolve));
+});
 
 async function pageWithModules(context) {
   const page = await context.newPage();
-  await page.route(ORIGIN + "/**", async route => {
-    const path = new URL(route.request().url()).pathname;
-    if (path === "/") return route.fulfill({ status: 200, contentType: "text/html", body: "<title>V2 storage test</title>" });
-    if (path === "/v2/storage.mjs") return route.fulfill({ status: 200, contentType: "text/javascript", body: STORAGE_SOURCE });
-    if (path === "/v2/domain.mjs") return route.fulfill({ status: 200, contentType: "text/javascript", body: DOMAIN_SOURCE });
-    return route.fulfill({ status: 404, body: "not found" });
-  });
-  await page.goto(ORIGIN + "/");
+  await page.goto(origin + "/", { timeout: 15000 });
   return page;
 }
 
