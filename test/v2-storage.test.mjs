@@ -14,6 +14,7 @@ const STORAGE_SOURCE = readFileSync(fileURLToPath(new URL("../v2/storage.mjs", i
 const DOMAIN_SOURCE = readFileSync(fileURLToPath(new URL("../v2/domain.mjs", import.meta.url)), "utf8");
 const SYNC_SOURCE = readFileSync(fileURLToPath(new URL("../v2/sync.mjs", import.meta.url)), "utf8");
 const CRYPTO_SOURCE = readFileSync(fileURLToPath(new URL("../v2/crypto.mjs", import.meta.url)), "utf8");
+const QR_SOURCE = readFileSync(fileURLToPath(new URL("../v2/qr-pairing.mjs", import.meta.url)), "utf8");
 let browser, server, origin;
 
 before(async () => {
@@ -23,11 +24,13 @@ before(async () => {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end("<title>V2 storage test</title>");
     } else if (path === "/v2/storage.mjs" || path === "/v2/domain.mjs" ||
-        path === "/v2/sync.mjs" || path === "/v2/crypto.mjs") {
+        path === "/v2/sync.mjs" || path === "/v2/crypto.mjs" ||
+        path === "/v2/qr-pairing.mjs") {
       res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
       res.end(path === "/v2/storage.mjs" ? STORAGE_SOURCE :
         path === "/v2/domain.mjs" ? DOMAIN_SOURCE :
-        path === "/v2/sync.mjs" ? SYNC_SOURCE : CRYPTO_SOURCE);
+        path === "/v2/sync.mjs" ? SYNC_SOURCE :
+        path === "/v2/crypto.mjs" ? CRYPTO_SOURCE : QR_SOURCE);
     } else {
       res.writeHead(404); res.end("Not found");
     }
@@ -631,6 +634,39 @@ test("WebCrypto signed mutation round-trips through durable IndexedDB in Chromiu
     assert.deepEqual(result, {
       item: "Milk", cursor: 1, pending: 0, ciphertextIdentical: true,
       acknowledged: true, nonExtractable: true,
+    });
+  } finally { await context.close(); }
+});
+
+test("in-person QR owner-offline key transfer works in Chromium and Firefox Web Crypto", async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await pageWithModules(context);
+    const result = await evaluate(page, async () => {
+      const { generateSigningIdentity } = await import("/v2/crypto.mjs");
+      const { prepareQrInvitation, prepareQrRedemption, openQrKeyPackage } =
+        await import("/v2/qr-pairing.mjs");
+      const owner = await generateSigningIdentity();
+      const listSecret = crypto.getRandomValues(new Uint8Array(32));
+      const issued = await prepareQrInvitation({
+        listId: "household01", ownerId: owner.actorId, epoch: 1,
+        listSecret, ownerPrivateKey: owner.privateKey,
+        ownerPublicJwk: owner.publicKeyJwk,
+      });
+      const redeem = await prepareQrRedemption(issued.qr);
+      // The owner is no longer involved; scanner verifies package independently.
+      const imported = await openQrKeyPackage({
+        qr: issued.qr, serverRecord: issued.serverRecord,
+      });
+      return {
+        sameKey: imported.listSecret.every((value, i) => value === listSecret[i]),
+        sameList: imported.listId === "household01",
+        distinctToken: redeem.token !== issued.serverRecord.tokenHash,
+        ownerKeyPrivate: owner.privateKey.extractable === false,
+      };
+    });
+    assert.deepEqual(result, {
+      sameKey: true, sameList: true, distinctToken: true, ownerKeyPrivate: true,
     });
   } finally { await context.close(); }
 });
