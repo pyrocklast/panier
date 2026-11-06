@@ -10,6 +10,7 @@ import {QrInvitationRegistry} from "./qr-registry.mjs";
 import {publishAtomicRotation,readCurrentKeyPackage,assertCurrentEpochAppend} from "./atomic-rotation.mjs";
 import {authorizeV2Request,signedRequestPath} from "./api-auth.mjs";
 import {consumePublicAttempt} from "./do-quotas.mjs";
+import {storeSignedRekeyReceipt,getStoredRekeyReceipts} from "./rekey-receipt-store.mjs";
 
 const ID=/^[A-Za-z0-9_-]{8,64}$/;
 const HEADERS={"Content-Type":"application/json; charset=utf-8",
@@ -54,7 +55,7 @@ async function verifyMutationWire(sealed,member){
 }
 function pathOf(request) {
   const p=new URL(request.url).pathname;
-  const m=p.match(/^\/v2\/lists\/([A-Za-z0-9_-]{8,64})\/(bootstrap|invitations|redeem|rotate|key-package|mutations|pull|history)$/);
+  const m=p.match(/^\/v2\/lists\/([A-Za-z0-9_-]{8,64})\/(bootstrap|invitations|redeem|rotate|key-package|rekey-receipt|rekey-receipts|mutations|pull|history)$/);
   return m?{listId:m[1],route:m[2],path:p}:null;
 }
 async function parse(req){
@@ -126,6 +127,22 @@ async function route(storage,request,listId,routeName,path){
     return reply(200,await readCurrentKeyPackage(storage,{
       listId,memberId:member.memberId,
     }));
+  }
+  if(routeName==="rekey-receipt"){
+    const member=await auth();
+    if(!exact(input.body,["listId","receipt"])||
+      input.body.listId!==listId)
+      throw Error("invalid key receipt request");
+    return reply(200,await storeSignedRekeyReceipt(storage,{
+      listId,memberId:member.memberId,receipt:input.body.receipt,
+    }));
+  }
+  if(routeName==="rekey-receipts"){
+    await auth("owner");
+    if(!exact(input.body,["listId"])||
+      input.body.listId!==listId)
+      throw Error("invalid key receipt query");
+    return reply(200,await getStoredRekeyReceipts(storage,{listId}));
   }
   if(routeName==="history"){
     await auth();
