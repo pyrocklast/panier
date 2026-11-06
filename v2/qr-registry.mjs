@@ -67,15 +67,19 @@ function key(name, id) { return name + ":" + id; }
  * authOwner({listId, ownerId, epoch, ownerPublicJwk}) MUST verify against
  * the authoritative (signed) current owner membership/epoch, not the request.
  * Without that adapter, createInvitation always fails closed.
+ * authorizeEnrollment({tx,listId,ownerId,epoch,inviteId,memberId}) MUST check
+ * the same object's current signed owner/membership epoch INSIDE the consume
+ * transaction. If absent, redemption fails closed.
  *
  * The atomic transaction consumes a token and writes the member record in
  * one commit. Concurrent calls to the same DO are serialised by DO storage.
  */
 export class QrInvitationRegistry {
-  constructor({storage, authOwner, now = () => Date.now()}) {
+  constructor({storage, authOwner, authorizeEnrollment, now = () => Date.now()}) {
     check(storage && typeof storage.transaction === "function", "requires Durable Object storage");
     check(typeof now === "function", "invalid clock");
-    this.storage = storage; this.authOwner = authOwner; this.now = now;
+    this.storage = storage; this.authOwner = authOwner;
+    this.authorizeEnrollment = authorizeEnrollment; this.now = now;
   }
 
   async createInvitation(serverRecord) {
@@ -138,6 +142,13 @@ export class QrInvitationRegistry {
       check(saved && saved.listId === listId && saved.status === "open" &&
         saved.expiresAt > now && saved.tokenHash === tokenHash,
         "invitation unavailable, expired, consumed or invalid");
+      // Same DO transaction must check current owner membership, unchanged
+      // list epoch, and invitation issuance authority. Do not trust stale
+      // authentication from invitation creation or a separate remote read.
+      check(typeof this.authorizeEnrollment === "function" &&
+        await this.authorizeEnrollment({tx, listId, ownerId: saved.ownerId,
+          epoch: saved.epoch, inviteId, memberId}),
+        "current membership or epoch authorization unavailable");
       check(!await tx.get(key("member", memberId)), "member ID already exists");
       // Both effects must be in the SAME durable transaction. This is the
       // single-use enforcement point; concurrent redemption cannot both win.
