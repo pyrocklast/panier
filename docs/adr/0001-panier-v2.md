@@ -15,13 +15,14 @@ The following are **decided**, not open design questions:
    with no remaining authorised owner means loss of administrative control;
    no server-side account reset is promised. The exact recovery credential,
    transfer proof and lost-device workflow require a protocol specification.
-2. **Invitations = link.** The owner creates a random, single-use, list-scoped
-   invitation link. Joining does **not** require a separate approval screen.
-   Unused invitations are revocable and may expire. Possession of the complete
-   link grants the ability to redeem it before expiry; this is a bearer-capability
-   security trade-off, not proof of the recipient's real-world identity. The
-   recipient must receive a cryptographically authenticated key envelope; that
-   handshake still requires review.
+2. **Invitations = strict in-person QR-only pairing (revised 2026-11-06).**
+   The owner displays a short-lived, single-use QR code while physically with
+   the recipient, who scans it to join. No remote-sharing, copy-link, send,
+   invitation export, or approval workflow is offered. Unused invitations are
+   revocable. The encoded QR payload remains a bearer secret: a photo or
+   forwarded QR can be redeemed by an attacker before the intended recipient.
+   Physical proximity is a *product usage rule*, not cryptographic proof.
+   The signed key package and redemption transaction still require review.
 3. **Migration = explicit copy.** Users consciously copy a v1 list into a
    freshly generated independent v2 list. The source v1 list, `#k=` pairing
    links, browser data, and server log remain unchanged. There is no automatic
@@ -130,17 +131,38 @@ recipient and sender identity, and authentication of the issuer. Client-side
 verification is required; do not silently accept unauthenticated envelopes.
 Private key material and plaintext list keys never enter server APIs.
 
-**Invitation (approved UX):** an owner creates a cryptographically random,
-list-scoped, **single-use link**; unused links can be revoked and may expire.
-No separate owner approval is required once the link is issued. Redemption atomically
-consumes it and registers a recipient public key. An invitation URL can carry
-client-only secret material in its fragment, which is not sent with an HTTP
-request. However, **the whole URL is a bearer secret** and can leak through
-messaging, screenshots, browser history or malicious app code. Clear fragments
-after parsing, redact logs and protect against replay and simultaneous redemption.
-The final enrollment handshake must specify how the owner authenticates the
-recipient's public key and how that recipient obtains the correct envelope;
-**do not implement an unauthenticated key swap**.
+**Invitation (approved UX; revised to QR-only):** the owner opens the Members
+screen in person, generates and uploads a single-use invitation package, and
+shows its QR code only on screen. The recipient scans it with their camera.
+There is **no share-link, copy-link, text, email, screenshot export or
+remote-join fallback UI**. The QR is short-lived (target 10 minutes),
+list-scoped, revocable and single-use; creation and redemption require network
+access, but the owner need not remain connected after creating the package.
+The scanner obtains an independent member credential, never the owner's
+credential. The QR is consumed by the first successful atomic redemption.
+
+The QR may encode a URL for the platform to open, but its invitation identifier
+and **high-entropy transfer secret** are a bearer capability. Keep the transfer
+secret in the fragment (not sent in an HTTP request), remove it promptly from
+the address bar, and avoid logging or sharing the full payload. A QR may be
+photographed, screen-captured or forwarded; the server cannot verify physical
+proximity. Never claim QR-only makes interception impossible.
+
+**Candidate owner-offline enrollment mechanism, NOT YET APPROVED:**
+at creation the owner locally constructs a versioned, authenticated key package
+containing the list/epoch key, encrypts it under a random one-time secret using
+AEAD, and signs the outer package with its owner identity key. Upload **only**
+the ciphertext and a commitment to the one-use redemption capability. Embed
+the corresponding decryption secret, invitation identifier, intended list ID
+and a trustworthy binding to the owner identity (e.g. owner public-key
+fingerprint) in the QR. The scanner creates fresh installation/member keys,
+atomically redeems the invitation, obtains the ciphertext, validates the owner
+identity binding and signature, and decrypts the key locally. The redeemed
+membership must be bound to the scanner's new public keys. The server cannot
+read the encryption secret or substitute list/owner identity unnoticed.
+Exact token split, challenge/signature encoding, rate limits, confidentiality
+of secrets in URL fragments, and race-safe consume/register transaction need
+security review and executable vectors **before implementation**.
 
 **Revocation:** refuse the revoked member's API access, commit a new key epoch,
 and send recipient-specific key envelopes to remaining members. All new writes
@@ -231,7 +253,7 @@ A WebSocket connection is not proof of synchronisation.
 | Server inspects database | Encrypted payloads and encrypted snapshots | List/member IDs, IPs, timing and sizes remain visible |
 | Unauthorized writes or replays | Member signatures, authorization, nonce/challenge/ID checking | Compromised member can write as itself |
 | Malicious server drops/reorders data | Signed mutations, revision checks, authenticated snapshots | Availability and freshness cannot be fully guaranteed |
-| Stolen invitation | Short-lived single-use grant, revocation, client-side key handling | Holder can join before legitimate recipient |
+| Photographed/forwarded QR | In-person display-only UI, short-lived single-use grant, revocation, client-side secret | Anyone obtaining the QR first can redeem; proximity cannot be proven |
 | Revoked member | Server access denial and future-epoch key rotation | Previous keys and previously read contents remain exposed |
 | Device/browser storage lost | Recovery export, trusted member re-invitation | Total loss of all keys/backups is unrecoverable |
 | Modified client JavaScript or compromised deploy | Protected deployment, pinned actions, scoped credentials, 2FA | Same-origin malicious JS can access plaintext and key operations |
@@ -244,17 +266,19 @@ generic distributed database or required background synchronization.
 
 ## Decision gates / unresolved protocol details
 
-**Approved:** recovery kit + explicit ownership transfer, single-use invitation
-links without approval, and opt-in v1 → v2 **copy** (no in-place migration).
+**Approved:** recovery kit + explicit ownership transfer, **strict in-person
+QR-only invitations** (no remote sharing or approval), and opt-in v1 → v2
+**copy** (no in-place migration).
 
 **Still blocking security-sensitive implementation / approval:**
 
 1. **Key recovery and ownership-transfer protocol:** key material in encrypted
    recovery kit, secret strength, recovery credential revocation, authenticated
    role transfer, lost-owner behavior and tests.
-2. **Invitation enrollment handshake:** authenticating ephemeral/recipient
-   public keys, ensuring single-use atomic redemption, preventing envelope
-   substitution, confirming what link theft permits and cross-browser tests.
+2. **QR enrollment handshake:** validate the signed owner-prepared encrypted
+   key package and fingerprint bound in the QR; authenticate and register the
+   scanner's public keys atomically on single-use redemption; test photographed
+   QR theft, expiration, race conditions and cross-browser compatibility.
 3. **Key epoch rotation:** atomic membership/rekey boundaries, recovering
    remaining offline members, conflict handling for queued old-epoch writes,
    split-brain/rollback avoidance and explicit treatment of revoked devices.
