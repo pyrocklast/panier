@@ -70,16 +70,19 @@ function key(name, id) { return name + ":" + id; }
  * authorizeEnrollment({tx,listId,ownerId,epoch,inviteId,memberId}) MUST check
  * the same object's current signed owner/membership epoch INSIDE the consume
  * transaction. If absent, redemption fails closed.
+ * registerMember may append the signed owner-grant/recipient-proof evidence
+ * to a ledger within the SAME transaction; it must not do external I/O.
  *
  * The atomic transaction consumes a token and writes the member record in
  * one commit. Concurrent calls to the same DO are serialised by DO storage.
  */
 export class QrInvitationRegistry {
-  constructor({storage, authOwner, authorizeEnrollment, now = () => Date.now()}) {
+  constructor({storage, authOwner, authorizeEnrollment, registerMember, now = () => Date.now()}) {
     check(storage && typeof storage.transaction === "function", "requires Durable Object storage");
     check(typeof now === "function", "invalid clock");
     this.storage = storage; this.authOwner = authOwner;
-    this.authorizeEnrollment = authorizeEnrollment; this.now = now;
+    this.authorizeEnrollment = authorizeEnrollment;
+    this.registerMember = registerMember; this.now = now;
   }
 
   async createInvitation(serverRecord) {
@@ -96,6 +99,11 @@ export class QrInvitationRegistry {
       "owner authorization unavailable or denied");
     const { inviteId, listId, ownerId, epoch, expiresAt, tokenHash } = serverRecord;
     return this.storage.transaction(async tx => {
+      // Recheck under the SAME transaction that inserts the grant; a role or
+      // epoch change between signature verification and this write must fail.
+      check(await this.authOwner({tx,listId,ownerId,epoch,
+        ownerPublicJwk:serverRecord.ownerPublicJwk}),
+        "owner authorization changed before invitation registration");
       const prior = await tx.get(key("invite", inviteId));
       check(!prior, "invitation ID already registered");
       await tx.put(key("invite", inviteId), { listId, ownerId, epoch,
@@ -114,6 +122,8 @@ export class QrInvitationRegistry {
       const saved = await tx.get(key("invite", inviteId));
       check(saved && saved.listId === listId && saved.ownerId === ownerId,
         "invitation unavailable");
+      check(await this.authOwner({tx,listId,ownerId,epoch,ownerPublicJwk}),
+        "owner authorization changed before revocation");
       if (saved.status !== "open") return {status: saved.status};
       saved.status = "revoked";
       await tx.put(key("invite",inviteId), saved);
@@ -152,6 +162,12 @@ export class QrInvitationRegistry {
       check(!await tx.get(key("member", memberId)), "member ID already exists");
       // Both effects must be in the SAME durable transaction. This is the
       // single-use enforcement point; concurrent redemption cannot both win.
+      if (this.registerMember) {
+        // The signed-invitation/recipient-proof ledger event must be appended
+        // atomically with member registration and invite consumption.
+        await this.registerMember({tx,listId,inviteId,memberId,
+          memberPublicJwk,nonce,proof,serverRecord:saved.serverRecord});
+      }
       await tx.put(key("member", memberId), {
         memberId, listId, publicJwk: jwkXY(memberPublicJwk),
         invitedBy: saved.ownerId, invitationId: inviteId, epoch: saved.epoch,
