@@ -43,6 +43,8 @@ jobs:
         run: node --test test/v2-rekey.test.mjs
       - name: V2 authenticated rekey receipt tests
         run: node --test test/v2-rekey-receipt.test.mjs
+      - name: V2 atomic epoch publication and append fencing tests
+        run: node --test test/v2-atomic-rotation.test.mjs
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race ./...

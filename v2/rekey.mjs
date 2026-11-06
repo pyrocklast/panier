@@ -31,13 +31,17 @@ const publicJwk=k=>{
 };
 const compare=(a,b)=>JSON.stringify(publicJwk(a))===JSON.stringify(publicJwk(b));
 const wireFields=["v","listId","epoch","rotationHead","ownerId","memberId",
-  "ephemeralPublicJwk","nonce","ciphertext"];
-const body=({listId,epoch,rotationHead,ownerId,memberId,ephemeralPublicJwk,nonce,ciphertext})=>
-  ({v:1,listId,epoch,rotationHead,ownerId,memberId,
+  "recipientAgreementPublicJwk","ephemeralPublicJwk","nonce","ciphertext"];
+const body=({listId,epoch,rotationHead,ownerId,memberId,recipientAgreementPublicJwk,
+  ephemeralPublicJwk,nonce,ciphertext})=>
+  ({v:2,listId,epoch,rotationHead,ownerId,memberId,
+    recipientAgreementPublicJwk:publicJwk(recipientAgreementPublicJwk),
     ephemeralPublicJwk:publicJwk(ephemeralPublicJwk),nonce,ciphertext});
-const context=({listId,epoch,rotationHead,ownerId,memberId,ephemeralPublicJwk})=>
-  ({v:1,purpose:"panier/v2/rekey/key-envelope/1",listId,epoch,rotationHead,
-    ownerId,memberId,ephemeralPublicJwk:publicJwk(ephemeralPublicJwk)});
+const context=({listId,epoch,rotationHead,ownerId,memberId,
+  recipientAgreementPublicJwk,ephemeralPublicJwk})=>
+  ({v:2,purpose:"panier/v2/rekey/key-envelope/2",listId,epoch,rotationHead,
+    ownerId,memberId,recipientAgreementPublicJwk:publicJwk(recipientAgreementPublicJwk),
+    ephemeralPublicJwk:publicJwk(ephemeralPublicJwk)});
 async function importEcdh(k) {
   return crypto.subtle.importKey("jwk",publicJwk(k),
     {name:"ECDH",namedCurve:"P-256"},false,[]);
@@ -104,7 +108,9 @@ export async function sealRotatedKeyPackages({
     const ephemeralPublicJwk=publicJwk(
       await crypto.subtle.exportKey("jwk",eph.publicKey));
     const metadata={listId,epoch,rotationHead,ownerId,
-      memberId:member.memberId,ephemeralPublicJwk};
+      memberId:member.memberId,
+      recipientAgreementPublicJwk:publicJwk(member.agreementPublicJwk),
+      ephemeralPublicJwk};
     const key=await derived(eph.privateKey,memberKey,metadata);
     const nonce=crypto.getRandomValues(new Uint8Array(12));
     const ciphertext=b64(await crypto.subtle.encrypt({
@@ -129,7 +135,7 @@ export async function openRotatedKeyPackage({
   check(object(envelope)&&exact(envelope,[...wireFields,"signature"])&&
     id(listId)&&id(memberId)&&Number.isSafeInteger(currentEpoch)&&
     currentEpoch>=2&&validHead(rotationHead),"invalid rekey envelope");
-  check(envelope.v===1&&envelope.listId===listId&&
+  check(envelope.v===2&&envelope.listId===listId&&
     envelope.memberId===memberId&&envelope.epoch===currentEpoch&&
     envelope.rotationHead===rotationHead&&id(envelope.ownerId),
     "rekey envelope does not match trusted membership checkpoint");
@@ -185,4 +191,32 @@ export function classifyPendingEpochs(pending,currentEpoch) {
     else throw new TypeError("future epoch pending mutation");
   }
   return {ready,quarantined};
+}
+
+/**
+ * Server-facing, public-data-only validation of an owner-signed encrypted
+ * package. The recipient ECDH key is explicitly bound into the signed
+ * envelope and AAD, permitting comparison with the signed membership ledger
+ * without decrypting the fresh epoch secret.
+ */
+export async function verifySignedRotatedKeyPackage({
+  envelope,listId,ownerId,memberId,epoch,rotationHead,
+  recipientAgreementPublicJwk,trustedOwnerSigningKey,
+}) {
+  check(object(envelope)&&exact(envelope,[...wireFields,"signature"]) &&
+    envelope.v===2&&id(listId)&&id(ownerId)&&id(memberId) &&
+    Number.isSafeInteger(epoch)&&epoch>=2&&validHead(rotationHead),
+    "invalid signed rotation envelope");
+  check(envelope.listId===listId&&envelope.ownerId===ownerId &&
+    envelope.memberId===memberId&&envelope.epoch===epoch &&
+    envelope.rotationHead===rotationHead &&
+    compare(envelope.recipientAgreementPublicJwk,recipientAgreementPublicJwk),
+    "rotation package recipient/key/epoch mismatch");
+  check(unb64(envelope.nonce,64).length===12 &&
+    unb64(envelope.ciphertext,256).length===48 &&
+    unb64(envelope.signature,128).length===64,
+    "invalid signed rotation encoding");
+  check(await verify(trustedOwnerSigningKey,envelope.signature,body(envelope)),
+    "invalid owner key-package signature");
+  return true;
 }

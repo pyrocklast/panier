@@ -136,6 +136,18 @@ async function applied(state,event) {
     members:state.members.map(m=>m.memberId===event.removedMemberId?{...m,active:false}:m)};
 }
 
+/**
+ * Preview a signed rotation against a specific already verified/matched
+ * membership state, without persisting it. This gives the deterministic
+ * head to which the owner must bind all ciphertext packages BEFORE commit.
+ * The state must be rechecked under the transaction at publication time.
+ */
+export async function previewSignedRotation(state,event) {
+  ok(obj(state),"membership ledger uninitialised");
+  await checkRotation(event,state);
+  return applied(state,event);
+}
+
 /** First genesis can only be trusted if its public key is pinned out of band. */
 export async function bootstrapLedger(storage, event, trustedOwnerPublicJwk) {
   await checkGenesis(event,trustedOwnerPublicJwk);
@@ -152,7 +164,11 @@ export async function bootstrapLedger(storage, event, trustedOwnerPublicJwk) {
  * Persist a signed owner-rotation event. A new epoch does NOT distribute its
  * key; encryption/key-envelope rotation remains a separate unresolved gate.
  */
-export async function rotateLedger(storage,event) {
+export async function rotateLedger(storage,event,{testOnlyUnsafe=false}={}) {
+  // Historic isolated unit tests can exercise bare ledger transitions.
+  // Production must never rotate without publishing recipient ciphertexts.
+  ok(testOnlyUnsafe===true,
+    "bare epoch rotation forbidden; use publishAtomicRotation");
   return storage.transaction(async tx=>{
     const state=await tx.get(ROOT);
     ok(state,"membership ledger uninitialised");

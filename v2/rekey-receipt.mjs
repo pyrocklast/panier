@@ -56,8 +56,9 @@ function authenticatedMember(verifiedMembership, memberId, envelope) {
 
 async function fingerprint(envelope) {
   check(exact(envelope, ["v", "listId", "epoch", "rotationHead", "ownerId",
-    "memberId", "ephemeralPublicJwk", "nonce", "ciphertext", "signature"]) &&
-    envelope.v === 1, "invalid signed key package");
+    "memberId", "recipientAgreementPublicJwk", "ephemeralPublicJwk",
+    "nonce", "ciphertext", "signature"]) &&
+    envelope.v === 2, "invalid signed key package");
   return base64url(await crypto.subtle.digest("SHA-256", encoded(envelope)));
 }
 
