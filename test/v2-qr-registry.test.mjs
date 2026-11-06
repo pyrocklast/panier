@@ -214,3 +214,24 @@ test("enrollment without a signed ECDH binding is rejected",async()=>{
   await assert.rejects(f.registry.redeem(missing),/invalid enrollment request/);
   assert.equal(f.backend.get("invite:"+req.inviteId).status,"open");
 });
+
+test("invalid P-256 agreement point cannot be registered even with valid signing proof",async()=>{
+  const f=await setup();
+  await f.registry.createInvitation(f.serverRecord);
+  const recipient=await generateSigningIdentity();
+  const nonce=Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
+  const agreementPublicJwk={kty:"EC",crv:"P-256",
+    x:Buffer.alloc(32,0).toString("base64url"),
+    y:Buffer.alloc(32,0).toString("base64url")};
+  const memberId="newmember01";
+  const proof=Buffer.from(await crypto.subtle.sign(
+    {name:"ECDSA",hash:"SHA-256"},recipient.privateKey,
+    new TextEncoder().encode(enrollmentStatement({
+      listId:LIST,inviteId:f.serverRecord.inviteId,memberId,nonce,
+      tokenHash:f.serverRecord.tokenHash,agreementPublicJwk,
+    })))).toString("base64url");
+  await assert.rejects(f.registry.redeem({listId:LIST,
+    inviteId:f.serverRecord.inviteId,memberId,nonce,token:f.token,
+    memberPublicJwk:recipient.publicKeyJwk,agreementPublicJwk,proof}));
+  assert.equal(f.backend.get("invite:"+f.serverRecord.inviteId).status,"open");
+});
