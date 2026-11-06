@@ -83,7 +83,7 @@ test("real SQLite DO: QR enrollment, signed reads, encrypted mutation, rotation 
   assert.equal(duplicate.memberId,a.member.id);
   const intruder=await recipientEnroll({listId,prepared:first});
   const stolen=await post(signedRequestPath(listId,"redeem"),
-    {body:intruder.body},null,409);
+    {body:intruder.body},null,403);
   assert.match(stolen.error,/used by another device/);
 
   const headData=await signed({listId,member:owner,route:"history",body:{listId}});
@@ -173,7 +173,7 @@ test("real SQLite DO: QR enrollment, signed reads, encrypted mutation, rotation 
     body:{listId},expected:403});
   assert.match(revoked.error,/authorized/);
   const invalidRetry=await post(signedRequestPath(listId,"redeem"),
-    {body:a.body},null,409);
+    {body:a.body},null,403);
   assert.match(invalidRetry.error,/no longer authorized/);
   const stale=await signed({listId,member:b.member,route:"mutations",
     body:sealed,expected:409});
