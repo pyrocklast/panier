@@ -61,12 +61,12 @@ export function validateOperation(op) {
     case "item.add":
       payloadKeys(p, ["id", "name", "quantity", "sectionId", "position", "checked"]);
       assert(id(p.id), "invalid item id");
-      assertFields(p, ITEM_FIELDS, ["name", "position"]);
+      assertFields(Object.fromEntries(Object.entries(p).filter(([k]) => k !== "id")), ITEM_FIELDS, ["name", "position"]);
       break;
     case "section.add":
       payloadKeys(p, ["id", "name", "position"]);
       assert(id(p.id), "invalid section id");
-      assertFields(p, SECTION_FIELDS, ["name", "position"]);
+      assertFields(Object.fromEntries(Object.entries(p).filter(([k]) => k !== "id")), SECTION_FIELDS, ["name", "position"]);
       break;
     case "item.patch":
     case "section.patch": {
