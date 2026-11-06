@@ -23,7 +23,7 @@ const raw64=x=>{
     throw new Error("invalid encrypted message");
   const raw=Uint8Array.from(atob(x.replace(/-/g,"+").replace(/_/g,"/")),v=>v.charCodeAt(0));
   let str="";for(let i=0;i<raw.length;i+=4096)str+=String.fromCharCode(...raw.subarray(i,i+4096));
-  if(str.replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")!==x)
+  if(btoa(str).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")!==x)
     throw new Error("noncanonical signed message");
   return new TextDecoder("utf-8",{fatal:true}).decode(raw);
 };
@@ -166,7 +166,7 @@ export class V2List extends DurableObject {
     catch(error){
       // Do not return details of signed keys, raw bodies, or storage state.
       const message=String(error?.message||"rejected");
-      const code=/already|replay|collision|stale|future|rotation|incomplete|revoked|unavailable|invalid/.test(message)?409:403;
+      const code=/already|replay|collision|stale|future|rotation|incomplete|revoked|unavailable/.test(message)?409:403;
       return reply(code,{error:message.slice(0,180)});
     }
   }
