@@ -103,6 +103,26 @@ export async function readLocalOwnerSigningKey(db,listId){
     return row.signingPrivateKey;
   },"readonly");
 }
+
+/**
+ * Return the EXACT original signed genesis for safe retry after an uncertain
+ * HTTP bootstrap outcome. Re-signing generates different ECDSA signature bytes
+ * and therefore a DIFFERENT genesis hash even with the same owner identity.
+ */
+export async function readPinnedOwnerGenesis(db,listId){
+  const row=await transact(db,listId,record=>{
+    assert(record&&record.source==="owner-local"&&record.genesisEvent,
+      "original owner bootstrap is not available; use reviewed recovery");
+    return {event:record.genesisEvent,anchor:publicAnchor(record),
+      genesisHead:record.genesisHead};
+  },"readonly");
+  const state=await verifyMembershipHistory([row.event],row.anchor.ownerPublicJwk);
+  assert(row.event.listId===listId&&
+    row.event.ownerId===row.anchor.ownerId&&
+    state.head===row.genesisHead,
+    "persisted genesis does not match pinned owner root");
+  return row.event;
+}
 function saveOnce(db,row){
   return transact(db,row.listId,(existing,store)=>{
     assert(!existing,"trust anchor already pinned; refusing replacement");
@@ -137,6 +157,7 @@ export async function pinNewOwnerBeforeBootstrap(db,{listId,identity}){
   const trust=await saveOnce(db,{
     listId,ownerId:identity.actorId,ownerPublicJwk:root,
     source:"owner-local",checkpoint:checkpoint(state),
+    genesisHead:state.head,genesisEvent:event,
     signingPrivateKey:identity.privateKey,
   });
   return {event,trust};
