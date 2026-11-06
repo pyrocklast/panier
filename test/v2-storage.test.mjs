@@ -1048,3 +1048,88 @@ test("obsolete-epoch offline edit stays encrypted and queued after verified revo
       pending:1,revision:0,identical:true,epoch:2});
   }finally{await context.close();}
 });
+
+test("recipient signing and ECDH private keys survive reopen and require signed active membership",async()=>{
+  const context=await browser.newContext();
+  try{
+    const page=await pageWithModules(context);
+    const result=await evaluate(page,async({name,trustName})=>{
+      const trust=await import("/v2/trust.mjs");
+      const credentials=await import("/v2/member-keys.mjs");
+      const {generateSigningIdentity}=await import("/v2/crypto.mjs");
+      const {generateRecipientAgreementKey}=await import("/v2/rekey.mjs");
+      const {prepareQrInvitation}=await import("/v2/qr-pairing.mjs");
+      const {enrollmentStatement}=await import("/v2/qr-registry.mjs");
+      const ledger=await import("/v2/membership-ledger.mjs");
+      const listId="household01";
+      const owner=await generateSigningIdentity();
+      const genesis=await ledger.signGenesis({
+        listId,ownerId:owner.actorId,ownerPublicJwk:owner.publicKeyJwk,
+        privateKey:owner.privateKey});
+      const secret=crypto.getRandomValues(new Uint8Array(32));
+      const now=Date.now();
+      const {qr,serverRecord}=await prepareQrInvitation({
+        listId,ownerId:owner.actorId,epoch:1,listSecret:secret,
+        ownerPrivateKey:owner.privateKey,ownerPublicJwk:owner.publicKeyJwk,now});
+      let trustDb=await trust.openTrustDatabase({name:trustName});
+      await trust.pinOwnerFromScannedQr(trustDb,{
+        qr,serverRecord,events:[genesis],now:now+100});
+      const signer=await generateSigningIdentity();
+      const agreement=await generateRecipientAgreementKey();
+      let db=await credentials.openMemberKeyDatabase({name});
+      const saved=await credentials.saveNewMemberKeys({
+        db,trustDb,listId,identity:signer,agreement});
+      db.close();trustDb.close();
+      db=await credentials.openMemberKeyDatabase({name});
+      trustDb=await trust.openTrustDatabase({name:trustName});
+      const pending=await credentials.readPendingMemberKeys({
+        db,trustDb,listId});
+      const memberId=signer.actorId;
+      const nonce=btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
+        .replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"");
+      const proofBytes=await crypto.subtle.sign({
+        name:"ECDSA",hash:"SHA-256"},pending.signingPrivateKey,
+        new TextEncoder().encode(enrollmentStatement({
+          listId,inviteId:serverRecord.inviteId,memberId,nonce,
+          tokenHash:serverRecord.tokenHash,
+          agreementPublicJwk:pending.agreementPublicJwk})));
+      const proof=btoa(String.fromCharCode(...new Uint8Array(proofBytes)))
+        .replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"");
+      const genesisState=await ledger.verifyMembershipHistory([genesis],
+        owner.publicKeyJwk);
+      const join={v:2,kind:"join",listId,sequence:2,
+        previous:genesisState.head,ownerId:owner.actorId,epoch:1,
+        inviteId:serverRecord.inviteId,memberId,
+        memberPublicJwk:pending.signingPublicJwk,
+        agreementPublicJwk:pending.agreementPublicJwk,
+        nonce,proof,grant:serverRecord};
+      const authorized=await credentials.readAuthorizedMemberKeys({
+        db,trustDb,listId,events:[genesis,join]});
+      const checkpoint=await trust.readPinnedTrust(trustDb,listId);
+      const foreign=await generateSigningIdentity();
+      const second=await generateRecipientAgreementKey();
+      let replacementBlocked=false;
+      try{await credentials.saveNewMemberKeys({db,trustDb,listId,
+        identity:foreign,agreement:second});}
+      catch(e){replacementBlocked=/already saved/.test(e.message);}
+      const rotated=await ledger.signRotation({
+        listId,sequence:3,previous:checkpoint.checkpoint.head,ownerId:owner.actorId,
+        epoch:2,removedMemberId:memberId,privateKey:owner.privateKey});
+      let revokedBlocked=false;
+      try{await credentials.readAuthorizedMemberKeys({
+        db,trustDb,listId,events:[genesis,join,rotated]});}
+      catch(e){revokedBlocked=/not authorized/.test(e.message);}
+      db.close();trustDb.close();
+      return {sameIdentity:saved.memberId===pending.memberId&&
+        authorized.memberId===memberId,
+        nonExtractable:authorized.signingPrivateKey.extractable===false&&
+          authorized.agreementPrivateKey.extractable===false,
+        checkpoint:checkpoint.checkpoint.sequence,
+        replacementBlocked,revokedBlocked};
+    },{name:dbName(),trustName:dbName()});
+    assert.deepEqual(result,{
+      sameIdentity:true,nonExtractable:true,
+      checkpoint:2,replacementBlocked:true,revokedBlocked:true,
+    });
+  }finally{await context.close();}
+});
