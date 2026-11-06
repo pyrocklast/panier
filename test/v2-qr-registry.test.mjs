@@ -2,7 +2,7 @@ import {test} from "node:test";
 import assert from "node:assert/strict";
 import {generateSigningIdentity} from "../v2/crypto.mjs";
 import {prepareQrInvitation, prepareQrRedemption} from "../v2/qr-pairing.mjs";
-import {QrInvitationRegistry, enrollmentStatement} from "../v2/qr-registry.mjs";
+import {QrInvitationRegistry, enrollmentStatement, revocationStatement} from "../v2/qr-registry.mjs";
 
 const NOW = 1_750_000_000_000;
 const LIST = "household01";
@@ -104,10 +104,13 @@ test("expired or revoked invitations cannot be redeemed",async()=>{
   const f=await setup();
   await f.registry.createInvitation(f.serverRecord);
   const r=await f.request();
-  assert.deepEqual(await f.registry.revokeInvitation({
-    listId:LIST,inviteId:r.inviteId,ownerId:f.owner.actorId,epoch:1,
-    ownerPublicJwk:f.owner.publicKeyJwk,
-  }),{status:"revoked"});
+  const cancel={listId:LIST,inviteId:r.inviteId,ownerId:f.owner.actorId,epoch:1,
+    ownerPublicJwk:f.owner.publicKeyJwk};
+  const statement=revocationStatement(cancel);
+  const proof=Buffer.from(await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},
+    f.owner.privateKey,new TextEncoder().encode(statement))).toString("base64url");
+  await assert.rejects(f.registry.revokeInvitation(cancel),/signature/);
+  assert.deepEqual(await f.registry.revokeInvitation({...cancel,proof}),{status:"revoked"});
   await assert.rejects(f.registry.redeem(r),/unavailable/);
   const late=await setup();
   await late.registry.createInvitation(late.serverRecord);
@@ -177,4 +180,19 @@ test("revocation/epoch gate checked at consume time, including after valid issua
   assert.equal(f.backend.get("member:"+request.memberId),undefined);
   f.registry.authorizeEnrollment=undefined;
   await assert.rejects(f.registry.redeem(request),/current membership or epoch/);
+});
+
+test("public owner signing key alone cannot cancel an invitation",async()=>{
+  const f=await setup();
+  await f.registry.createInvitation(f.serverRecord);
+  const req=await f.request();
+  const cancel={listId:LIST,inviteId:req.inviteId,ownerId:f.owner.actorId,
+    epoch:1,ownerPublicJwk:f.owner.publicKeyJwk};
+  const outsider=await generateSigningIdentity();
+  const forged=Buffer.from(await crypto.subtle.sign(
+    {name:"ECDSA",hash:"SHA-256"},outsider.privateKey,
+    new TextEncoder().encode(revocationStatement(cancel)))).toString("base64url");
+  await assert.rejects(f.registry.revokeInvitation({...cancel,proof:forged}),/signature/);
+  assert.equal(f.backend.get("invite:"+req.inviteId).status,"open");
+  await f.registry.redeem(req);
 });
