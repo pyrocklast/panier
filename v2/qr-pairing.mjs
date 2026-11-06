@@ -126,9 +126,17 @@ export async function prepareQrInvitation({
     tagLength: 128,
   }, key, encoder.encode(JSON.stringify(payload))));
   const body = signedBody(h, b64(nonce), ciphertext);
-  const signature = b64(await cryptoApi().sign(
+  const signatureBytes = new Uint8Array(await cryptoApi().sign(
     { name: "ECDSA", hash: "SHA-256" }, ownerPrivateKey,
     encoder.encode(JSON.stringify(body))));
+  // Reject accidental owner-key mismatch at issuance time. The public key
+  // and signing private key must belong to the SAME identity.
+  const publicKey = await cryptoApi().importKey("jwk", ownerJwk(ownerPublicJwk),
+    { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+  requireThat(await cryptoApi().verify(
+    { name: "ECDSA", hash: "SHA-256" }, publicKey, signatureBytes,
+    encoder.encode(JSON.stringify(body))), "owner key pair mismatch");
+  const signature = b64(signatureBytes);
   const serverRecord = {
     ...body, ownerPublicJwk: ownerJwk(ownerPublicJwk), signature,
   };
