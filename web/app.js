@@ -1175,11 +1175,27 @@ function qrSvg(textToEncode) {
   t.innerHTML = '<svg viewBox="0 0 ' + (n + 2 * pad) + " " + (n + 2 * pad) + '" shape-rendering="crispEdges" aria-hidden="true"><rect width="100%" height="100%" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>';
   return t.content.firstChild;
 }
+// Sheets (pairing, Settings) open as a step in the browser's history, so the phone's
+// back gesture closes them like a page.
+// Each opening is its own step, so one left over from before a reload doesn't count.
+const sheetOf = () => (history.state && history.state.sheet) || null;
+function openSheet(dlg) {
+  dlg.showModal();
+  dlg.dataset.step = Date.now() + "-" + Math.random();
+  history.pushState({ sheet: dlg.dataset.step }, "");
+}
+for (const dlg of document.querySelectorAll("dialog")) {
+  dlg.addEventListener("close", () => { if (dlg.dataset.step && sheetOf() === dlg.dataset.step) history.back(); });
+}
+addEventListener("popstate", () => {
+  for (const dlg of document.querySelectorAll("dialog[open]")) if (sheetOf() !== dlg.dataset.step) dlg.close();
+});
+
 function openPair() {
   const link = store.pairingLink();
   $("#qr").replaceChildren(window.qrcode ? qrSvg(link) : "");
   $("#share-link").hidden = !navigator.share;
-  $("#pair").showModal();
+  openSheet($("#pair"));
 }
 $("#pair-open").addEventListener("click", openPair);
 $("#pair-close").addEventListener("click", () => $("#pair").close());
@@ -1196,6 +1212,64 @@ $("#copy-link").addEventListener("click", async e => {
   }
   setTimeout(() => { b.textContent = "Copy link"; }, 2000);
 });
+
+/* ---------- Settings ---------- */
+
+const THEME_KEY = "panier-theme";
+// Asks the browser to keep the list even when the phone runs low on space. Firefox asks
+// you once; Chrome decides for itself. Returns whether it's kept, or null if unknown.
+async function keepList() {
+  try { return await navigator.storage.persist(); } catch (_) { return null; }
+}
+async function isKept() {
+  try { return await navigator.storage.persisted(); } catch (_) { return null; }
+}
+const size = n => (n < 1024 ? n + " bytes" : n < 1048576 ? Math.round(n / 1024) + " KB" : (n / 1048576).toFixed(1) + " MB");
+async function paintSettings() {
+  const theme = (() => { try { return localStorage.getItem(THEME_KEY) || ""; } catch (_) { return ""; } })();
+  for (const r of document.querySelectorAll('input[name="theme"]')) r.checked = r.value === theme;
+  const kept = await isKept();
+  $("#keep-text").textContent = kept
+    ? "Kept on this phone: the browser won't clear the list to free up space."
+    : "The browser may clear the list if this phone runs low on space. Keep the link from \u201cAdd someone to this list\u201d somewhere safe, such as a password manager: it brings the list back.";
+  $("#keep-btn").hidden = kept !== false;
+  let bytes = 0;
+  try { bytes = new Blob([localStorage.getItem("panier") || ""]).size; } catch (_) {}
+  const toGet = items.filter(i => !i.checked).length;
+  $("#size-text").textContent = "On this phone, the list takes " + size(bytes) + ": " + toGet + (toGet === 1 ? " item" : " items") + " to get, " + (items.length - toGet) + " bought before.";
+  $("#about-server").textContent = location.host;
+  let version = "dev";
+  try { const k = (await caches.keys()).find(k => k.startsWith("panier-")); if (k) version = k.slice(7); } catch (_) {}
+  $("#about-version").textContent = version;
+}
+// The list as a plain-text checklist: each section's items to get, then everything bought before.
+function exportList() {
+  const now = new Date();
+  const lines = ["Panier, " + now.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })];
+  for (const s of sections) {
+    const list = items.filter(i => i.section === s.id && !i.checked).sort((a, b) => a.pos - b.pos);
+    if (list.length) lines.push("", s.name, ...list.map(i => "- [ ] " + i.text));
+  }
+  const done = items.filter(i => i.checked).sort((a, b) => b.checkedAt - a.checkedAt);
+  if (done.length) lines.push("", "Bought before", ...done.map(i => "- [x] " + i.text));
+  const url = URL.createObjectURL(new Blob([lines.join("\n") + "\n"], { type: "text/plain;charset=utf-8" }));
+  const day = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map(n => String(n).padStart(2, "0")).join("-");
+  const a = h("a", { href: url, download: "panier-" + day + ".txt", hidden: true });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+$("#settings-open").addEventListener("click", () => { paintSettings(); openSheet($("#settings")); });
+$("#settings-close").addEventListener("click", () => $("#settings").close());
+for (const r of document.querySelectorAll('input[name="theme"]')) {
+  r.addEventListener("change", () => {
+    try { if (r.value) localStorage.setItem(THEME_KEY, r.value); else localStorage.removeItem(THEME_KEY); } catch (_) {}
+    if (window.panierTheme) window.panierTheme(r.value);
+  });
+}
+$("#keep-btn").addEventListener("click", async () => { await keepList(); paintSettings(); });
+$("#export-btn").addEventListener("click", exportList);
 
 /* ---------- Wiring and start ---------- */
 
@@ -1255,6 +1329,7 @@ $("#setup-form").addEventListener("submit", async e => {
     await store.createList(code);
     showList();
     openPair();
+    keepList();
   } catch (err) {
     showWelcome(MESSAGES[err.message] || MESSAGES.server);
   }
@@ -1264,11 +1339,12 @@ async function init() {
   const params = new URLSearchParams(location.hash.slice(1));
   if (location.hash) history.replaceState(null, "", location.pathname); // keep keys out of history
   try {
-    if (params.get("k")) await store.join(params.get("k"));
+    if (params.get("k")) { await store.join(params.get("k")); keepList(); }
     else if (params.get("setup") && !store.hasList()) {
       await store.createList(params.get("setup"));
       showList();
       openPair();
+      keepList();
       return;
     }
   } catch (err) {
@@ -1285,7 +1361,7 @@ init();
 // A new version installs in the background. When it takes over, the app reloads into it,
 // waiting first for anything in progress: editing, typing, dragging or the pairing sheet.
 function busy() {
-  return !!(editingId || drag || lifted || pointerIsDown || $("#pair").open ||
+  return !!(editingId || drag || lifted || pointerIsDown || document.querySelector("dialog[open]") ||
     $("#add-sec").value.trim() || Object.values(shells).some(sh => sh.input.value.trim()));
 }
 function reloadWhenIdle() {

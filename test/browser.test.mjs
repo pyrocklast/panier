@@ -708,3 +708,44 @@ test("sections are reordered by dragging their names, folded meanwhile", async (
   assert.equal(await a.evaluate(() => document.activeElement.textContent), "Essentials", "keeping the focus on its name");
   await t.close();
 });
+
+test("settings: appearance, keeping the list, its size, export, and about", async () => {
+  const t = await pair();
+  const { a } = t;
+  await add(a, "ess", "Milk");
+  await add(a, "ess", "2 eggs");
+  await add(a, "look", "Ripe avocados");
+  await blur(a);
+  await item(a, "Milk").locator(".boxcell").click();
+  await sleep(1900);
+  await a.click("#settings-open");
+  assert.ok(await a.locator("#settings").isVisible());
+
+  await a.locator('#settings .seg span:text-is("Dark")').click();
+  assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), "dark");
+  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "#111513", "the browser's bars follow");
+  await a.reload();
+  await a.locator("#app").waitFor();
+  assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), "dark", "the choice is kept on this phone");
+  await a.click("#settings-open");
+  assert.ok(await a.locator('input[name="theme"][value="dark"]').isChecked());
+
+  assert.match(await a.locator("#size-text").innerText(), /2 items to get, 1 bought before/);
+  assert.match(await a.locator("#keep-text").innerText(), /browser/);
+  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
+  assert.match(dl.suggestedFilename(), /^panier-\d{4}-\d{2}-\d{2}\.txt$/);
+  const text = readFileSync(await dl.path(), "utf8");
+  assert.match(text, /\nEssentials\n- \[ \] 2 eggs\n/);
+  assert.match(text, /\nLook out for\n- \[ \] Ripe avocados\n/);
+  assert.match(text, /\nBought before\n- \[x\] Milk\n/);
+
+  assert.equal(await a.locator("#about-server").innerText(), new URL(BASE).host);
+  assert.notEqual(await a.locator("#about-version").innerText(), "");
+
+  await a.locator('#settings .seg span:text-is("Same as phone")').click();
+  assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), undefined);
+  await a.evaluate(() => history.back()); // the phone's back gesture
+  assert.ok(await eventually(async () => !(await a.locator("#settings").isVisible())), "going back closes Settings");
+  assert.ok(await a.locator("#app").isVisible(), "and stays in the app");
+  await t.close();
+});

@@ -10,6 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script src="theme.js"></script>
 <link rel="stylesheet" href="app.css">
 <script src="vendor/qrcode.js" defer></script>
 <script type="module" src="app.js"></script>
@@ -37,6 +38,7 @@
   </section>
   <footer class="foot">
     <button type="button" class="linkbtn" id="pair-open">Add someone to this list</button>
+    <button type="button" class="linkbtn" id="settings-open">Settings</button>
   </footer>
 </main>
 
@@ -67,6 +69,41 @@
     <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M13 4.5L16.5 8 13 11.5M16 8H8a4.5 4.5 0 0 0 0 9h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
 </div>
+
+<dialog class="sheet page" id="settings" aria-labelledby="settings-title" tabindex="-1" autofocus>
+  <div class="page-in">
+    <div class="page-head">
+      <h2 id="settings-title">Settings</h2>
+      <button type="button" class="ib" id="settings-close" aria-label="Close">
+        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <section class="set" aria-labelledby="set-look">
+      <h3 id="set-look">Appearance</h3>
+      <div class="seg" role="radiogroup" aria-labelledby="set-look">
+        <label><input type="radio" name="theme" value="" checked><span>Same as phone</span></label>
+        <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+        <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+      </div>
+    </section>
+    <section class="set" aria-labelledby="set-data">
+      <h3 id="set-data">Data</h3>
+      <p id="keep-text"></p>
+      <button type="button" class="btn" id="keep-btn" hidden>Keep it on this phone</button>
+      <p id="size-text"></p>
+      <button type="button" class="btn" id="export-btn">Export the list</button>
+    </section>
+    <section class="set" aria-labelledby="set-about">
+      <h3 id="set-about">About</h3>
+      <dl class="facts">
+        <dt>Version</dt><dd id="about-version"></dd>
+        <dt>Server</dt><dd id="about-server"></dd>
+      </dl>
+      <p>Your list is encrypted on your phones, with a key that never leaves them. The server keeps it without being able to read it: it can't see your items, your sections or anything you type. It can see when changes are made, roughly how big they are, and the internet address they come from.</p>
+      <p class="note"><a href="https://github.com/pyrocklast/panier" target="_blank" rel="noopener">Source code</a>, under the MIT licence.</p>
+    </section>
+  </div>
+</dialog>
 
 <dialog class="sheet" id="pair" aria-labelledby="pair-title" tabindex="-1" autofocus>
   <h2 id="pair-title">Add someone to this list</h2>
