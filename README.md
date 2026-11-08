@@ -19,7 +19,7 @@ Each section is a card with its name at the top. A list starts with three:
 - Tap a section's name to rename it. Both phones see the new name.
 - While you rename a section, its colours show under the name: eight, the same in light and dark themes. A tap recolours the section at once, and undo puts the old colour back.
 - *Add a section*, below the cards, adds one at the end with its own colour. Its name is typed like a section name, and the cursor then moves to its *Add item* field.
-- While you rename a section that has nothing left to get, a bin appears to delete it. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
+- While you rename a section that has nothing left to get, a cross appears to delete it. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 - Tick boxes take their section's colour.
 
 ### Adding
@@ -51,7 +51,7 @@ Each section is a card with its name at the top. A list starts with three:
 - Enter in the middle of the text splits the item in two: the first part stays, the second becomes the next item, with the cursor at its start. One undo joins them again.
 - Backspace at the very start of an item joins it onto the item above, the reverse of Enter; straight after a split, the two parts join back exactly. In an emptied item, Backspace deletes it and moves to the end of the item above.
 - Clearing the text and leaving deletes the item. An emptied section name goes back to the old one.
-- While editing, a bin appears at the right of the row. Tapping it deletes the item.
+- While editing, a cross appears at the right of the row. Tapping it deletes the item.
 - Renaming to the name of another item on screen cancels and highlights that item. Renaming to an older, hidden item merges the two.
 
 ### Reordering

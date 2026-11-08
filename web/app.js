@@ -75,10 +75,9 @@ function h(tag, attrs, ...kids) {
 const SVG = (w, body, extra = "") => '<svg viewBox="0 0 20 20" width="' + w + '" height="' + w + '" aria-hidden="true"' + extra + '>' + body + "</svg>";
 const STROKE = 'fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"';
 const ICONS = {
-  plus: SVG(18, '<path d="M10 4v12M4 10h12" ' + STROKE + ' stroke-width="2.2"/>'),
-  bin: SVG(19, '<path d="M4 6h12M8 6V4.5h4V6M5.8 6l.8 10h6.8l.8-10M8.6 9v4.5M11.4 9v4.5" ' + STROKE + ' stroke-width="1.6"/>'),
-  back: SVG(16, '<path d="M7.5 4.4L3.1 8.75l4.4 4.35M3.75 8.75h8.75a4.4 4.4 0 0 1 0 8.75H10" ' + STROKE + ' stroke-width="2.1"/>'),
-  cross: SVG(16, '<path d="M5.5 5.5l9 9M14.5 5.5l-9 9" ' + STROKE + ' stroke-width="1.8"/>'),
+  plus: SVG(18, '<path d="M10 4v12M4 10h12" ' + STROKE + ' stroke-width="1.95"/>'),
+  back: SVG(16, '<path d="M7.5 4.4L3.1 8.75l4.4 4.35M3.75 8.75h8.75a4.4 4.4 0 0 1 0 8.75H10" ' + STROKE + ' stroke-width="2.2"/>'),
+  cross: SVG(16, '<path d="M5.5 5.5l9 9M14.5 5.5l-9 9" ' + STROKE + ' stroke-width="2.2"/>'),
 };
 function icon(name) {
   const t = document.createElement("template");
@@ -370,7 +369,7 @@ function aroundCursor(span) {
 }
 // editInPlace turns a text span into an editable field until Enter, Escape or leaving
 // it, with the cursor where you tapped, or at caret. While editing, the text is plain;
-// fill shows it again afterwards, as an item shows its quantity. With onDelete, a bin appears at the
+// fill shows it again afterwards, as an item shows its quantity. With onDelete, a cross appears at the
 // end of the row while editing. With onSplit, Enter in the middle of the text splits it
 // there; with onJoin, Backspace at its very start joins it to what's above, when canJoin
 // allows; with onEmpty, leaving the text empty calls it instead of restoring the old text.
@@ -395,7 +394,7 @@ function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSave, onD
     type: "button", class: "bin", "aria-label": deleteLabel,
     onpointerdown: e => e.preventDefault(), onmousedown: e => e.preventDefault(),
     onclick: () => { cancelled = binned = true; finish(); onDelete(); },
-  }, icon("bin"));
+  }, icon("cross"));
   row.classList.add("editing");
   if (bin) row.append(bin);
   if (below) row.after(below); // more tools while editing, such as a section's colours
@@ -1177,6 +1176,7 @@ function qrSvg(textToEncode) {
 const sheetOf = () => (history.state && history.state.sheet) || null;
 function openSheet(dlg) {
   dlg.showModal();
+  dlg.focus(); // the sheet itself, not its first button, which would show a focus ring
   dlg.dataset.step = Date.now() + "-" + Math.random();
   history.pushState({ sheet: dlg.dataset.step }, "");
 }
