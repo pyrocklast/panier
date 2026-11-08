@@ -810,7 +810,7 @@ test("the stored list names each phone once and forgets items deleted over six m
   await a.close();
   a = await t.A.newPage();
   watch(a, t.errors);
-  await a.goto(BASE + "/manifest.webmanifest");
+  await a.goto(BASE + "/api/lists"); // a plain answer from the server: the app isn't running
   await a.evaluate(() => {
     const s = JSON.parse(localStorage.getItem("panier"));
     for (const f of Object.values(s.items)) for (const v of Object.values(f)) v[2] = s.devs[v[2]];
