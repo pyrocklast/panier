@@ -761,7 +761,7 @@ test("settings: appearance, keeping the list, its size, export, and about", asyn
 
 test("in French when the phone is in French", async () => {
   const t = await pair({ locale: "fr-FR" });
-  const { a, A } = t;
+  const { a, b, A } = t;
   const nb = " ";
   assert.equal(await a.evaluate(() => document.documentElement.lang), "fr");
   assert.deepEqual(await names(a), ["Essentiels", "À l’occasion", "À long terme"]);
@@ -776,6 +776,7 @@ test("in French when the phone is in French", async () => {
   assert.equal(await a.locator("#size-text").evaluate(el => el.textContent.split(":").pop().trim()), "1 article à acheter, 0 déjà acheté.", "French counts 0 as one");
   await a.click("#settings-close");
 
+  assert.ok(await eventually(async () => (await texts(b, "Essentiels")).join() === "2 lait"), "sent before going offline");
   await offline(A, a);
   await add(a, "ess", "Pain");
   await blur(a);
