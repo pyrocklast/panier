@@ -28,6 +28,7 @@ Each section is a card with its name at the top. A list starts with three:
 - As soon as you type, the `+` becomes a tick box: the row is a new item. Enter adds it and keeps the field open for the next one. Leaving the field adds it too, so nothing typed is lost. A notification or switching apps doesn't cut it short, and text left in the field when the app closes is added the next time it opens.
 - Typing something already on the list highlights it instead of adding a copy.
 - Typing something bought before puts it back, into the section you are typing in.
+- **Quantities.** A number at the start, such as *2 milk*, *2× milk*, *500 g flour* or *1.5kg potatoes*, is shown slightly apart from the name, in bold. It's left out when comparing names, so *2 milk* is still Milk: typing it when Milk is on the list, or was bought before, gives that item the new quantity, and *2 mil* suggests Milk.
 
 ### Suggestions
 
@@ -56,6 +57,7 @@ Each section is a card with its name at the top. A list starts with three:
 ### Reordering
 
 - Hold an item for about half a second: it lifts and its tick box turns into a grip. Move to drag it, including into another section; the grip takes the colour of the section it is over. Releasing without moving does nothing.
+- Sections move the same way, held by their name. While one moves, every section folds down to its name, so even long ones are easy to reorder; they unfold when it's let go.
 - When you let go, the item glides into its place. Things that move after a change glide too, without ever getting in the way of a tap.
 - With a mouse, dragging starts as soon as you move.
 - Until someone has dragged once, the first item lifts briefly when the app opens, to show that items can move.
@@ -72,7 +74,7 @@ Each section is a card with its name at the top. A list starts with three:
 
 ### Keyboard and accessibility
 
-- Space ticks, Enter or F2 edits an item or a section name, Delete deletes, Alt+↑/↓ moves an item (across sections at the ends), Ctrl+Z and Ctrl+Shift+Z undo and redo.
+- Space ticks, Enter or F2 edits an item or a section name, Delete deletes, Alt+↑/↓ moves an item (across sections at the ends) or, on its name, a section, Ctrl+Z and Ctrl+Shift+Z undo and redo.
 - In suggestions, ↓ and ↑ choose one, → moves to its ×, and Enter picks; Shift+Delete removes the one chosen.
 - Changes are announced to screen readers. Light and dark themes follow the system; reduced motion is respected.
 
@@ -113,15 +115,9 @@ BASE=http://127.0.0.1:8080 SETUP=<code> STORE=./data node --test test/browser.te
 
 In order. Each batch is built, tested on both servers, deployed, and tried on the phones before the next.
 
-Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*; splitting an item with Enter and joining it back with Backspace, deleting it by clearing its text, removing suggestions; a tap that leaves a field always lands, on touch screens too; the drop zone inside the ticked group, dragging ticked items back, and items gliding into place again; sections without icons, with a colour chosen from a palette.
+Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*; splitting an item with Enter and joining it back with Backspace, deleting it by clearing its text, removing suggestions; a tap that leaves a field always lands, on touch screens too; the drop zone inside the ticked group, dragging ticked items back, and items gliding into place again; sections without icons, with a colour chosen from a palette; reordering sections by dragging; quantities; a new app icon.
 
-### 1. Small changes
-
-- Reorder sections by dragging them.
-- **Quantities, without a new field.** A number at the start of an item, such as *2 milk*, *2× milk* or *500 g flour*, is shown slightly apart from the name, and ignored when spotting duplicates and making suggestions, so *2 milk* still finds *Milk*.
-- A new app icon: simple and monochrome, in the style of Arcticons, with a monochrome version for Android's themed icons.
-
-### 2. Settings
+### 1. Settings
 
 One new screen.
 
@@ -131,11 +127,11 @@ One new screen.
   - How much storage the list uses, and exporting it.
 - **About:** version, server, and what the server can and can't see.
 
-### 3. French
+### 2. French
 
 A French translation, following the phone's language. It comes after Settings so it covers the final wording of every screen at once.
 
-### 4. Bigger features
+### 3. Bigger features
 
 These change how lists are stored and shared, so each starts with a short design note and sketches of the screens, agreed before building.
 
@@ -147,7 +143,7 @@ These change how lists are stored and shared, so each starts with a short design
 - Folding a section.
 - Compacting the change log.
 
-Waiting on browsers: the Android navigation bar's colour is the browser's to choose. Chrome takes it from one manifest colour, now dark, so it's dark in light mode too until Chrome supports separate dark-mode colours (`color_scheme_dark`, already in the manifest). Firefox appears to use its own theme; to check on a phone.
+Waiting on browsers: the app icon has a monochrome version, for Android's themed icons, but no browser on Android uses it for installed web apps yet. The Android navigation bar's colour is the browser's to choose. Chrome takes it from one manifest colour, now dark, so it's dark in light mode too until Chrome supports separate dark-mode colours (`color_scheme_dark`, already in the manifest). Firefox appears to use its own theme; to check on a phone.
 
 ## Licence
 

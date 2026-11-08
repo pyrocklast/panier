@@ -76,7 +76,9 @@ const section = (pg, name) => pg.locator(`#list .sec:has(.sec-name:text-is("${na
 const texts = (pg, name) => section(pg, name).locator(".items .text").allInnerTexts();
 const names = pg => pg.locator("#list .sec-name").allInnerTexts();
 const ticked = pg => pg.locator("#basket-list .text").allInnerTexts();
-const item = (pg, text) => pg.locator(`#list .item:has(.text:text-is("${text}"))`);
+// An item by its whole text, including a quantity shown apart from the name.
+const exactly = text => new RegExp("^\\s*" + text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*$");
+const item = (pg, text) => pg.locator("#list .item").filter({ has: pg.locator(".text", { hasText: exactly(text) }) });
 const blur = pg => pg.evaluate(() => document.activeElement.blur());
 async function offline(ctx, pg) { await ctx.setOffline(true); await pg.evaluate(() => dispatchEvent(new Event("offline"))); }
 async function online(ctx, pg) { await ctx.setOffline(false); await pg.evaluate(() => dispatchEvent(new Event("online"))); }
@@ -639,5 +641,70 @@ test("a section's colour is chosen from a palette while renaming it", async () =
   await a.click("#undo");
   assert.equal(await colour(a, ess), "var(--ess)", "undo restores the colour");
   assert.ok(await eventually(async () => (await colour(b, ess)) === "var(--ess)"));
+  await t.close();
+});
+
+test("a quantity at the start is shown apart and ignored when matching names", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await add(a, "ess", "2 milk");
+  await add(a, "ess", "500g flour");
+  await blur(a);
+  assert.deepEqual(await a.locator('.sec[data-sec="ess"] .items .qty').allInnerTexts(), ["2", "500g"], "quantities are shown apart");
+  assert.deepEqual(await texts(a, "Essentials"), ["2 milk", "500g flour"]);
+
+  await add(a, "look", "Milk");
+  await blur(a);
+  assert.deepEqual(await texts(a, "Look out for"), [], "Milk is the same item as 2 milk: nothing is added");
+  await add(a, "ess", "3× milk");
+  await blur(a);
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "3× milk,500g flour"), "a quantity typed for an item on the list updates it");
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "3× milk,500g flour"));
+
+  await item(a, "3× milk").locator(".boxcell").click();
+  await sleep(1900);
+  await a.fill("#add-look", "2 mil");
+  assert.deepEqual(await a.locator("#sug-look .t").allInnerTexts(), ["3× milk"], "suggestions match the name, not the quantity");
+  await a.locator("#sug-look .sug-pick").first().click();
+  assert.ok(await eventually(async () => (await texts(a, "Look out for")).join() === "2 milk"), "picked, it takes the quantity typed");
+
+  await item(a, "2 milk").locator(".text").click();
+  assert.equal((await editing(a)).text, "2 milk", "while editing, the text is plain");
+  await a.keyboard.press("Escape");
+  assert.equal(await item(a, "2 milk").locator(".qty").innerText(), "2", "and the quantity shows apart again after");
+  await t.close();
+});
+
+test("sections are reordered by dragging their names, folded meanwhile", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await add(a, "ess", "Milk");
+  await add(a, "ess", "Bread");
+  await add(a, "long", "Bike lights");
+  await blur(a);
+  await still(a);
+  const box = await section(a, "Long term").locator(".sec-name").boundingBox();
+  const x = box.x + 20, y = box.y + box.height / 2;
+  await a.mouse.move(x, y);
+  await a.mouse.down();
+  await a.mouse.move(x, y - 10);
+  assert.equal(await a.evaluate(() => document.documentElement.classList.contains("sorting")), true);
+  assert.equal(await a.locator('#list .sec[data-sec="ess"] .items').isVisible(), false, "sections fold to their headings");
+  const top = await section(a, "Essentials").boundingBox();
+  for (let i = 1; i <= 10; i++) { await a.mouse.move(x, y - 10 + (top.y + 4 - (y - 10)) * i / 10); await sleep(20); }
+  await sleep(100);
+  await a.mouse.up();
+  assert.deepEqual(await names(a), ["Long term", "Essentials", "Look out for"]);
+  assert.equal(await a.locator('#list .sec[data-sec="ess"] .items').isVisible(), true, "and unfold when let go");
+  assert.equal(await a.locator(".sec-name.editing").count(), 0, "letting go doesn't start renaming");
+  assert.ok(await eventually(async () => (await names(b)).join() === "Long term,Essentials,Look out for"), "the other phone sees the new order");
+  assert.ok(await eventually(async () => (await a.locator(".ghost").count()) === 0), "nothing is left behind");
+
+  await a.click("#undo");
+  assert.deepEqual(await names(a), ["Essentials", "Look out for", "Long term"], "undo puts it back");
+  await section(a, "Essentials").locator(".sec-name").focus();
+  await a.keyboard.press("Alt+ArrowDown");
+  assert.deepEqual(await names(a), ["Look out for", "Essentials", "Long term"], "Alt+↓ moves a section down");
+  assert.equal(await a.evaluate(() => document.activeElement.textContent), "Essentials", "keeping the focus on its name");
   await t.close();
 });

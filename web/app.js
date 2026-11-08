@@ -23,6 +23,24 @@ const PLAIN = (() => { try { const d = document.createElement("div"); d.contentE
 
 const fold = s => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const keyOf = s => fold(s).replace(/\s+/g, " ").trim();
+// A quantity at the start of an item, such as "2", "2×", "500 g" or "1.5kg", is shown
+// apart from the name and left out when comparing names, so "2 milk" is still Milk.
+const QTY = /^((?:\d+(?:[.,]\d+)?|[½¼¾⅓⅔])\s*(?:[x×]|(?:kg|g|mg|ml|cl|dl|l|lb|oz)\b)?)\s+(?=\S)/i;
+function splitQty(text) {
+  const m = QTY.exec(text);
+  return m ? { qty: m[1], name: text.slice(m[0].length) } : { qty: "", name: text };
+}
+const nameKey = s => keyOf(splitQty(s).name);
+// An item's text after typing typed for it: a quantity typed replaces its quantity.
+function retext(old, typed) {
+  const q = splitQty(typed).qty;
+  return q ? q + " " + splitQty(old).name : old;
+}
+// Fills an item's text: the quantity in its own span, the name after it.
+function fillText(el, text) {
+  const { qty, name } = splitQty(text);
+  el.replaceChildren(...(qty ? [h("span", { class: "qty" }, qty.replace(/x$/i, "×")), " "] : []), name);
+}
 const clean = (s, max = MAX_ITEM) => s.replace(/\s+/g, " ").trim().slice(0, max);
 const q = s => "“" + s + "”";
 const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} };
@@ -230,29 +248,31 @@ function clearAdd(sec) {
   saveDraft(sec, "");
   closeSug();
 }
-function revive(id, sec, opts = {}) {
+function revive(id, sec, opts = {}, typed = "") {
   clearAdd(sec);
-  const it = find(id);
+  const it = find(id), text = retext(it.text, typed);
   settling.delete(id);
   flashId = id;
-  announce(it.text + " is back on the list");
-  act("putting back " + q(it.text), [[id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "checked", false], [id, "checkedAt", 0]], opts);
+  announce(text + " is back on the list");
+  act("putting back " + q(it.text), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "checked", false], [id, "checkedAt", 0]], opts);
 }
 // submitAdd adds what was typed into a section's "Add item" field: on Enter, or, with
 // leaving, when you leave the field or reopen the app with text still in it.
 function submitAdd(sec, leaving = false) {
   const opts = leaving ? { leaving: true } : {};
-  const pick = !leaving && ui.sugSec === sec && ui.sugIndex >= 0 && ui.sug[ui.sugIndex];
-  if (pick) return ui.sugCol ? forget(pick.id, sec, true) : revive(pick.id, sec);
   const text = clean(shells[sec].input.value);
+  const pick = !leaving && ui.sugSec === sec && ui.sugIndex >= 0 && ui.sug[ui.sugIndex];
+  if (pick) return ui.sugCol ? forget(pick.id, sec, true) : revive(pick.id, sec, {}, text);
   if (!text) { clearAdd(sec); return; }
-  const ex = items.find(i => keyOf(i.text) === keyOf(text));
-  if (ex && ex.checked && !settling.has(ex.id)) return revive(ex.id, sec, opts);
+  const ex = items.find(i => nameKey(i.text) === nameKey(text));
+  if (ex && ex.checked && !settling.has(ex.id)) return revive(ex.id, sec, opts, text);
   clearAdd(sec);
-  if (ex) {
+  if (ex) { // already on the list: highlighted, with the quantity just typed, if any
     flashId = ex.id;
-    announce(ex.text + " is already on the list");
-    if (leaving) whenTapEnds(leftPaint);
+    const now = retext(ex.text, text);
+    announce(ex.text + " is already on the list" + (now !== ex.text ? ", now " + now : ""));
+    if (now !== ex.text) act("changing " + q(ex.text), [[ex.id, "text", now]], opts);
+    else if (leaving) whenTapEnds(leftPaint);
     else paint(null, false);
     return;
   }
@@ -312,6 +332,14 @@ function deleteSection(id) {
 
 /* ---------- Editing in place ---------- */
 
+// How many characters come before a range's start within span.
+function offsetIn(span, r) {
+  if (!r) return null;
+  const head = document.createRange();
+  head.selectNodeContents(span);
+  head.setEnd(r.startContainer, r.startOffset);
+  return head.toString().length;
+}
 function caretAt(span, x, y) {
   try {
     if (document.caretPositionFromPoint) {
@@ -343,26 +371,25 @@ function aroundCursor(span) {
   return { head: head.toString(), tail: tail.toString(), collapsed: r.collapsed };
 }
 // editInPlace turns a text span into an editable field until Enter, Escape or leaving
-// it, with the cursor where you tapped, or at caret. With onDelete, a bin appears at the
+// it, with the cursor where you tapped, or at caret. While editing, the text is plain;
+// fill shows it again afterwards, as an item shows its quantity. With onDelete, a bin appears at the
 // end of the row while editing. With onSplit, Enter in the middle of the text splits it
 // there; with onJoin, Backspace at its very start joins it to what's above, when canJoin
 // allows; with onEmpty, leaving the text empty calls it instead of restoring the old text.
-function editInPlace(span, { key, row, orig, max, x, y, caret, onSave, onDelete, deleteLabel, onSplit, canJoin, onJoin, onEmpty, below }) {
+function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSave, onDelete, deleteLabel, onSplit, canJoin, onJoin, onEmpty, below }) {
   if (editingId || drag) return;
   editingId = key;
+  const at = x != null ? offsetIn(span, caretAt(span, x, y)) : caret; // counted before the text turns plain
+  const show = () => (fill ? fill(span, orig) : (span.textContent = orig));
+  span.textContent = orig;
   span.contentEditable = PLAIN ? "plaintext-only" : "true";
   span.classList.add("editing");
   span.setAttribute("role", "textbox");
-  const at = x != null ? caretAt(span, x, y) : null;
   span.focus();
   try {
-    let r = at;
-    if (!r) {
-      r = document.createRange();
-      const t = span.firstChild;
-      if (caret != null && t && t.nodeType === Node.TEXT_NODE) { r.setStart(t, Math.min(caret, t.length)); r.collapse(true); }
-      else { r.selectNodeContents(span); r.collapse(caret === 0); }
-    }
+    const r = document.createRange(), t = span.firstChild;
+    if (at != null && t) { r.setStart(t, Math.min(at, t.length)); r.collapse(true); }
+    else { r.selectNodeContents(span); r.collapse(false); }
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
   } catch (_) {}
   let cancelled = false, binned = false, done = false;
@@ -433,11 +460,11 @@ function editInPlace(span, { key, row, orig, max, x, y, caret, onSave, onDelete,
     const text = clean(span.textContent, max);
     if (!text && !cancelled && !away && onEmpty) return onEmpty();
     if (cancelled || !text || text === orig) {
-      span.textContent = orig;
+      show();
       if (renderPending && !binned) whenTapEnds(refreshFromStore);
       return;
     }
-    if (onSave(text) === false) span.textContent = orig;
+    if (onSave(text) === false) show();
   }
   span.addEventListener("keydown", onKey);
   span.addEventListener("beforeinput", onBefore);
@@ -450,7 +477,7 @@ function editItem(span, id, x, y, caret) {
   const orig = find(id).text;
   const row = span.closest(".item");
   editInPlace(span, {
-    key: id, row, orig, max: MAX_ITEM, x, y, caret,
+    key: id, row, orig, max: MAX_ITEM, x, y, caret, fill: fillText,
     onDelete: () => del(id), deleteLabel: "Delete " + orig,
     onSplit: (first, second, glue) => splitItem(id, first, second, glue),
     canJoin: text => !!joinTarget(id, text),
@@ -458,7 +485,7 @@ function editItem(span, id, x, y, caret) {
     // Hidden at once but redrawn after the tap, so nothing moves under your finger.
     onEmpty: () => { row.style.visibility = "hidden"; del(id, { leaving: true }); },
     onSave: text => {
-      const dup = items.find(i => i.id !== id && keyOf(i.text) === keyOf(text));
+      const dup = items.find(i => i.id !== id && nameKey(i.text) === nameKey(text));
       if (dup && onScreen(dup)) {
         flashId = dup.id;
         announce(dup.text + " is already on the list");
@@ -479,7 +506,7 @@ function editItem(span, id, x, y, caret) {
 let lastSplit = null; // so Backspace can join the two parts back exactly
 function splitItem(id, first, second, glue) {
   const it = find(id);
-  const dupOf = text => items.find(i => i.id !== id && keyOf(i.text) === keyOf(text));
+  const dupOf = text => items.find(i => i.id !== id && nameKey(i.text) === nameKey(text));
   const sib = shown(it.section), k = sib.indexOf(it);
   const pos = between(it.pos, k >= 0 && sib[k + 1] ? sib[k + 1].pos : null);
   const ops = [];
@@ -490,7 +517,7 @@ function splitItem(id, first, second, glue) {
   else { ops.push([id, "text", first]); if (d1) ops.push([d1.id, "deleted", true]); }
   const here = nid => [[nid, "section", it.section], [nid, "pos", pos], [nid, "checked", it.checked], [nid, "checkedAt", it.checkedAt]];
   const d2 = dupOf(second);
-  if (keyOf(second) === keyOf(first)) { /* "milk milk": one is enough */ }
+  if (nameKey(second) === nameKey(first)) { /* "milk milk": one is enough */ }
   else if (d2 && inList(d2)) { flashId = d2.id; msg = d2.text + " is already on the list"; }
   else if (d2) { ops.push(...here(d2.id)); next = d2.id; }
   else {
@@ -554,12 +581,12 @@ function recolour(id, color, label) {
 /* ---------- Suggestions from everything bought before ---------- */
 
 function suggestions(text) {
-  const n = keyOf(text);
+  const n = nameKey(text);
   if (n.length < 3) return [];
   const scored = [];
   for (const it of items) {
     if (!it.checked || settling.has(it.id)) continue;
-    const t = keyOf(it.text);
+    const t = nameKey(it.text);
     const at = t.indexOf(n);
     if (at < 0) continue;
     const wordStart = at === 0 || /[\s(,'-]/.test(t[at - 1]);
@@ -581,13 +608,13 @@ function highlight(text, query) {
 // removes it for good. With the keyboard, arrows move between them and Enter picks.
 const sugCellId = (sec, i, col) => "sug-" + sec + "-" + i + (col ? "-x" : "");
 function paintSug(sec, list) {
-  const sh = shells[sec], query = sh.input.value;
+  const sh = shells[sec], query = splitQty(sh.input.value).name;
   const active = ui.sugSec === sec ? ui.sugIndex : -1;
   const keep = e => e.preventDefault(); // the cursor stays in the field
   sh.sug.replaceChildren(...list.map((it, i) => h("li", { role: "row", class: "sugopt" + (i === active ? " active" : ""), onpointerdown: keep, onmousedown: keep },
     h("span", {
       role: "gridcell", class: "sug-pick", id: sugCellId(sec, i, 0), "aria-selected": String(i === active && !ui.sugCol),
-      onclick: () => revive(it.id, sec),
+      onclick: () => revive(it.id, sec, {}, sh.input.value),
     }, icon("back"), h("span", { class: "t" }, highlight(it.text, query))),
     h("span", { role: "gridcell", class: "sug-x-cell", id: sugCellId(sec, i, 1), "aria-selected": String(i === active && !!ui.sugCol) },
       h("button", { type: "button", class: "sug-x", tabindex: "-1", "aria-label": "Remove " + it.text + " from suggestions", onclick: () => forget(it.id, sec) }, icon("cross"))))));
@@ -637,13 +664,18 @@ function buildShell(id) {
     h("label", { class: "add-plus", for: "add-" + id, "aria-hidden": "true" }, icon("plus")), input);
   const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": "Bought before", hidden: true });
   const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id } });
-  name.addEventListener("click", e => { if (editingId !== "#" + id) editSection(name, id, e.clientX, e.clientY); });
+  name.addEventListener("click", e => {
+    if (suppressClick) { suppressClick = false; return; }
+    if (editingId !== "#" + id) editSection(name, id, e.clientX, e.clientY);
+  });
   name.addEventListener("keydown", e => {
     if (editingId === "#" + id) return;
     if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editSection(name, id); }
+    else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); moveSection(id, e.key === "ArrowUp" ? -1 : 1); }
   });
   const head = h("h2", { class: "sec-head" }, name);
   const el = h("section", { class: "sec", "data-sec": id, "aria-labelledby": "h-" + id }, head, ul, sug, form);
+  bindPress(head, { look: el, can: () => sections.length > 1, start: (offY, y) => startSectionDrag(id, y) });
   input.addEventListener("input", () => {
     form.classList.toggle("typing", !!input.value.trim());
     saveDraft(id, input.value.trim() ? input.value : "");
@@ -705,7 +737,8 @@ function itemEl(it) {
   const cell = h("label", { class: "boxcell", for: "chk-" + it.id },
     chk, h("span", { class: "box", "aria-hidden": "true" }, icon("check")), h("span", { class: "grip", "aria-hidden": "true" }, icon("grip")));
   cell.addEventListener("click", e => { if (suppressClick) { e.preventDefault(); suppressClick = false; } });
-  const text = h("span", { class: "text", id: "txt-" + it.id, role: "button", tabindex: "0", "aria-label": "Edit " + it.text, dataset: { fk: "txt-" + it.id } }, it.text);
+  const text = h("span", { class: "text", id: "txt-" + it.id, role: "button", tabindex: "0", "aria-label": "Edit " + it.text, dataset: { fk: "txt-" + it.id } });
+  fillText(text, it.text);
   text.addEventListener("click", e => {
     if (suppressClick) { suppressClick = false; return; }
     if (editingId !== it.id) editItem(text, it.id, e.clientX, e.clientY);
@@ -716,55 +749,72 @@ function itemEl(it) {
     else if (e.key === "Delete") { e.preventDefault(); del(it.id); }
   });
   li.append(cell, text);
-  bindPress(li, it.id);
+  bindPress(li, { can: () => !!li.closest("#list .items, #basket-list"), start: (offY, y) => startDrag(li, it.id, offY, y) });
   return li;
 }
 
-/* Press and hold, then move, to drag */
-function bindPress(li, id) {
+/* Press and hold, then move, to drag; with a mouse, just move. look is what lifts. */
+function bindPress(target, { look = target, can, start }) {
   let timer = null, p = null;
   const off = () => {
     clearTimeout(timer); timer = null; p = null; lifted = false;
-    li.classList.remove("pressing", "lifted");
+    look.classList.remove("pressing", "lifted");
     removeEventListener("pointermove", move);
     removeEventListener("pointerup", off);
     removeEventListener("pointercancel", off);
   };
-  const draggable = () => !!li.closest("#list .items, #basket-list");
   const lift = () => {
     clearTimeout(timer); timer = null;
     if (!p || p.lifted) return;
-    if (!draggable()) { suppressClick = true; off(); return; }
+    if (!can()) { suppressClick = true; off(); return; }
     p.lifted = true; lifted = true; suppressClick = true;
-    li.classList.remove("pressing");
-    li.classList.add("lifted");
+    look.classList.remove("pressing");
+    look.classList.add("lifted");
     buzz(8);
   };
   const move = e => {
     if (!p) return;
     const d = Math.hypot(e.clientX - p.x, e.clientY - p.y);
-    if ((p.lifted || p.mouse) && d > 6 && draggable()) {
-      const offY = p.y - li.getBoundingClientRect().top;
+    if ((p.lifted || p.mouse) && d > 6 && can()) {
+      const offY = p.y - look.getBoundingClientRect().top;
       off();
       suppressClick = true;
-      startDrag(li, id, offY, e.clientY);
+      start(offY, e.clientY);
     } else if (!p.lifted && !p.mouse && d > 8) off();
   };
-  li.addEventListener("pointerdown", e => {
+  target.addEventListener("pointerdown", e => {
     if (e.button > 0 || editingId || drag) return;
     suppressClick = false;
     p = { x: e.clientX, y: e.clientY, mouse: e.pointerType === "mouse", lifted: false };
-    li.classList.add("pressing");
+    look.classList.add("pressing");
     timer = setTimeout(lift, LONG_PRESS_MS);
     addEventListener("pointermove", move);
     addEventListener("pointerup", off);
     addEventListener("pointercancel", off);
   });
-  li.addEventListener("contextmenu", e => {
+  target.addEventListener("contextmenu", e => {
     if (e.pointerType === "mouse") return;
     e.preventDefault();
     if (p && !p.mouse && !editingId) lift();
   });
+}
+// A drag in progress: the ghost follows the pointer, d.place puts the slot under it, the
+// page scrolls near the edges, and d.end runs when it's let go.
+function beginDrag(d) {
+  drag = { ...d, raf: 0 };
+  addEventListener("pointermove", onDragMove);
+  addEventListener("pointerup", stopDrag);
+  addEventListener("pointercancel", stopDrag);
+  drag.raf = requestAnimationFrame(dragTick);
+  drag.place(drag.y);
+}
+function stopDrag() {
+  if (!drag) return;
+  cancelAnimationFrame(drag.raf);
+  removeEventListener("pointermove", onDragMove);
+  removeEventListener("pointerup", stopDrag);
+  removeEventListener("pointercancel", stopDrag);
+  drag.end();
 }
 document.addEventListener("touchmove", e => { if (lifted || drag) e.preventDefault(); }, { passive: false });
 
@@ -784,18 +834,13 @@ function startDrag(li, id, offY, y) {
   document.documentElement.classList.add("dragging");
   document.documentElement.classList.toggle("drag-ticked", ticked);
   const home = { ul: li.parentElement, next: li.nextElementSibling, sec: li.style.getPropertyValue("--sec") };
-  drag = { id, li, ghost, offY, y, raf: 0, toTick: null, ticked, home };
-  addEventListener("pointermove", onDragMove);
-  addEventListener("pointerup", endDrag);
-  addEventListener("pointercancel", endDrag);
-  drag.raf = requestAnimationFrame(dragTick);
-  place(y);
+  beginDrag({ id, li, ghost, offY, y, toTick: null, ticked, home, place, end: endDrag });
 }
 function onDragMove(e) {
   if (!drag) return;
   drag.y = e.clientY;
   drag.ghost.style.top = (e.clientY - drag.offY) + "px";
-  place(e.clientY);
+  drag.place(e.clientY);
 }
 function dragTick() {
   if (!drag) return;
@@ -803,7 +848,7 @@ function dragTick() {
   let dy = 0;
   if (y < 64) dy = -Math.ceil((64 - y) / 6);
   else if (y > H - 64) dy = Math.ceil((y - (H - 64)) / 6);
-  if (dy) { window.scrollBy(0, dy); place(y); }
+  if (dy) { window.scrollBy(0, dy); drag.place(y); }
   drag.raf = requestAnimationFrame(dragTick);
 }
 function setSec(sec) {
@@ -842,12 +887,7 @@ function place(y) {
   setSec("var(--" + colorOf(ul.dataset.sec) + ")");
 }
 function endDrag() {
-  if (!drag) return;
   const { li, ghost, id, toTick, ticked } = drag;
-  cancelAnimationFrame(drag.raf);
-  removeEventListener("pointermove", onDragMove);
-  removeEventListener("pointerup", endDrag);
-  removeEventListener("pointercancel", endDrag);
   // Taken before anything changes, with the ghost where it was let go: it glides into place from there.
   const snap = reduceMotion.matches ? null : snapshot();
   if (snap) snap.items.set(id, { li: ghost, rect: ghost.getBoundingClientRect(), part: null });
@@ -879,6 +919,68 @@ function endDrag() {
   sync();
   paint(activeFk(), !!snap, false, snap);
   scheduleSettle();
+}
+
+/* Reordering sections */
+
+// Sections are reordered folded down to their headings, so even long ones are easy to
+// move. Each gets a new position in the new order, all in one step.
+const orderOps = order => order.map((id, k) => ["#" + id, "pos", k + 1, (DEFAULTS.find(d => d.id === id) || {}).pos]);
+function startSectionDrag(id, y) {
+  landAll();
+  const el = shells[id].el;
+  const before = el.getBoundingClientRect().top;
+  document.documentElement.classList.add("sorting");
+  window.scrollBy(0, el.getBoundingClientRect().top - before); // its heading stays under your finger
+  const r = el.getBoundingClientRect();
+  const ghost = el.cloneNode(true);
+  ghost.replaceChildren(ghost.querySelector(".sec-head"));
+  ghost.classList.remove("lifted", "pressing");
+  ghost.classList.add("ghost");
+  ghost.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
+  const offY = Math.min(Math.max(y - r.top, 0), r.height);
+  Object.assign(ghost.style, { left: r.left + "px", top: (y - offY) + "px", width: r.width + "px" });
+  document.body.append(ghost);
+  el.classList.add("placeholder");
+  beginDrag({ id, el, ghost, offY, y, place: placeSection, end: endSectionDrag });
+}
+function placeSection(y) {
+  const list = $("#list");
+  let before = null;
+  for (const c of list.children) {
+    if (c === drag.el) continue;
+    const r = c.getBoundingClientRect();
+    if (y < r.top + r.height / 2) { before = c; break; }
+  }
+  if (drag.el.nextElementSibling !== before) list.insertBefore(drag.el, before);
+}
+function endSectionDrag() {
+  const { id, el, ghost } = drag;
+  drag = null;
+  try { localStorage.setItem(HINT_KEY, "1"); } catch (_) {}
+  const order = [...$("#list").children].map(c => c.dataset.sec);
+  const snap = reduceMotion.matches ? null : snapshot(); // folded: the cards unfold from here
+  const from = ghost.getBoundingClientRect();
+  document.documentElement.classList.remove("sorting");
+  el.classList.remove("placeholder");
+  if (store.change("moving section " + q(nameOf(id)), orderOps(order))) announce(nameOf(id) + " moved");
+  sync();
+  render();
+  const head = el.querySelector(".sec-head");
+  if (snap) {
+    const to = head.getBoundingClientRect(); // where it ends up, measured before anything glides
+    glide(snap);
+    fly({ li: ghost, rect: from }, to, head);
+  } else ghost.remove();
+  scheduleSettle();
+}
+// With a keyboard: Alt+↑ or Alt+↓ on a section's name.
+function moveSection(id, dir) {
+  const order = sections.map(s => s.id), i = order.indexOf(id), j = i + dir;
+  if (j < 0 || j >= order.length) return;
+  [order[i], order[j]] = [order[j], order[i]];
+  announce(nameOf(id) + " moved " + (dir < 0 ? "up" : "down"));
+  act("moving section " + q(nameOf(id)), orderOps(order), { focusKey: "name-" + id });
 }
 
 /* ---------- Motion ---------- */

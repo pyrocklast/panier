@@ -59,7 +59,10 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16px; }
 #list { display: flex; flex-direction: column; gap: 16px; }
 .sec, .basket-list { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: clip; } /* clip: never scrolled from inside, even while a card changes height */
-.sec-head { margin: 0; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 16px 0; font-size: 1rem; }
+.sec-head {
+  margin: 0; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 16px 0; font-size: 1rem;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
 .sec-name {
   flex: 1; min-width: 0; padding: 8px 0 4px; font-weight: 700; overflow-wrap: anywhere; cursor: text; outline: none; border-radius: 4px;
 }
@@ -108,6 +111,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   border-radius: 4px; outline: none;
 }
 .text:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.qty { margin-right: 0.15em; font-weight: 700; font-variant-numeric: tabular-nums; } /* a quantity, a little apart */
 .text.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 var(--sec); border-radius: 0; }
 .item.done .text { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .item.done .text.editing { color: var(--ink); text-decoration: none; }
@@ -221,7 +225,18 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .add-sec .add-plus { color: var(--muted); }
 #add-sec { font-size: 1rem; font-weight: 700; } /* typed like a section name */
 #add-sec::placeholder { font-weight: 400; }
-:root.dragging, :root.dragging * { cursor: grabbing !important; }
+:root.dragging, :root.dragging *, :root.sorting, :root.sorting * { cursor: grabbing !important; }
+
+/* Reordering sections: hold a name, then move; meanwhile each section folds to its heading */
+:root.sorting #list > .sec > :not(.sec-head) { display: none; }
+:root.sorting #list > .sec > .sec-head { padding-bottom: 4px; }
+.sec.pressing > .sec-head { background-color: var(--press); transition: background-color 0.3s 0.12s; }
+.sec.lifted { position: relative; z-index: 2; box-shadow: var(--float); transform: scale(1.01); transition: transform 0.15s, box-shadow 0.15s; }
+.sec.placeholder { background-color: color-mix(in oklab, var(--sec) 10%, var(--surface)); box-shadow: none; }
+.sec.placeholder > * { visibility: hidden; }
+.sec.ghost { border-radius: var(--r); }
+.sec.ghost.landing { animation-name: land-card; }
+@keyframes land-card { 0%, 40% { box-shadow: var(--float); } 100% { box-shadow: none; } }
 .item.flash { animation: flash 1.4s ease-out; }
 @keyframes flash { 0%, 35% { background-color: color-mix(in oklab, var(--sec) 20%, var(--surface)); } 100% { background-color: var(--surface); } }
 
