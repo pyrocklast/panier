@@ -75,8 +75,6 @@ function h(tag, attrs, ...kids) {
 const SVG = (w, body, extra = "") => '<svg viewBox="0 0 20 20" width="' + w + '" height="' + w + '" aria-hidden="true"' + extra + '>' + body + "</svg>";
 const STROKE = 'fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"';
 const ICONS = {
-  grip: SVG(18, '<g fill="currentColor"><circle cx="7" cy="4.5" r="1.6"/><circle cx="13" cy="4.5" r="1.6"/><circle cx="7" cy="10" r="1.6"/><circle cx="13" cy="10" r="1.6"/><circle cx="7" cy="15.5" r="1.6"/><circle cx="13" cy="15.5" r="1.6"/></g>'),
-  check: SVG(13, '<path d="M4.5 10.5l3.7 3.7 7.3-8.7" ' + STROKE + ' stroke-width="2.7"/>'),
   plus: SVG(18, '<path d="M10 4v12M4 10h12" ' + STROKE + ' stroke-width="2.2"/>'),
   bin: SVG(19, '<path d="M4 6h12M8 6V4.5h4V6M5.8 6l.8 10h6.8l.8-10M8.6 9v4.5M11.4 9v4.5" ' + STROKE + ' stroke-width="1.6"/>'),
   back: SVG(16, '<path d="M7.5 4.4L3.1 8.75l4.4 4.35M3.75 8.75h8.75a4.4 4.4 0 0 1 0 8.75H10" ' + STROKE + ' stroke-width="2.1"/>'),
@@ -735,7 +733,7 @@ function itemEl(it) {
     else if (e.key === "Delete") { e.preventDefault(); del(it.id); }
   });
   const cell = h("label", { class: "boxcell", for: "chk-" + it.id },
-    chk, h("span", { class: "box", "aria-hidden": "true" }, icon("check")), h("span", { class: "grip", "aria-hidden": "true" }, icon("grip")));
+    chk, h("span", { class: "box", "aria-hidden": "true" }), h("span", { class: "grip", "aria-hidden": "true" }));
   cell.addEventListener("click", e => { if (suppressClick) { e.preventDefault(); suppressClick = false; } });
   const text = h("span", { class: "text", id: "txt-" + it.id, role: "button", tabindex: "0", "aria-label": t("Edit {x}", { x: it.text }), dataset: { fk: "txt-" + it.id } });
   fillText(text, it.text);
@@ -818,16 +816,35 @@ function stopDrag() {
 }
 document.addEventListener("touchmove", e => { if (lifted || drag) e.preventDefault(); }, { passive: false });
 
+// A floating copy over the page, at rect: a drag's ghost, or an item flying to its new
+// place. It has no ids, so nothing is found twice.
+function float(el, rect, cls, top = rect.top) {
+  el.classList.remove("placeholder", "away", "lifted", "pressing", "flash", "hint");
+  el.classList.add(cls);
+  el.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
+  el.setAttribute("aria-hidden", "true");
+  Object.assign(el.style, { left: rect.left + "px", top: top + "px", width: rect.width + "px" });
+  document.body.append(el);
+  return el;
+}
+// Letting go: the drag ends, and how the page looked is kept, so things glide from there
+// and the ghost from where it was let go.
+function letGo() {
+  const { ghost } = drag;
+  const snap = reduceMotion.matches ? null : snapshot();
+  if (snap) snap.ghost = { li: ghost, rect: ghost.getBoundingClientRect(), part: null };
+  else ghost.remove();
+  document.documentElement.classList.remove("dragging", "drag-ticked", "sorting");
+  $("#tick-drop").classList.remove("over");
+  drag = null;
+  try { localStorage.setItem(HINT_KEY, "1"); } catch (_) {}
+  return snap;
+}
+
 function startDrag(li, id, offY, y) {
   landAll();
   li.style.opacity = "";
-  const r = li.getBoundingClientRect();
-  const ghost = li.cloneNode(true);
-  ghost.classList.remove("lifted", "pressing", "flash", "hint");
-  ghost.classList.add("ghost");
-  ghost.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
-  Object.assign(ghost.style, { left: r.left + "px", top: (y - offY) + "px", width: r.width + "px" });
-  document.body.append(ghost);
+  const ghost = float(li.cloneNode(true), li.getBoundingClientRect(), "ghost", y - offY);
   li.classList.add("placeholder");
   // A ticked item can go back into a section; over the ticked group, it returns to its place there.
   const ticked = li.parentElement.id === "basket-list";
@@ -887,15 +904,9 @@ function place(y) {
   setSec("var(--" + colorOf(ul.dataset.sec) + ")");
 }
 function endDrag() {
-  const { li, ghost, id, toTick, ticked } = drag;
-  // Taken before anything changes, with the ghost where it was let go: it glides into place from there.
-  const snap = reduceMotion.matches ? null : snapshot();
-  if (snap) snap.items.set(id, { li: ghost, rect: ghost.getBoundingClientRect(), part: null });
-  else ghost.remove();
-  document.documentElement.classList.remove("dragging", "drag-ticked");
-  $("#tick-drop").classList.remove("over");
-  drag = null;
-  try { localStorage.setItem(HINT_KEY, "1"); } catch (_) {}
+  const { li, id, toTick, ticked } = drag;
+  const snap = letGo();
+  if (snap) snap.items.set(id, snap.ghost); // the item glides from where it was let go
   const it = find(id);
   if (toTick && !ticked) {
     settling.delete(id);
@@ -932,15 +943,10 @@ function startSectionDrag(id, y) {
   const before = el.getBoundingClientRect().top;
   document.documentElement.classList.add("sorting");
   window.scrollBy(0, el.getBoundingClientRect().top - before); // its heading stays under your finger
-  const r = el.getBoundingClientRect();
-  const ghost = el.cloneNode(true);
-  ghost.replaceChildren(ghost.querySelector(".sec-head"));
-  ghost.classList.remove("lifted", "pressing");
-  ghost.classList.add("ghost");
-  ghost.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
-  const offY = Math.min(Math.max(y - r.top, 0), r.height);
-  Object.assign(ghost.style, { left: r.left + "px", top: (y - offY) + "px", width: r.width + "px" });
-  document.body.append(ghost);
+  const r = el.getBoundingClientRect(), offY = Math.min(Math.max(y - r.top, 0), r.height);
+  const copy = el.cloneNode(true);
+  copy.replaceChildren(copy.querySelector(".sec-head"));
+  const ghost = float(copy, r, "ghost", y - offY);
   el.classList.add("placeholder");
   beginDrag({ id, el, ghost, offY, y, place: placeSection, end: endSectionDrag });
 }
@@ -955,13 +961,9 @@ function placeSection(y) {
   if (drag.el.nextElementSibling !== before) list.insertBefore(drag.el, before);
 }
 function endSectionDrag() {
-  const { id, el, ghost } = drag;
-  drag = null;
-  try { localStorage.setItem(HINT_KEY, "1"); } catch (_) {}
+  const { id, el } = drag;
   const order = [...$("#list").children].map(c => c.dataset.sec);
-  const snap = reduceMotion.matches ? null : snapshot(); // folded: the cards unfold from here
-  const from = ghost.getBoundingClientRect();
-  document.documentElement.classList.remove("sorting");
+  const snap = letGo(); // folded: the cards unfold from here
   el.classList.remove("placeholder");
   if (store.change(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order))) announce(t("Section moved: {x}", { x: nameOf(id) }));
   sync();
@@ -970,8 +972,8 @@ function endSectionDrag() {
   if (snap) {
     const to = head.getBoundingClientRect(); // where it ends up, measured before anything glides
     glide(snap);
-    fly({ li: ghost, rect: from }, to, head);
-  } else ghost.remove();
+    fly(snap.ghost, to, head);
+  }
   scheduleSettle();
 }
 // With a keyboard: Alt+↑ or Alt+↓ on a section's name.
@@ -1046,14 +1048,7 @@ function fly(o, to, target) {
   const dx = to.left - o.rect.left, dy = to.top - o.rect.top;
   const ms = target ? Math.round(Math.min(700, 420 + Math.hypot(dx, dy) * 0.35)) : 320;
   if (el.classList.contains("ghost")) el.classList.add("landing"); // let go after a drag
-  else {
-    el.classList.remove("placeholder", "away", "lifted", "pressing", "flash", "hint");
-    el.classList.add("flying");
-    el.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
-    el.setAttribute("aria-hidden", "true");
-    Object.assign(el.style, { left: o.rect.left + "px", top: o.rect.top + "px", width: o.rect.width + "px" });
-    document.body.append(el);
-  }
+  else float(el, o.rect, "flying");
   el.style.animationDuration = ms + "ms"; // the lift and landing, in app.css
   if (target) target.style.opacity = "0";
   const move = `translate(${dx}px, ${dy}px)`;
@@ -1192,11 +1187,17 @@ addEventListener("popstate", () => {
   for (const dlg of document.querySelectorAll("dialog[open]")) if (sheetOf() !== dlg.dataset.step) dlg.close();
 });
 
+// The QR code library is only needed here, so it loads the first time the sheet opens.
+let qrLib = null;
+const loadQr = () => (qrLib ||= new Promise((resolve, reject) => {
+  document.head.append(h("script", { src: "vendor/qrcode.js", onload: resolve, onerror: () => { qrLib = null; reject(); } }));
+}));
 function openPair() {
   const link = store.pairingLink();
-  $("#qr").replaceChildren(window.qrcode ? qrSvg(link) : "");
+  $("#qr").replaceChildren();
   $("#share-link").hidden = !navigator.share;
   openSheet($("#pair"));
+  loadQr().then(() => $("#qr").replaceChildren(qrSvg(link)), () => {});
 }
 $("#pair-open").addEventListener("click", openPair);
 $("#pair-close").addEventListener("click", () => $("#pair").close());
@@ -1243,7 +1244,7 @@ async function paintSettings() {
     ? t("Kept on this phone: the browser won't clear the list to free up space.")
     : t("The browser may clear the list if this phone runs low on space. Keep the link from {link} somewhere safe, such as a password manager: it brings the list back.", { link: q(t("Add someone to this list")) });
   $("#keep-btn").hidden = kept !== false;
-  const k = keys.find(k => k.startsWith("panier-"));
+  const k = keys.find(k => k.startsWith("panier-") && !k.startsWith("panier-static-"));
   $("#about-version").textContent = k ? k.slice(7) : "dev";
 }
 // The list as a plain-text checklist: each section's items to get, then everything bought before.

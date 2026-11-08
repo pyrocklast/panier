@@ -138,6 +138,12 @@ test("two phones share changes live", async () => {
   await a.click("#pair-open");
   assert.equal(await a.locator("#pair-title").innerText(), "Add someone to this list");
   await a.click("#pair-close");
+
+  assert.equal(await b.evaluate(() => typeof window.qrcode), "undefined", "the QR code library loads only for pairing");
+  await b.click("#pair-open");
+  assert.ok(await eventually(async () => (await b.locator("#qr svg").count()) === 1), "and draws the code when pairing opens");
+  await b.click("#pair-close");
+  assert.equal(await a.locator(".item .boxcell svg").count(), 0, "tick boxes draw their tick and grip in CSS");
   await t.close();
 });
 
@@ -721,8 +727,11 @@ test("settings: appearance, keeping the list, its size, export, and about", asyn
   await a.click("#settings-open");
   assert.ok(await a.locator("#settings").isVisible());
 
+  const bg = () => a.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  assert.equal(await bg(), "rgb(244, 245, 243)", "light, like this phone");
   await a.locator('#settings .choices label', { hasText: "Dark" }).click();
   assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), "dark");
+  assert.equal(await bg(), "rgb(17, 21, 19)", "dark colours when Dark is chosen");
   assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "#111513", "the browser's bars follow");
   await a.reload();
   await a.locator("#app").waitFor();
@@ -780,5 +789,69 @@ test("in French when the phone is in French", async () => {
     assert.ok(!shown.includes(en), "“" + en + "” is in French");
   }
   await online(A, a);
+  await t.close();
+});
+
+const stored = pg => pg.evaluate(() => JSON.parse(localStorage.getItem("panier")));
+
+test("the stored list names each phone once and forgets items deleted over six months ago", async () => {
+  const t = await pair();
+  let { a } = t;
+  await add(a, "ess", "Milk");
+  await blur(a);
+  assert.ok(await eventually(async () => Object.values((await stored(a)).items).some(f => f.text && f.text[0] === "Milk")), "saved shortly after");
+  const st = await stored(a);
+  const milk = Object.values(st.items).find(f => f.text && f.text[0] === "Milk");
+  assert.equal(typeof milk.text[2], "number", "each field names its phone by number");
+  assert.equal(st.devs[milk.text[2]], st.dev);
+
+  // A list as an earlier version stored it, with an item deleted seven months ago and one a
+  // month ago, written while the app isn't running, as it would be after an update.
+  await a.close();
+  a = await t.A.newPage();
+  watch(a, t.errors);
+  await a.goto(BASE + "/manifest.webmanifest");
+  await a.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem("panier"));
+    for (const f of Object.values(s.items)) for (const v of Object.values(f)) v[2] = s.devs[v[2]];
+    delete s.devs;
+    const day = 864e5, gone = (text, ago) => {
+      const at = Date.now() - ago;
+      return { text: [text, at, s.dev], section: ["ess", at, s.dev], pos: [9, at, s.dev], checked: [false, at, s.dev], checkedAt: [0, at, s.dev], deleted: [true, at, s.dev] };
+    };
+    s.items.oldGone = gone("Old", 210 * day);
+    s.items.newGone = gone("Recent", 30 * day);
+    localStorage.setItem("panier", JSON.stringify(s));
+  });
+  await a.goto(BASE + "/");
+  await a.locator("#app").waitFor();
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk"], "a list stored by the earlier version opens as before");
+  await add(a, "ess", "Bread");
+  await blur(a);
+  assert.ok(await eventually(async () => Array.isArray((await stored(a)).devs)));
+  const now = await stored(a);
+  assert.equal(now.items.oldGone, undefined, "deleted seven months ago: forgotten");
+  assert.ok(now.items.newGone, "deleted a month ago: kept");
+  await t.close();
+});
+
+test("a phone doesn't download its own changes again", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await add(a, "ess", "Milk");
+  await blur(a);
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk"));
+  await sleep(500);
+  const fetched = [];
+  a.on("request", r => { if (r.method() === "GET" && r.url().includes("/changes")) fetched.push(r.url()); });
+  await item(a, "Milk").locator(".boxcell").click();
+  await add(a, "look", "Ripe avocados");
+  await blur(a);
+  assert.ok(await eventually(async () => (await texts(b, "Look out for")).join() === "Ripe avocados"), "the changes reach the other phone");
+  await sleep(800);
+  assert.deepEqual(fetched, [], "the sending phone doesn't fetch them back");
+  await add(b, "long", "Bike lights");
+  await blur(b);
+  assert.ok(await eventually(async () => (await texts(a, "Long term")).join() === "Bike lights"), "but still gets the other phone's");
   await t.close();
 });

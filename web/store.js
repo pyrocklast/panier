@@ -21,19 +21,48 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export const newId = () => b64u(crypto.getRandomValues(new Uint8Array(9)));
 
 function blank(key, dev) {
-  return { key, dev: dev || newId(), clock: 0, seq: 0, items: {}, outbox: [] };
+  return { key, dev: dev || newId(), clock: 0, seq: 0, items: {}, devs: [], outbox: [] };
 }
+// Each field is stored as [value, time, device], the device as its place in devs, so
+// its id is written once rather than in every field.
+function devNo(st, dev) {
+  const i = st.devs.indexOf(dev);
+  return i >= 0 ? i : st.devs.push(dev) - 1;
+}
+// Deleted items are kept, so a late change from a phone that was offline can't bring
+// them back, but only for about six months.
+const FORGET_MS = 183 * 24 * 3600 * 1000;
 function load() {
   try {
-    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (s && s.items && Array.isArray(s.outbox)) return s;
-  } catch (_) {}
-  return blank(null);
+    const st = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (!st || !st.items || !Array.isArray(st.outbox)) return blank(null);
+    if (!st.devs) { // stored by an earlier version, with each field's device id in full
+      st.devs = [];
+      for (const f of Object.values(st.items)) for (const v of Object.values(f)) v[2] = devNo(st, v[2]);
+    }
+    const before = Date.now() - FORGET_MS;
+    for (const [id, f] of Object.entries(st.items)) {
+      if (id[0] !== "#" && f.deleted && f.deleted[0] === true && f.deleted[1] < before) delete st.items[id];
+    }
+    return st;
+  } catch (_) {
+    return blank(null);
+  }
 }
 let s = load();
-function save() {
+// Writing the whole list takes a while once it's big, so changes close together are
+// written once, and anything pending is written as soon as the app is put away.
+let saveTimer = 0;
+function saveNow() {
+  clearTimeout(saveTimer);
+  saveTimer = 0;
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (_) {}
 }
+function save() {
+  if (!saveTimer) saveTimer = setTimeout(saveNow, 400);
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden && saveTimer) saveNow(); });
+addEventListener("pagehide", () => { if (saveTimer) saveNow(); });
 
 /* Listeners: kind is "local", "remote" or "status" */
 const listeners = new Set();
@@ -42,12 +71,12 @@ const emit = kind => listeners.forEach(fn => fn(kind));
 
 /* ---------- Merging ---------- */
 
-// A field is stored as [value, time, device].
-const newer = (a, b) => !b || a[1] > b[1] || (a[1] === b[1] && a[2] > b[2]);
+// The latest write wins; on a tie, the device id decides, the same way on every phone.
+const newer = (a, b) => !b || a[1] > b[1] || (a[1] === b[1] && s.devs[a[2]] > s.devs[b[2]]);
 
 function put(id, field, value, t, dev) {
   const item = (s.items[id] ||= {});
-  const cand = [value, t, dev];
+  const cand = [value, t, devNo(s, dev)];
   if (!newer(cand, item[field])) return false;
   item[field] = cand;
   return true;
@@ -197,7 +226,7 @@ export async function createList(code) {
   });
   if (!res.ok) throw new Error(res.status === 403 ? "code" : "server");
   s = blank(b64u(raw), s.dev);
-  save();
+  saveNow();
   session = d;
   start();
 }
@@ -209,7 +238,7 @@ export async function join(key) {
   stop();
   s = blank(key, s.dev);
   undoStack.length = redoStack.length = 0;
-  save();
+  saveNow();
   emit("remote");
 }
 
@@ -217,7 +246,7 @@ export async function join(key) {
 
 let state = "offline"; // "online", "offline", or "full" when the server has no room left for this list
 let started = false, flushing = false, pulling = null, pullAgain = false, flushTimer = 0;
-let wake = null, socket = null, reconnectNow = false;
+let wake = null, socket = null, reconnectNow = false, heard = 0;
 
 export const status = () => ({ online: state === "online", full: state === "full", waiting: s.outbox.length });
 function setState(next) {
@@ -244,8 +273,11 @@ async function flush() {
   try {
     const batch = s.outbox.slice(0, 100);
     const changes = await Promise.all(batch.map(seal));
-    await api("/changes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes }) });
+    const res = await api("/changes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes }) });
+    const { latest } = await res.json();
     s.outbox.splice(0, batch.length);
+    // Nothing else arrived in between: the server holds just what this phone already has.
+    if (latest === s.seq + batch.length) s.seq = latest;
     save();
     setState("online");
     emit("status");
@@ -254,6 +286,8 @@ async function flush() {
   } finally {
     flushing = false;
   }
+  if (heard > s.seq) pull(); // news that came in while sending, unless it was this phone's own
+  heard = 0;
   if (s.outbox.length && state === "online") flushSoon();
 }
 
@@ -304,7 +338,11 @@ function connect(current, onOpen) {
       onOpen();
       pinger = setInterval(() => { try { ws.send("ping"); } catch (_) {} }, 30000);
     };
-    ws.onmessage = e => { if (/^\d+$/.test(e.data) && +e.data > s.seq) pull(); };
+    ws.onmessage = e => {
+      if (!/^\d+$/.test(e.data) || +e.data <= s.seq) return;
+      if (flushing) heard = Math.max(heard, +e.data); // probably this phone's own changes: wait and see
+      else pull();
+    };
     ws.onclose = () => {
       clearInterval(pinger);
       if (socket === ws) socket = null;
@@ -355,6 +393,11 @@ function resume() {
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) resume(); });
 addEventListener("online", resume);
+// Another tab saved the list: take its copy, rather than later writing this one over it.
 addEventListener("storage", e => {
-  if (e.key === STORAGE_KEY) { s = load(); emit("remote"); }
+  if (e.key !== STORAGE_KEY) return;
+  clearTimeout(saveTimer);
+  saveTimer = 0;
+  s = load();
+  emit("remote");
 });

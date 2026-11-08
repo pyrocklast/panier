@@ -93,9 +93,13 @@ jobs:
             echo "Set the PANIER_SETUP_CODE secret to a code of at least 12 characters (see docs/cloudflare.md)."
             exit 1
           fi
-          # Phones notice a new release by the version in the service worker.
+          # Phones notice a new release by the version in the service worker, and changed
+          # fonts, icons or QR library by the fingerprint of those files.
           sed -i "s/^const VERSION = \"dev\";/const VERSION = \"${GITHUB_SHA::7}\";/" web/sw.js
           grep -q "^const VERSION = \"${GITHUB_SHA::7}\";" web/sw.js
+          STATIC=$(find web/vendor web/fonts web/icon.svg web/icon-192.png -type f | sort | xargs cat | sha256sum | cut -c1-8)
+          sed -i "s/^const STATIC = \"panier-static-dev\";/const STATIC = \"panier-static-$STATIC\";/" web/sw.js
+          grep -q "^const STATIC = \"panier-static-$STATIC\";" web/sw.js
           jq -n --arg c "$SETUP_CODE" '{SETUP_CODE: $c}' > "$RUNNER_TEMP/secrets.json"
           trap 'rm -f "$RUNNER_TEMP/secrets.json"' EXIT
           # The logs of a public repository are public: hide the workers.dev address and any email.
@@ -119,6 +123,9 @@ jobs:
         run: |
           sed -i "s/^const VERSION = \"dev\";/const VERSION = \"$TAG\";/" web/sw.js
           grep -q "^const VERSION = \"$TAG\";" web/sw.js
+          STATIC=$(find web/vendor web/fonts web/icon.svg web/icon-192.png -type f | sort | xargs cat | sha256sum | cut -c1-8)
+          sed -i "s/^const STATIC = \"panier-static-dev\";/const STATIC = \"panier-static-$STATIC\";/" web/sw.js
+          grep -q "^const STATIC = \"panier-static-$STATIC\";" web/sw.js
           mkdir dist
           build() { CGO_ENABLED=0 GOOS=linux GOARCH=$1 GOARM=$2 go build -trimpath -ldflags "-s -w -X main.version=$TAG" -o "dist/panier-linux-$3" .; }
           build arm64 "" arm64   # Raspberry Pi 3, 4, 5 with a 64-bit system

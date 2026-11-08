@@ -52,6 +52,7 @@ test("a new version takes over in the same launch, once you've stopped typing", 
     await page.fill("#add-ess", "Milk");
     await page.press("#add-ess", "Enter");
     assert.ok(await eventually(async () => (await page.evaluate(() => caches.keys())).includes("panier-old")));
+    assert.ok((await page.evaluate(() => caches.keys())).includes("panier-static-dev"), "fonts and icons have a cache of their own");
 
     // Deploy: the new build replaces the old one while the app stays open.
     await stop(server);
@@ -63,6 +64,7 @@ test("a new version takes over in the same launch, once you've stopped typing", 
       const keys = await page.evaluate(() => caches.keys());
       return keys.includes("panier-new") && !keys.includes("panier-old");
     }), "the new version installs");
+    assert.ok((await page.evaluate(() => caches.keys())).includes("panier-static-dev"), "which outlasts the update");
     await sleep(1500);
     assert.equal(await page.evaluate(() => window.stillThisPage), true, "no reload while typing");
 
