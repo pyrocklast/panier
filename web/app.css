@@ -299,15 +299,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .set .btn:last-child, .set p:last-child { margin-bottom: 0; }
 .set .note { color: var(--muted); font-size: 0.875rem; }
 .set a { color: inherit; text-underline-offset: 3px; }
-.seg { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--press); }
-.seg label { flex: 1 1 auto; position: relative; white-space: nowrap; }
-.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.seg span {
-  display: grid; place-items: center; min-height: 40px; padding: 4px 10px; box-sizing: border-box; border-radius: 9px; text-align: center;
-  color: var(--muted); font-size: 0.9375rem; font-weight: 700; cursor: pointer;
-}
-.seg input:checked + span { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
-.seg input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 1px; }
+.choices { display: flex; flex-direction: column; margin: -6px 0; }
+.choices label { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; }
+.choices input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--ink); cursor: pointer; }
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 12px; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }

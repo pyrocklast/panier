@@ -84,7 +84,11 @@ Each section is a card with its name at the top. A list starts with three:
 
 - Space ticks, Enter or F2 edits an item or a section name, Delete deletes, Alt+↑/↓ moves an item (across sections at the ends) or, on its name, a section, Ctrl+Z and Ctrl+Shift+Z undo and redo.
 - In suggestions, ↓ and ↑ choose one, → moves to its ×, and Enter picks; Shift+Delete removes the one chosen.
-- Changes are announced to screen readers. Light and dark themes follow the system; reduced motion is respected.
+- Changes are announced to screen readers. Light and dark themes follow the system unless chosen in Settings; reduced motion is respected.
+
+### Languages
+
+Panier is in English and French, following the phone's language. The default section names follow it too, until one is renamed: *Essentiels*, *À l’occasion*, *À long terme*. The words live in `web/i18n.js`; another language is one more table there.
 
 ## How it works
 
@@ -123,13 +127,9 @@ BASE=http://127.0.0.1:8080 SETUP=<code> STORE=./data node --test test/browser.te
 
 In order. Each batch is built, tested on both servers, deployed, and tried on the phones before the next.
 
-Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*; splitting an item with Enter and joining it back with Backspace, deleting it by clearing its text, removing suggestions; a tap that leaves a field always lands, on touch screens too; the drop zone inside the ticked group, dragging ticked items back, and items gliding into place again; sections without icons, with a colour chosen from a palette; reordering sections by dragging; quantities; a new app icon; Settings.
+Done so far: the server, encryption, pairing and sync; hosting on Cloudflare Workers or your own server; editable sections, dragging to tick, adding without Enter; browser tests on every deploy; a clear status when offline; updates in one launch; *Add someone to this list*; splitting an item with Enter and joining it back with Backspace, deleting it by clearing its text, removing suggestions; a tap that leaves a field always lands, on touch screens too; the drop zone inside the ticked group, dragging ticked items back, and items gliding into place again; sections without icons, with a colour chosen from a palette; reordering sections by dragging; quantities; a new app icon; Settings; French.
 
-### 1. French
-
-A French translation, following the phone's language. It comes after Settings so it covers the final wording of every screen at once.
-
-### 2. Bigger features
+### 1. Bigger features
 
 These change how lists are stored and shared, so each starts with a short design note and sketches of the screens, agreed before building.
 

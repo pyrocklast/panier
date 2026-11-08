@@ -9,7 +9,7 @@
 const VERSION = "dev";
 const CACHE = "panier-" + VERSION;
 const FILES = [
-  "./", "app.css", "app.js", "store.js", "vendor/qrcode.js", "manifest.webmanifest",
+  "./", "app.css", "app.js", "store.js", "i18n.js", "theme.js", "vendor/qrcode.js", "manifest.webmanifest",
   "icon.svg", "icon-192.png", "fonts/atkinson-hyperlegible-400.woff2", "fonts/atkinson-hyperlegible-700.woff2",
 ];
 

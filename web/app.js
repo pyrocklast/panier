@@ -1,10 +1,11 @@
 import * as store from "./store.js";
+import { t, plural, q, lang, translatePage } from "./i18n.js";
 
 // The three sections every list starts with. They can be renamed, recoloured or deleted like any other.
 const DEFAULTS = [
-  { id: "ess", name: "Essentials", color: "ess", pos: 1 },
-  { id: "look", name: "Look out for", color: "look", pos: 2 },
-  { id: "long", name: "Long term", color: "long", pos: 3 },
+  { id: "ess", name: t("Essentials"), color: "ess", pos: 1 },
+  { id: "look", name: t("Look out for"), color: "look", pos: 2 },
+  { id: "long", name: t("Long term"), color: "long", pos: 3 },
 ];
 // Section colours, in palette order; each is a colour in app.css, light and dark.
 const COLORS = [["ess", "Green"], ["teal", "Teal"], ["blue", "Blue"], ["long", "Indigo"], ["plum", "Plum"], ["rose", "Rose"], ["look", "Amber"], ["olive", "Olive"]];
@@ -42,7 +43,6 @@ function fillText(el, text) {
   el.replaceChildren(...(qty ? [h("span", { class: "qty" }, qty.replace(/x$/i, "×")), " "] : []), name);
 }
 const clean = (s, max = MAX_ITEM) => s.replace(/\s+/g, " ").trim().slice(0, max);
-const q = s => "“" + s + "”";
 const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} };
 
 let items = [];
@@ -89,7 +89,7 @@ function icon(name) {
 }
 
 const find = id => items.find(i => i.id === id);
-const nameOf = id => (sectionInfo.get(id) || { name: "this section" }).name;
+const nameOf = id => (sectionInfo.get(id) || { name: t("this section") }).name;
 const colorOf = id => (sectionInfo.has(id) ? sectionInfo.get(id).color : "muted");
 const isShown = id => sections.some(s => s.id === id);
 const inList = i => !i.checked || settling.has(i.id);
@@ -119,11 +119,11 @@ function computeSections() {
     all.set(d.id, { ...d, name: st.name ?? d.name, color: colorOk(st.color, d.color), pos: st.pos ?? d.pos, deleted: !!st.deleted });
   }
   for (const st of stored.values()) {
-    if (!all.has(st.id)) all.set(st.id, { id: st.id, name: st.name || "Untitled", color: colorOk(st.color, PALETTE[0]), pos: st.pos ?? 100, deleted: st.deleted });
+    if (!all.has(st.id)) all.set(st.id, { id: st.id, name: st.name || t("Untitled"), color: colorOk(st.color, PALETTE[0]), pos: st.pos ?? 100, deleted: st.deleted });
   }
   const used = new Set(items.filter(inList).map(i => i.section));
   for (const [id, sh] of Object.entries(shells)) if (sh.input.value.trim()) used.add(id);
-  for (const id of used) if (!all.has(id)) all.set(id, { id, name: "Untitled", color: PALETTE[0], pos: 100, deleted: false });
+  for (const id of used) if (!all.has(id)) all.set(id, { id, name: t("Untitled"), color: PALETTE[0], pos: 100, deleted: false });
   sectionInfo = all;
   sections = [...all.values()].filter(s => !s.deleted || used.has(s.id)).sort((a, b) => a.pos - b.pos || (a.id < b.id ? -1 : 1));
 }
@@ -192,15 +192,15 @@ function refreshFromStore() {
   sync();
   paint(activeFk(), false);
 }
-function step(fn, verb) {
+function step(fn, done, nothing) {
   const r = fn();
   if (!r) return;
-  announce(r.done ? verb + " " + r.label : "Nothing to " + verb.toLowerCase().replace(/id$/, "o") + ": the other phone already changed it");
+  announce(r.done ? t(done, { x: r.label }) : t(nothing));
   refreshFromStore();
   scheduleSettle();
 }
-const undo = () => step(store.undo, "Undid");
-const redo = () => step(store.redo, "Redid");
+const undo = () => step(store.undo, "Undid {x}", "Nothing to undo: the other phone already changed it");
+const redo = () => step(store.redo, "Redid {x}", "Nothing to redo: the other phone already changed it");
 
 // Ticked items stay put briefly, then all move to the ticked group together.
 function scheduleSettle() {
@@ -220,8 +220,8 @@ function toggle(id, checked) {
   if (checked) {
     if (fromList) settling.add(id);
     buzz(12);
-    announce(it.text + " ticked");
-    act("checking " + q(it.text), [[id, "checked", true], [id, "checkedAt", Date.now()]], { animate: false });
+    announce(t("{x} ticked", { x: it.text }));
+    act(t("checking {x}", { x: q(it.text) }), [[id, "checked", true], [id, "checkedAt", Date.now()]], { animate: false });
   } else {
     settling.delete(id);
     const ops = [[id, "checked", false], [id, "checkedAt", 0]];
@@ -229,8 +229,8 @@ function toggle(id, checked) {
       const sec = isShown(it.section) ? it.section : sections[0].id;
       ops.push([id, "section", sec], [id, "pos", maxPos(sec) + 1]);
     }
-    announce(it.text + " back on the list");
-    act("unchecking " + q(it.text), ops, { animate: !wasSettling });
+    announce(t("{x} back on the list", { x: it.text }));
+    act(t("unchecking {x}", { x: q(it.text) }), ops, { animate: !wasSettling });
   }
   scheduleSettle();
 }
@@ -253,8 +253,8 @@ function revive(id, sec, opts = {}, typed = "") {
   const it = find(id), text = retext(it.text, typed);
   settling.delete(id);
   flashId = id;
-  announce(text + " is back on the list");
-  act("putting back " + q(it.text), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "checked", false], [id, "checkedAt", 0]], opts);
+  announce(t("{x} back on the list", { x: text }));
+  act(t("putting back {x}", { x: q(it.text) }), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "checked", false], [id, "checkedAt", 0]], opts);
 }
 // submitAdd adds what was typed into a section's "Add item" field: on Enter, or, with
 // leaving, when you leave the field or reopen the app with text still in it.
@@ -270,38 +270,38 @@ function submitAdd(sec, leaving = false) {
   if (ex) { // already on the list: highlighted, with the quantity just typed, if any
     flashId = ex.id;
     const now = retext(ex.text, text);
-    announce(ex.text + " is already on the list" + (now !== ex.text ? ", now " + now : ""));
-    if (now !== ex.text) act("changing " + q(ex.text), [[ex.id, "text", now]], opts);
+    announce(now !== ex.text ? t("{x} is already on the list, now {y}", { x: ex.text, y: now }) : t("{x} is already on the list", { x: ex.text }));
+    if (now !== ex.text) act(t("changing {x}", { x: q(ex.text) }), [[ex.id, "text", now]], opts);
     else if (leaving) whenTapEnds(leftPaint);
     else paint(null, false);
     return;
   }
   const id = store.newId();
   flashId = id;
-  announce("Added " + text);
-  act("adding " + q(text), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1],
+  announce(t("Added {x}", { x: text }));
+  act(t("adding {x}", { x: q(text) }), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1],
     [id, "checked", false], [id, "checkedAt", 0], [id, "deleted", false]], opts);
 }
 function del(id, opts) {
   const it = find(id);
   settling.delete(id);
-  announce("Deleted " + it.text);
-  act("deleting " + q(it.text), [[id, "deleted", true]], opts);
+  announce(t("Deleted {x}", { x: it.text }));
+  act(t("deleting {x}", { x: q(it.text) }), [[id, "deleted", true]], opts);
 }
 function nudge(id, dir) {
   const it = find(id);
   const list = shown(it.section);
   const other = list[list.indexOf(it) + dir];
   if (other) {
-    act("moving " + q(it.text), [[id, "pos", other.pos], [other.id, "pos", it.pos]], { focusKey: "chk-" + id });
+    act(t("moving {x}", { x: q(it.text) }), [[id, "pos", other.pos], [other.id, "pos", it.pos]], { focusKey: "chk-" + id });
     return;
   }
   const next = sections[sections.findIndex(s => s.id === it.section) + dir];
   if (!next) return;
   const l = shown(next.id);
   const pos = dir > 0 ? (l.length ? l[0].pos - 1 : 1) : maxPos(next.id) + 1;
-  announce(it.text + " moved to " + next.name);
-  act("moving " + q(it.text), [[id, "section", next.id], [id, "pos", pos]], { focusKey: "chk-" + id });
+  announce(t("{x} moved to {y}", { x: it.text, y: next.name }));
+  act(t("moving {x}", { x: q(it.text) }), [[id, "section", next.id], [id, "pos", pos]], { focusKey: "chk-" + id });
 }
 
 function addSection(raw) {
@@ -312,22 +312,22 @@ function addSection(raw) {
   const usedColors = new Set(sections.map(s => s.color));
   const color = PALETTE.find(c => !usedColors.has(c)) || PALETTE[sectionInfo.size % PALETTE.length];
   const pos = sections.reduce((m, s) => Math.max(m, s.pos), 0) + 1;
-  announce("Added section " + name);
+  announce(t("Added section {x}", { x: name }));
   // No animation: the cursor moves to the new section's field at once, so nothing typed straight after lands in the wrong field.
-  act("adding section " + q(name), [[key, "name", name], [key, "pos", pos], [key, "color", color], [key, "deleted", false]], { focusKey: "add-" + id, animate: false });
+  act(t("adding section {x}", { x: q(name) }), [[key, "name", name], [key, "pos", pos], [key, "color", color], [key, "deleted", false]], { focusKey: "add-" + id, animate: false });
 }
 function renameSection(id, name) {
   const info = sectionInfo.get(id);
   const fallback = (DEFAULTS.find(d => d.id === id) || {}).name;
-  announce("Renamed section to " + name);
-  act("renaming section " + q(info.name), [["#" + id, "name", name, fallback]], { leaving: true });
+  announce(t("Renamed section to {x}", { x: name }));
+  act(t("renaming section {x}", { x: q(info.name) }), [["#" + id, "name", name, fallback]], { leaving: true });
 }
 // A section can only be deleted once it has nothing to get, and the last one stays.
 const canDelete = id => sections.length > 1 && !items.some(i => i.section === id && inList(i));
 function deleteSection(id) {
   const name = nameOf(id);
-  announce("Deleted section " + name);
-  act("deleting section " + q(name), [["#" + id, "deleted", true, false]]);
+  announce(t("Deleted section {x}", { x: name }));
+  act(t("deleting section {x}", { x: q(name) }), [["#" + id, "deleted", true, false]]);
 }
 
 /* ---------- Editing in place ---------- */
@@ -478,7 +478,7 @@ function editItem(span, id, x, y, caret) {
   const row = span.closest(".item");
   editInPlace(span, {
     key: id, row, orig, max: MAX_ITEM, x, y, caret, fill: fillText,
-    onDelete: () => del(id), deleteLabel: "Delete " + orig,
+    onDelete: () => del(id), deleteLabel: t("Delete {x}", { x: orig }),
     onSplit: (first, second, glue) => splitItem(id, first, second, glue),
     canJoin: text => !!joinTarget(id, text),
     onJoin: text => joinItem(id, text),
@@ -488,14 +488,14 @@ function editItem(span, id, x, y, caret) {
       const dup = items.find(i => i.id !== id && nameKey(i.text) === nameKey(text));
       if (dup && onScreen(dup)) {
         flashId = dup.id;
-        announce(dup.text + " is already on the list");
+        announce(t("{x} is already on the list", { x: dup.text }));
         whenTapEnds(leftPaint);
         return false;
       }
       const ops = [[id, "text", text]];
       if (dup) ops.push([dup.id, "deleted", true]);
-      announce("Renamed to " + text);
-      act("renaming " + q(orig), ops, { leaving: true });
+      announce(t("Renamed to {x}", { x: text }));
+      act(t("renaming {x}", { x: q(orig) }), ops, { leaving: true });
     },
   });
 }
@@ -511,14 +511,14 @@ function splitItem(id, first, second, glue) {
   const pos = between(it.pos, k >= 0 && sib[k + 1] ? sib[k + 1].pos : null);
   const ops = [];
   let next = null; // the item to carry on editing
-  let msg = "Split into " + first + " and " + second;
+  let msg = t("Split into {x} and {y}", { x: first, y: second });
   const d1 = dupOf(first), kept = !(d1 && onScreen(d1));
   if (!kept) { ops.push([id, "deleted", true]); flashId = d1.id; }
   else { ops.push([id, "text", first]); if (d1) ops.push([d1.id, "deleted", true]); }
   const here = nid => [[nid, "section", it.section], [nid, "pos", pos], [nid, "checked", it.checked], [nid, "checkedAt", it.checkedAt]];
   const d2 = dupOf(second);
   if (nameKey(second) === nameKey(first)) { /* "milk milk": one is enough */ }
-  else if (d2 && inList(d2)) { flashId = d2.id; msg = d2.text + " is already on the list"; }
+  else if (d2 && inList(d2)) { flashId = d2.id; msg = t("{x} is already on the list", { x: d2.text }); }
   else if (d2) { ops.push(...here(d2.id)); next = d2.id; }
   else {
     next = store.newId();
@@ -528,7 +528,7 @@ function splitItem(id, first, second, glue) {
   if (next && settling.has(id)) settling.add(next);
   announce(msg);
   // Nothing to save when the second part was already on the list: just redraw.
-  if (!act("splitting " + q(it.text), ops, { animate: false })) paint(activeFk(), false);
+  if (!act(t("splitting {x}", { x: q(it.text) }), ops, { animate: false })) paint(activeFk(), false);
   const span = next && document.getElementById("txt-" + next);
   if (span) editItem(span, next, null, null, 0);
 }
@@ -545,8 +545,8 @@ function joinItem(id, text) {
   const glue = !text ? "" : lastSplit && lastSplit.a === prev.id && lastSplit.b === id ? lastSplit.glue : " ";
   lastSplit = null;
   const joined = prev.text + glue + text;
-  announce(text ? "Joined into " + joined : "Deleted " + it.text);
-  act(text ? "joining " + q(prev.text) + " and " + q(text) : "deleting " + q(it.text),
+  announce(text ? t("Joined into {x}", { x: joined }) : t("Deleted {x}", { x: it.text }));
+  act(text ? t("joining {x} and {y}", { x: q(prev.text), y: q(text) }) : t("deleting {x}", { x: q(it.text) }),
     [[prev.id, "text", joined], [id, "deleted", true]], { animate: false });
   const span = document.getElementById("txt-" + prev.id);
   if (span) editItem(span, prev.id, null, null, prev.text.length + glue.length);
@@ -557,9 +557,9 @@ function joinItem(id, text) {
 function editSection(span, id, x, y) {
   const orig = nameOf(id);
   const keep = e => e.preventDefault();
-  const palette = h("div", { class: "palette", role: "group", "aria-label": "Colour of " + orig },
+  const palette = h("div", { class: "palette", role: "group", "aria-label": t("Colour of {x}", { x: orig }) },
     COLORS.map(([c, label]) => h("button", {
-      type: "button", class: "swatch", style: "--c:var(--" + c + ")", "aria-label": label,
+      type: "button", class: "swatch", style: "--c:var(--" + c + ")", "aria-label": t(label),
       "aria-pressed": String(colorOf(id) === c), onpointerdown: keep, onmousedown: keep,
       onclick: e => {
         for (const b of palette.children) b.setAttribute("aria-pressed", String(b === e.currentTarget));
@@ -568,14 +568,14 @@ function editSection(span, id, x, y) {
     })));
   editInPlace(span, {
     key: "#" + id, row: span.closest(".sec-head"), orig, max: MAX_SECTION, x, y, below: palette,
-    onDelete: canDelete(id) ? () => deleteSection(id) : null, deleteLabel: "Delete section " + orig,
+    onDelete: canDelete(id) ? () => deleteSection(id) : null, deleteLabel: t("Delete section {x}", { x: orig }),
     onSave: name => renameSection(id, name),
   });
 }
 function recolour(id, color, label) {
   const fallback = (DEFAULTS.find(d => d.id === id) || {}).color;
-  announce(nameOf(id) + " is now " + label.toLowerCase());
-  act("changing the colour of " + q(nameOf(id)), [["#" + id, "color", color, fallback]], { animate: false });
+  announce(t("{x} is now {y}", { x: nameOf(id), y: t(label).toLowerCase() }));
+  act(t("changing the colour of {x}", { x: q(nameOf(id)) }), [["#" + id, "color", color, fallback]], { animate: false });
 }
 
 /* ---------- Suggestions from everything bought before ---------- */
@@ -617,7 +617,7 @@ function paintSug(sec, list) {
       onclick: () => revive(it.id, sec, {}, sh.input.value),
     }, icon("back"), h("span", { class: "t" }, highlight(it.text, query))),
     h("span", { role: "gridcell", class: "sug-x-cell", id: sugCellId(sec, i, 1), "aria-selected": String(i === active && !!ui.sugCol) },
-      h("button", { type: "button", class: "sug-x", tabindex: "-1", "aria-label": "Remove " + it.text + " from suggestions", onclick: () => forget(it.id, sec) }, icon("cross"))))));
+      h("button", { type: "button", class: "sug-x", tabindex: "-1", "aria-label": t("Remove {x} from suggestions", { x: it.text }), onclick: () => forget(it.id, sec) }, icon("cross"))))));
   sh.sug.hidden = !list.length;
   sh.input.setAttribute("aria-expanded", String(list.length > 0));
   if (list.length && active >= 0) sh.input.setAttribute("aria-activedescendant", sugCellId(sec, active, ui.sugCol));
@@ -639,8 +639,8 @@ function closeSug() {
 // The × on a suggestion deletes that item, so a typo such as "Mlik" stops coming back.
 function forget(id, sec, keyboard = false) {
   const it = find(id), was = ui.sugIndex;
-  announce("Removed " + it.text + " from suggestions");
-  act("removing " + q(it.text) + " from suggestions", [[id, "deleted", true]], { animate: false });
+  announce(t("Removed {x} from suggestions", { x: it.text }));
+  act(t("removing {x} from suggestions", { x: q(it.text) }), [[id, "deleted", true]], { animate: false });
   updateSug(sec);
   if (keyboard && ui.sug.length) {
     ui.sugIndex = Math.min(was, ui.sug.length - 1);
@@ -655,14 +655,14 @@ const shells = {};
 function buildShell(id) {
   const ul = h("ul", { class: "items", "data-sec": id });
   const input = h("input", {
-    type: "text", class: "add-input", id: "add-" + id, placeholder: "Add item",
+    type: "text", class: "add-input", id: "add-" + id, placeholder: t("Add item"),
     maxlength: String(MAX_ITEM), enterkeyhint: "enter", autocomplete: "off", autocapitalize: "sentences", spellcheck: "false",
     role: "combobox", "aria-autocomplete": "list", "aria-haspopup": "grid", "aria-expanded": "false", "aria-controls": "sug-" + id,
     dataset: { fk: "add-" + id },
   });
   const form = h("form", { class: "add", autocomplete: "off", onsubmit: e => { e.preventDefault(); submitAdd(id); } },
     h("label", { class: "add-plus", for: "add-" + id, "aria-hidden": "true" }, icon("plus")), input);
-  const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": "Bought before", hidden: true });
+  const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Bought before"), hidden: true });
   const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id } });
   name.addEventListener("click", e => {
     if (suppressClick) { suppressClick = false; return; }
@@ -714,8 +714,8 @@ function syncShells() {
     const sh = shells[s.id] || (shells[s.id] = buildShell(s.id));
     sh.el.style.setProperty("--sec", "var(--" + s.color + ")");
     if (editingId !== "#" + s.id && sh.name.textContent !== s.name) sh.name.textContent = s.name;
-    sh.name.setAttribute("aria-label", s.name + ", rename");
-    sh.input.setAttribute("aria-label", "Add item to " + s.name);
+    sh.name.setAttribute("aria-label", t("{x}, rename", { x: s.name }));
+    sh.input.setAttribute("aria-label", t("Add item to {x}", { x: s.name }));
     if (list.children[i] !== sh.el) list.insertBefore(sh.el, list.children[i] || null);
   });
 }
@@ -737,7 +737,7 @@ function itemEl(it) {
   const cell = h("label", { class: "boxcell", for: "chk-" + it.id },
     chk, h("span", { class: "box", "aria-hidden": "true" }, icon("check")), h("span", { class: "grip", "aria-hidden": "true" }, icon("grip")));
   cell.addEventListener("click", e => { if (suppressClick) { e.preventDefault(); suppressClick = false; } });
-  const text = h("span", { class: "text", id: "txt-" + it.id, role: "button", tabindex: "0", "aria-label": "Edit " + it.text, dataset: { fk: "txt-" + it.id } });
+  const text = h("span", { class: "text", id: "txt-" + it.id, role: "button", tabindex: "0", "aria-label": t("Edit {x}", { x: it.text }), dataset: { fk: "txt-" + it.id } });
   fillText(text, it.text);
   text.addEventListener("click", e => {
     if (suppressClick) { suppressClick = false; return; }
@@ -900,8 +900,8 @@ function endDrag() {
   if (toTick && !ticked) {
     settling.delete(id);
     buzz(12);
-    announce(it.text + " ticked");
-    store.change("checking " + q(it.text), [[id, "checked", true], [id, "checkedAt", Date.now()]]);
+    announce(t("{x} ticked", { x: it.text }));
+    store.change(t("checking {x}", { x: q(it.text) }), [[id, "checked", true], [id, "checkedAt", Date.now()]]);
   } else if (!toTick) {
     const ul = li.parentElement, sec = ul.dataset.sec;
     const sibs = [...ul.children], i = sibs.indexOf(li);
@@ -911,9 +911,9 @@ function endDrag() {
     if (it.checked) { // dragged out of the ticked group, or just ticked: back on the list
       settling.delete(id);
       ops.push([id, "checked", false], [id, "checkedAt", 0]);
-      announce(it.text + " back on the list");
-    } else if (it.section !== sec) announce(it.text + " moved to " + nameOf(sec));
-    store.change((it.checked ? "unchecking " : "moving ") + q(it.text), ops);
+      announce(t("{x} back on the list", { x: it.text }));
+    } else if (it.section !== sec) announce(t("{x} moved to {y}", { x: it.text, y: nameOf(sec) }));
+    store.change(t(it.checked ? "unchecking {x}" : "moving {x}", { x: q(it.text) }), ops);
   }
   // Also when nothing changed, such as an item dropped where it started: it comes back into view.
   sync();
@@ -963,7 +963,7 @@ function endSectionDrag() {
   const from = ghost.getBoundingClientRect();
   document.documentElement.classList.remove("sorting");
   el.classList.remove("placeholder");
-  if (store.change("moving section " + q(nameOf(id)), orderOps(order))) announce(nameOf(id) + " moved");
+  if (store.change(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order))) announce(t("Section moved: {x}", { x: nameOf(id) }));
   sync();
   render();
   const head = el.querySelector(".sec-head");
@@ -979,8 +979,8 @@ function moveSection(id, dir) {
   const order = sections.map(s => s.id), i = order.indexOf(id), j = i + dir;
   if (j < 0 || j >= order.length) return;
   [order[i], order[j]] = [order[j], order[i]];
-  announce(nameOf(id) + " moved " + (dir < 0 ? "up" : "down"));
-  act("moving section " + q(nameOf(id)), orderOps(order), { focusKey: "name-" + id });
+  announce(t(dir < 0 ? "{x} moved up" : "{x} moved down", { x: nameOf(id) }));
+  act(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order), { focusKey: "name-" + id });
 }
 
 /* ---------- Motion ---------- */
@@ -1071,8 +1071,9 @@ function fly(o, to, target) {
 
 function setHist(btn, label, verb) {
   btn.setAttribute("aria-disabled", String(!label));
-  btn.setAttribute("aria-label", label ? verb + " " + label : verb);
-  btn.title = label ? verb + " " + label : verb;
+  const text = label ? t(verb + " {x}", { x: label }) : t(verb);
+  btn.setAttribute("aria-label", text);
+  btn.title = text;
 }
 // The status pill appears only when something is wrong, after a moment, so a quick
 // reconnect doesn't flash it. Tapping it says what happens next.
@@ -1081,18 +1082,18 @@ function statusInfo() {
   const { online, full, waiting } = store.status();
   if (online && !full) return null;
   const kept = waiting
-    ? (waiting === 1 ? "1 change is" : waiting + " changes are") + " saved on this phone"
-    : "Changes you make are saved on this phone";
-  if (full) return { text: "List full", detail: "The server has no room left for this list. " + kept + "." };
-  if (!navigator.onLine) return { text: "Offline", detail: "No connection. " + kept + " and sent when you're back online." };
-  return { text: "Can't reach the server", detail: "The server isn't answering. " + kept + " and sent as soon as it answers." };
+    ? plural(waiting, "{n} change is saved on this phone", "{n} changes are saved on this phone")
+    : t("Changes you make are saved on this phone");
+  if (full) return { text: t("List full"), detail: t("The server has no room left for this list. {kept}.", { kept }) };
+  if (!navigator.onLine) return { text: t("Offline"), detail: t("No connection. {kept}, to be sent when you're back online.", { kept }) };
+  return { text: t("Can't reach the server"), detail: t("The server isn't answering. {kept}, to be sent as soon as it answers.", { kept }) };
 }
 function paintStatus() {
   const info = $("#app").hidden ? null : statusInfo();
   const el = $("#status");
   if (!info) {
     clearTimeout(statusTimer); statusTimer = 0;
-    if (statusShown) announce("Back online");
+    if (statusShown) announce(t("Back online"));
     statusShown = "";
     el.hidden = true;
     $("#status-detail").hidden = true;
@@ -1206,11 +1207,11 @@ $("#copy-link").addEventListener("click", async e => {
   const b = e.currentTarget;
   try {
     await navigator.clipboard.writeText(store.pairingLink());
-    b.textContent = "Copied";
+    b.textContent = t("Copied");
   } catch (_) {
-    b.textContent = "Couldn't copy";
+    b.textContent = t("Couldn't copy");
   }
-  setTimeout(() => { b.textContent = "Copy link"; }, 2000);
+  setTimeout(() => { b.textContent = t("Copy link"); }, 2000);
 });
 
 /* ---------- Settings ---------- */
@@ -1224,34 +1225,37 @@ async function keepList() {
 async function isKept() {
   try { return await navigator.storage.persisted(); } catch (_) { return null; }
 }
-const size = n => (n < 1024 ? n + " bytes" : n < 1048576 ? Math.round(n / 1024) + " KB" : (n / 1048576).toFixed(1) + " MB");
+const size = n => (n < 1024 ? t("{n} bytes", { n }) : n < 1048576 ? t("{n} KB", { n: Math.round(n / 1024) })
+  : t("{n} MB", { n: (n / 1048576).toLocaleString(lang, { maximumFractionDigits: 1 }) }));
+// Fills in what's known at once, then what the browser has to look up.
 async function paintSettings() {
   const theme = (() => { try { return localStorage.getItem(THEME_KEY) || ""; } catch (_) { return ""; } })();
   for (const r of document.querySelectorAll('input[name="theme"]')) r.checked = r.value === theme;
-  const kept = await isKept();
-  $("#keep-text").textContent = kept
-    ? "Kept on this phone: the browser won't clear the list to free up space."
-    : "The browser may clear the list if this phone runs low on space. Keep the link from \u201cAdd someone to this list\u201d somewhere safe, such as a password manager: it brings the list back.";
-  $("#keep-btn").hidden = kept !== false;
   let bytes = 0;
   try { bytes = new Blob([localStorage.getItem("panier") || ""]).size; } catch (_) {}
   const toGet = items.filter(i => !i.checked).length;
-  $("#size-text").textContent = "On this phone, the list takes " + size(bytes) + ": " + toGet + (toGet === 1 ? " item" : " items") + " to get, " + (items.length - toGet) + " bought before.";
+  $("#size-text").textContent = t("On this phone, the list takes {size}: {toGet} to get, {done}.", {
+    size: size(bytes), toGet: plural(toGet, "{n} item", "{n} items"), done: plural(items.length - toGet, "{n} bought before", "{n} bought before"),
+  });
   $("#about-server").textContent = location.host;
-  let version = "dev";
-  try { const k = (await caches.keys()).find(k => k.startsWith("panier-")); if (k) version = k.slice(7); } catch (_) {}
-  $("#about-version").textContent = version;
+  const [kept, keys] = await Promise.all([isKept(), caches.keys().catch(() => [])]);
+  $("#keep-text").textContent = kept
+    ? t("Kept on this phone: the browser won't clear the list to free up space.")
+    : t("The browser may clear the list if this phone runs low on space. Keep the link from {link} somewhere safe, such as a password manager: it brings the list back.", { link: q(t("Add someone to this list")) });
+  $("#keep-btn").hidden = kept !== false;
+  const k = keys.find(k => k.startsWith("panier-"));
+  $("#about-version").textContent = k ? k.slice(7) : "dev";
 }
 // The list as a plain-text checklist: each section's items to get, then everything bought before.
 function exportList() {
   const now = new Date();
-  const lines = ["Panier, " + now.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })];
+  const lines = ["Panier, " + now.toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })];
   for (const s of sections) {
     const list = items.filter(i => i.section === s.id && !i.checked).sort((a, b) => a.pos - b.pos);
     if (list.length) lines.push("", s.name, ...list.map(i => "- [ ] " + i.text));
   }
   const done = items.filter(i => i.checked).sort((a, b) => b.checkedAt - a.checkedAt);
-  if (done.length) lines.push("", "Bought before", ...done.map(i => "- [x] " + i.text));
+  if (done.length) lines.push("", t("Bought before"), ...done.map(i => "- [x] " + i.text));
   const url = URL.createObjectURL(new Blob([lines.join("\n") + "\n"], { type: "text/plain;charset=utf-8" }));
   const day = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map(n => String(n).padStart(2, "0")).join("-");
   const a = h("a", { href: url, download: "panier-" + day + ".txt", hidden: true });
@@ -1317,9 +1321,9 @@ function showWelcome(message) {
   if (message) $("#welcome-msg").textContent = message;
 }
 const MESSAGES = {
-  code: "That setup code didn't work. Check it on the server and try again.",
-  link: "That link is incomplete. Ask for the link again from the phone that has the list.",
-  server: "Couldn't reach the server. Check your connection and try again.",
+  code: t("That setup code didn't work. Check it on the server and try again."),
+  link: t("That link is incomplete. Ask for the link again from the phone that has the list."),
+  server: t("Couldn't reach the server. Check your connection and try again."),
 };
 $("#setup-form").addEventListener("submit", async e => {
   e.preventDefault();
@@ -1354,6 +1358,7 @@ async function init() {
   showList();
   store.start();
 }
+translatePage();
 init();
 
 /* ---------- Updates ---------- */

@@ -172,7 +172,7 @@ test("changes made offline are sent later, the status says so, and the app opens
   assert.ok(await eventually(() => b.locator("#status").isVisible(), 4000), "the status appears");
   assert.equal(await b.locator("#status-text").innerText(), "Offline");
   await b.click("#status-pill");
-  assert.match(await b.locator("#status-detail").innerText(), /1 change is saved on this phone and sent when you're back online/);
+  assert.match(await b.locator("#status-detail").innerText(), /1 change is saved on this phone, to be sent when you're back online/);
   assert.deepEqual(await texts(a, "Long term"), [], "nothing reaches the other phone yet");
   await online(B, b);
   assert.ok(await eventually(async () => (await texts(a, "Long term")).join() === "Bike lights", 10000), "sent when back online");
@@ -721,7 +721,7 @@ test("settings: appearance, keeping the list, its size, export, and about", asyn
   await a.click("#settings-open");
   assert.ok(await a.locator("#settings").isVisible());
 
-  await a.locator('#settings .seg span:text-is("Dark")').click();
+  await a.locator('#settings .choices label', { hasText: "Dark" }).click();
   assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), "dark");
   assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "#111513", "the browser's bars follow");
   await a.reload();
@@ -731,7 +731,7 @@ test("settings: appearance, keeping the list, its size, export, and about", asyn
   assert.ok(await a.locator('input[name="theme"][value="dark"]').isChecked());
 
   assert.match(await a.locator("#size-text").innerText(), /2 items to get, 1 bought before/);
-  assert.match(await a.locator("#keep-text").innerText(), /browser/);
+  assert.ok(await eventually(async () => /browser/.test(await a.locator("#keep-text").innerText())));
   const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
   assert.match(dl.suggestedFilename(), /^panier-\d{4}-\d{2}-\d{2}\.txt$/);
   const text = readFileSync(await dl.path(), "utf8");
@@ -740,12 +740,45 @@ test("settings: appearance, keeping the list, its size, export, and about", asyn
   assert.match(text, /\nBought before\n- \[x\] Milk\n/);
 
   assert.equal(await a.locator("#about-server").innerText(), new URL(BASE).host);
-  assert.notEqual(await a.locator("#about-version").innerText(), "");
+  assert.ok(await eventually(async () => (await a.locator("#about-version").innerText()) !== ""));
 
-  await a.locator('#settings .seg span:text-is("Same as phone")').click();
+  await a.locator('#settings .choices label', { hasText: "Same as phone" }).click();
   assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), undefined);
   await a.evaluate(() => history.back()); // the phone's back gesture
   assert.ok(await eventually(async () => !(await a.locator("#settings").isVisible())), "going back closes Settings");
   assert.ok(await a.locator("#app").isVisible(), "and stays in the app");
+  await t.close();
+});
+
+test("in French when the phone is in French", async () => {
+  const t = await pair({ locale: "fr-FR" });
+  const { a, A } = t;
+  const nb = " ";
+  assert.equal(await a.evaluate(() => document.documentElement.lang), "fr");
+  assert.deepEqual(await names(a), ["Essentiels", "À l’occasion", "À long terme"]);
+  assert.equal(await a.getAttribute("#add-ess", "placeholder"), "Ajouter un article");
+  assert.equal(await a.getAttribute("#add-sec", "placeholder"), "Ajouter une section");
+  await add(a, "ess", "2 lait");
+  await blur(a);
+  assert.equal(await a.getAttribute("#undo", "aria-label"), `Annuler${nb}: ajouter «${nb}2 lait${nb}»`);
+
+  await a.click("#settings-open");
+  assert.equal(await a.locator("#settings-title").innerText(), "Paramètres");
+  assert.equal(await a.locator("#size-text").evaluate(el => el.textContent.split(":").pop().trim()), "1 article à acheter, 0 déjà acheté.", "French counts 0 as one");
+  await a.click("#settings-close");
+
+  await offline(A, a);
+  await add(a, "ess", "Pain");
+  await blur(a);
+  assert.ok(await eventually(async () => (await a.locator("#status-text").innerText()) === "Hors ligne", 5000));
+  await a.click("#status-pill");
+  assert.match(await a.locator("#status-detail").innerText(), /1 modification est enregistrée sur ce téléphone, à envoyer dès votre retour en ligne/);
+
+  const shown = await a.evaluate(() => document.body.innerText + " " + [...document.querySelectorAll("[aria-label], [placeholder], [title]")]
+    .map(e => ["aria-label", "placeholder", "title"].map(k => e.getAttribute(k) || "").join(" ")).join(" "));
+  for (const en of ["Add item", "Add a section", "Settings", "Essentials", "Add someone", "Ticked items", "Undo", "Close", "Offline", "Edit "]) {
+    assert.ok(!shown.includes(en), "“" + en + "” is in French");
+  }
+  await online(A, a);
   await t.close();
 });
