@@ -7,9 +7,10 @@ const DEFAULTS = [
   { id: "look", name: t("Look out for"), color: "look", pos: 2 },
   { id: "long", name: t("Long term"), color: "long", pos: 3 },
 ];
-// Section colours, in palette order; each is a colour in app.css, light and dark.
-const COLORS = [["ess", "Green"], ["teal", "Teal"], ["blue", "Blue"], ["long", "Indigo"], ["plum", "Plum"], ["rose", "Rose"], ["look", "Amber"], ["olive", "Olive"]];
-const PALETTE = ["teal", "rose", "blue", "olive", "plum", "ess", "look", "long"]; // new sections take the first unused
+// Section colours, in palette order; each is a colour in app.css, light and dark. Ink,
+// the colour of Essentials and of the app's buttons, comes first; then eight hues.
+const COLORS = [["ess", "Ink"], ["green", "Green"], ["teal", "Teal"], ["blue", "Blue"], ["long", "Indigo"], ["plum", "Plum"], ["rose", "Rose"], ["look", "Amber"], ["olive", "Olive"]];
+const PALETTE = ["teal", "rose", "green", "blue", "olive", "plum", "look", "long", "ess"]; // new sections take the first unused
 const colorOk = (c, fallback) => (COLORS.some(([id]) => id === c) ? c : fallback);
 const MAX_ITEM = 120; // four lines on a phone
 const MAX_SECTION = 40; // and the list's name
@@ -1060,6 +1061,7 @@ function moveSection(id, dir) {
 // goes. New items fade in, removed ones fade out. Each element animates on its own, so
 // taps keep working throughout, unlike with the browser's page-wide transitions.
 const EASE = "cubic-bezier(0.4, 0, 0.2, 1)"; // gentle start, gentle landing
+const LEAVE = "cubic-bezier(0.4, 0, 1, 1)"; // gentle start, then out of view at full speed
 const MOTION = { duration: 400, easing: EASE };
 const PACE = 0.8; // px per ms: every trip at the same speed, however long the list
 const SHORTEST = 420; // ms, so a short hop still reads as a move
@@ -1112,10 +1114,11 @@ function glide(snap) {
 // The item's old element (or the drag ghost) travels from its old place to the new one,
 // over everything, and the real item shows when it lands. With no target, it fades away.
 // It only travels as far as the screen shows: a place beyond the edge is reached at the
-// edge, where the item slips out of view, so a long list doesn't make it rush.
+// edge, where the item slips out of view without slowing down, so a long list doesn't
+// make it rush.
 function fly(o, to, target) {
   const el = o.li, h = o.rect.height;
-  const top = Math.min(Math.max(to.top, -h - 8), innerHeight + 8);
+  const top = Math.min(Math.max(to.top, -h - 8), innerHeight + 8), leaving = top !== to.top;
   const dx = to.left - o.rect.left, dy = top - o.rect.top;
   const ms = target ? Math.round(Math.max(SHORTEST, Math.hypot(dx, dy) / PACE)) : 320;
   if (el.classList.contains("ghost")) el.classList.add("landing"); // let go after a drag
@@ -1123,7 +1126,7 @@ function fly(o, to, target) {
   el.style.animationDuration = ms + "ms"; // the lift and landing, in app.css
   if (target) target.style.opacity = "0";
   const move = `translate(${dx}px, ${dy}px)`;
-  const a = el.animate([{ transform: "none" }, target ? { transform: move } : { transform: move + " scale(0.94)", opacity: 0 }], { duration: ms, easing: EASE, id: "fly" });
+  const a = el.animate([{ transform: "none" }, target ? { transform: move } : { transform: move + " scale(0.94)", opacity: 0 }], { duration: ms, easing: leaving ? LEAVE : EASE, id: "fly" });
   const land = () => {
     if (!flights.delete(a)) return;
     el.remove();

@@ -17,12 +17,12 @@ Each section is a card with its name at the top. A list starts with three:
 
 | Section | Colour | For |
 | --- | --- | --- |
-| Essentials | green | everyday things the home runs on |
+| Essentials | ink | everyday things the home runs on |
 | Look out for | amber | things to buy if you come across them |
 | Long term | indigo | things to get eventually |
 
 - Tap a section's name to rename it. Both phones see the new name.
-- While you rename a section, its colours show under the name: eight, the same in light and dark themes. A tap recolours the section at once, and undo puts the old colour back.
+- While you rename a section, its colours show under the name: ink and eight hues, the same in light and dark themes. A tap recolours the section at once, and undo puts the old colour back.
 - *Add a section*, below the cards, adds one at the end with its own colour. Its name is typed like a section name; Enter or the `+` adds it, a cross clears it, and the cursor then moves to its *Add item* field.
 - While you rename a section that has nothing left to get, a cross appears to delete it. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 - Tick boxes take their section's colour.
@@ -48,7 +48,7 @@ Each section is a card with its name at the top. A list starts with three:
 
 - Tap the square to tick. A short vibration confirms it in browsers that let web pages vibrate, such as Chrome and Samsung Internet on Android. Firefox turned this off in version 129, and Safari never had it.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row move together and the list does not shift under your thumb.
-- They then slide to the ticked group below the lists, always at the same pace, however long the list. When the group is below the screen, they slide out of view at its bottom edge rather than racing all the way down. Its heading reads *3 ticked*, with an arrow to fold it away.
+- They then slide to the ticked group below the lists, always at the same pace, however long the list. When the group is below the screen, they slide out of view at its bottom edge, without slowing down, rather than racing all the way down. Its heading reads *3 ticked*, with an arrow to fold it away.
 - The group shows what was ticked in the last 12 hours. Older items are hidden but still suggested.
 - Dragging an item down onto the drop zone that appears under the ticked group's heading ticks it straight away; the item shows as ticked while it's over the group. The heading shows during the drag even when nothing is ticked yet.
 - Tapping a ticked square puts the item back at the end of its section, or of the first section if its own was deleted. Dragging a ticked item into a section puts it back right where you drop it.

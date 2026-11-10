@@ -815,7 +815,7 @@ test("a ticked item travels at the same pace however long the list, and only as 
     const r = await a.evaluate(() => {
       const x = document.getAnimations().find(x => x.id === "fly");
       const [, dx, dy] = /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/.exec(x.effect.getKeyframes()[1].transform);
-      return { ms: x.effect.getTiming().duration, d: Math.hypot(+dx, +dy), end: parseFloat(x.effect.target.style.top) + +dy, screen: innerHeight };
+      return { ms: x.effect.getTiming().duration, d: Math.hypot(+dx, +dy), end: parseFloat(x.effect.target.style.top) + +dy, screen: innerHeight, easing: x.effect.getTiming().easing };
     });
     assert.ok(await eventually(() => a.evaluate(() => !document.getAnimations().some(x => x.id === "fly")), 4000));
     return r;
@@ -832,6 +832,8 @@ test("a ticked item travels at the same pace however long the list, and only as 
   await item(a, "Bread").locator(".boxcell").click();
   const long = await trip();
   assert.ok(long.end <= long.screen + 8, "in a long list, it goes no further than the screen's edge");
+  assert.equal(long.easing, "cubic-bezier(0.4, 0, 1, 1)", "and leaves the screen without slowing down");
+  assert.equal(short.easing, "cubic-bezier(0.4, 0, 0.2, 1)", "while one landing on screen slows into place");
   assert.ok(Math.abs(long.d / long.ms - short.d / short.ms) < 0.05, `the same pace: ${(short.d / short.ms).toFixed(2)} and ${(long.d / long.ms).toFixed(2)} px/ms`);
   await t.close();
 });
@@ -847,8 +849,10 @@ test("a section's colour is chosen from a palette while renaming it", async () =
   assert.equal(await a.locator(ess + " .palette").count(), 0, "the colours show only while renaming");
 
   await section(a, "Essentials").locator(".sec-name").click();
-  assert.equal(await a.locator(ess + " .swatch").count(), 8);
-  assert.equal(await a.getAttribute(ess + ' .swatch[aria-pressed="true"]', "aria-label"), "Green");
+  assert.equal(await a.locator(ess + " .swatch").count(), 9, "ink and eight hues");
+  assert.equal(await a.getAttribute(ess + ' .swatch[aria-pressed="true"]', "aria-label"), "Ink");
+  const tops = await a.locator(ess + " .swatch").evaluateAll(els => new Set(els.map(e => Math.round(e.getBoundingClientRect().top))).size);
+  assert.equal(tops, 1, "on one row");
   await a.locator(ess + ' .swatch[aria-label="Plum"]').click();
   assert.equal(await colour(a, ess), "var(--plum)");
   assert.equal(await colour(a, ess + " .item"), "var(--plum)", "its tick boxes follow");

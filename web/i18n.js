@@ -60,7 +60,7 @@ const FR = {
   "{x}, rename": "{x}, renommer",
   "Bought before": "Déjà achetés",
   "Colour of {x}": "Couleur de {x}",
-  "Green": "Vert", "Teal": "Bleu canard", "Blue": "Bleu", "Indigo": "Indigo",
+  "Ink": "Encre", "Green": "Vert", "Teal": "Bleu canard", "Blue": "Bleu", "Indigo": "Indigo",
   "Plum": "Prune", "Rose": "Rose", "Amber": "Ambre", "Olive": "Olive",
   "{x} is now {y}": "{x} est maintenant {y}",
   "Delete section {x}": "Supprimer la section {x}",
