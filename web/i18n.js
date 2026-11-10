@@ -27,6 +27,7 @@ const FR = {
   "Same as phone": "Comme le téléphone",
   "Light": "Clair",
   "Dark": "Sombre",
+  "Compact layout": "Affichage compact",
   "Data": "Données",
   "Keep it on this phone": "La garder sur ce téléphone",
   "Export the list": "Exporter la liste",

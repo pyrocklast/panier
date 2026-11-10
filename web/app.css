@@ -2,7 +2,7 @@
 @font-face { font-family: "Atkinson Hyperlegible Next"; src: url("fonts/atkinson-hyperlegible-next-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
 
 /* Type: 17px for everything you read or type, 14px for small print, 20px for sheet
-   titles, 26px for page titles. Corners: 16px for cards and sheets, 12px for buttons,
+   titles, 26px for page titles (20px in the compact layout). Corners: 16px for cards and sheets, 12px for buttons,
    fields and floating items, 5px for tick boxes, round for round things.
    Layout: one calm column with a named card per section, a row to add sections, the ticked items after them, and undo and redo floating at the bottom within thumb reach. */
 :root {
@@ -321,6 +321,23 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 }
 .choices input:checked { border-color: var(--ink); background: radial-gradient(circle, var(--ink) 0 4.5px, transparent 5px); }
 .choices input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.switch { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 12px 0 -6px; padding-top: 6px; border-top: 1px solid var(--line); cursor: pointer; --sec: var(--muted); }
+.switch .chk:checked + .box { background: var(--ink); border-color: var(--ink); color: var(--surface); }
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 12px; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+
+/* Compact layout, chosen in Settings: every row 44 px, gaps of 12 px, titles of 20 px.
+   Everything you tap stays at least 44 px tall. */
+[data-layout="compact"] main.wrap { padding-top: 12px; gap: 12px; }
+[data-layout="compact"] #list { gap: 12px; }
+[data-layout="compact"] .list-head { margin: 0; font-size: 1.25rem; }
+[data-layout="compact"] .list-name { padding: 8px 0; }
+[data-layout="compact"] .page-head h2 { font-size: 1.25rem; }
+[data-layout="compact"] .sec-head { min-height: 44px; }
+[data-layout="compact"] .sec-name { padding: 10px 0; }
+[data-layout="compact"] .text { padding-block: 10px; }
+[data-layout="compact"] :is(.add, .add-sec, .drop) { min-height: 44px; }
+[data-layout="compact"] .add-input { height: 44px; }
+[data-layout="compact"] .sugopt { min-height: 44px; }
+[data-layout="compact"] .basket { gap: 6px; }

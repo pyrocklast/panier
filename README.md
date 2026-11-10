@@ -86,7 +86,7 @@ Each section is a card with its name at the top. A list starts with three:
 
 *Settings*, at the bottom of the list, opens a page of its own; the phone's back gesture closes it.
 
-- **Appearance:** the same as the phone, light or dark, chosen on each phone.
+- **Appearance:** the same as the phone, light or dark, and a *Compact layout* switch: rows of 44 px instead of 52, with smaller gaps and titles, so more of the list fits on screen. Both are chosen on each phone.
 - **Data:** whether the browser keeps the list even when the phone runs low on space. Panier asks for this when you start or join a list; Firefox asks you once, Chrome decides for itself. If it isn't kept, a button asks again, with a reminder that the pairing link brings the list back. Then *Export the list*, which saves it as a text checklist named after the list: each section's items to get, then everything bought before, by name.
 - **About:** the version, the server, how much space the list takes on this phone, and what the server can and can't see.
 

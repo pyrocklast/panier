@@ -11,3 +11,9 @@ window.panierTheme = function (t) {
   }
 };
 try { window.panierTheme(localStorage.getItem("panier-theme")); } catch (e) {}
+// The same for the compact layout, also chosen in Settings.
+window.panierLayout = function (l) {
+  if (l === "compact") document.documentElement.setAttribute("data-layout", "compact");
+  else document.documentElement.removeAttribute("data-layout");
+};
+try { window.panierLayout(localStorage.getItem("panier-layout")); } catch (e) {}

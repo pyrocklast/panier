@@ -943,6 +943,18 @@ test("settings: appearance, keeping the list, its size, export, and about", asyn
   await a.click("#settings-open");
   assert.ok(await a.locator('input[name="theme"][value="dark"]').isChecked());
 
+  const row = () => a.evaluate(() => Math.round(document.querySelector("#list .item").getBoundingClientRect().height));
+  assert.equal(await row(), 52, "roomy rows to start with");
+  await a.locator("#settings .switch").click();
+  assert.equal(await row(), 44, "the compact layout: rows of 44 px");
+  await a.reload();
+  await a.locator("#app").waitFor();
+  assert.equal(await row(), 44, "kept on this phone");
+  await a.click("#settings-open");
+  assert.ok(await a.locator("#compact-layout").isChecked());
+  await a.locator("#settings .switch").click();
+  assert.equal(await row(), 52, "and back");
+
   assert.match(await a.locator("#size-text").innerText(), /2 items to get, 1 bought before/);
   assert.ok(await eventually(async () => /browser/.test(await a.locator("#keep-text").innerText())));
   const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
