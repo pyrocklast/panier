@@ -1061,6 +1061,8 @@ function moveSection(id, dir) {
 // taps keep working throughout, unlike with the browser's page-wide transitions.
 const EASE = "cubic-bezier(0.4, 0, 0.2, 1)"; // gentle start, gentle landing
 const MOTION = { duration: 400, easing: EASE };
+const PACE = 0.8; // px per ms: every trip at the same speed, however long the list
+const SHORTEST = 420; // ms, so a short hop still reads as a move
 const PARTS = "#list > .sec, #basket-list";
 const ITEMS = "#list .item[data-id], #basket-list .item[data-id]";
 const ADDS = "#list > .sec > .add";
@@ -1109,10 +1111,13 @@ function glide(snap) {
 }
 // The item's old element (or the drag ghost) travels from its old place to the new one,
 // over everything, and the real item shows when it lands. With no target, it fades away.
+// It only travels as far as the screen shows: a place beyond the edge is reached at the
+// edge, where the item slips out of view, so a long list doesn't make it rush.
 function fly(o, to, target) {
-  const el = o.li;
-  const dx = to.left - o.rect.left, dy = to.top - o.rect.top;
-  const ms = target ? Math.round(Math.min(700, 420 + Math.hypot(dx, dy) * 0.35)) : 320;
+  const el = o.li, h = o.rect.height;
+  const top = Math.min(Math.max(to.top, -h - 8), innerHeight + 8);
+  const dx = to.left - o.rect.left, dy = top - o.rect.top;
+  const ms = target ? Math.round(Math.max(SHORTEST, Math.hypot(dx, dy) / PACE)) : 320;
   if (el.classList.contains("ghost")) el.classList.add("landing"); // let go after a drag
   else float(el, o.rect, "flying");
   el.style.animationDuration = ms + "ms"; // the lift and landing, in app.css

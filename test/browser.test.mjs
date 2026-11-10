@@ -802,6 +802,36 @@ test("ticked items slide into the ticked group, and taps land meanwhile", async 
   await t.close();
 });
 
+test("a ticked item travels at the same pace however long the list, and only as far as the screen", async () => {
+  const t = await pair();
+  const { a } = t;
+  // The trip of the item now flying to the ticked group: its length, duration and end.
+  const trip = async () => {
+    assert.ok(await eventually(() => a.evaluate(() => document.getAnimations().some(x => x.id === "fly")), 4000));
+    const r = await a.evaluate(() => {
+      const x = document.getAnimations().find(x => x.id === "fly");
+      const [, dx, dy] = /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/.exec(x.effect.getKeyframes()[1].transform);
+      return { ms: x.effect.getTiming().duration, d: Math.hypot(+dx, +dy), end: parseFloat(x.effect.target.style.top) + +dy, screen: innerHeight };
+    });
+    assert.ok(await eventually(() => a.evaluate(() => !document.getAnimations().some(x => x.id === "fly")), 4000));
+    return r;
+  };
+  for (const x of ["Milk", "Bread", "Eggs", "Butter"]) await add(a, "ess", x);
+  await blur(a);
+  await still(a);
+  await item(a, "Milk").locator(".boxcell").click();
+  const short = await trip();
+  for (let i = 1; i <= 20; i++) await add(a, "long", "Thing " + i);
+  await blur(a);
+  await a.evaluate(() => scrollTo(0, 0));
+  await still(a);
+  await item(a, "Bread").locator(".boxcell").click();
+  const long = await trip();
+  assert.ok(long.end <= long.screen + 8, "in a long list, it goes no further than the screen's edge");
+  assert.ok(Math.abs(long.d / long.ms - short.d / short.ms) < 0.05, `the same pace: ${(short.d / short.ms).toFixed(2)} and ${(long.d / long.ms).toFixed(2)} px/ms`);
+  await t.close();
+});
+
 test("a section's colour is chosen from a palette while renaming it", async () => {
   const t = await pair();
   const { a, b } = t;

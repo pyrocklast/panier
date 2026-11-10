@@ -48,7 +48,7 @@ Each section is a card with its name at the top. A list starts with three:
 
 - Tap the square to tick. A short vibration confirms it.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row move together and the list does not shift under your thumb.
-- They then slide to the ticked group below the lists. Its heading reads *3 ticked*, with an arrow to fold it away.
+- They then slide to the ticked group below the lists, always at the same pace, however long the list. When the group is below the screen, they slide out of view at its bottom edge rather than racing all the way down. Its heading reads *3 ticked*, with an arrow to fold it away.
 - The group shows what was ticked in the last 12 hours. Older items are hidden but still suggested.
 - Dragging an item down onto the drop zone that appears under the ticked group's heading ticks it straight away; the item shows as ticked while it's over the group. The heading shows during the drag even when nothing is ticked yet.
 - Tapping a ticked square puts the item back at the end of its section, or of the first section if its own was deleted. Dragging a ticked item into a section puts it back right where you drop it.
