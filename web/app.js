@@ -1308,7 +1308,7 @@ $("#copy-link").addEventListener("click", async e => {
 
 /* ---------- Settings ---------- */
 
-const THEME_KEY = "panier-theme", LAYOUT_KEY = "panier-layout";
+const THEME_KEY = "panier-theme", STYLE_KEY = "panier-style", LAYOUT_KEY = "panier-layout";
 // Asks the browser to keep the list even when the phone runs low on space. Firefox asks
 // you once; Chrome decides for itself. Returns whether it's kept, or null if unknown.
 async function keepList() {
@@ -1323,6 +1323,8 @@ const size = n => (n < 1024 ? t("{n} bytes", { n }) : n < 1048576 ? t("{n} KB", 
 async function paintSettings() {
   const theme = (() => { try { return localStorage.getItem(THEME_KEY) || ""; } catch (_) { return ""; } })();
   for (const r of document.querySelectorAll('input[name="theme"]')) r.checked = r.value === theme;
+  const style = document.documentElement.dataset.style || "";
+  for (const r of document.querySelectorAll('input[name="style"]')) r.checked = r.value === style;
   $("#compact-layout").checked = document.documentElement.dataset.layout === "compact";
   let bytes = 0;
   try { bytes = new Blob([localStorage.getItem("panier") || ""]).size; } catch (_) {}
@@ -1361,6 +1363,13 @@ function exportList() {
 }
 $("#settings-open").addEventListener("click", () => { paintSettings(); openSheet($("#settings")); });
 $("#settings-close").addEventListener("click", () => $("#settings").close());
+// Cards, or Paper: the list written straight on the page. On this phone only, like the rest.
+for (const r of document.querySelectorAll('input[name="style"]')) {
+  r.addEventListener("change", () => {
+    try { if (r.value) localStorage.setItem(STYLE_KEY, r.value); else localStorage.removeItem(STYLE_KEY); } catch (_) {}
+    if (window.panierStyle) window.panierStyle(r.value);
+  });
+}
 // Compact: every row 44 px, with smaller gaps and titles, on this phone only.
 $("#compact-layout").addEventListener("change", e => {
   const l = e.target.checked ? "compact" : "";

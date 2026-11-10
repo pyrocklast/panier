@@ -55,6 +55,8 @@ jobs:
           BASE=http://127.0.0.1:8787 SETUP=TEST-CODE-1234 STORE="$RUNNER_TEMP/worker" node --test test/browser.test.mjs
       - name: Browser tests in Firefox
         run: BROWSER=firefox BASE=http://127.0.0.1:8080 SETUP="$GO_SETUP" STORE="$RUNNER_TEMP/data" node --test test/browser.test.mjs
+      - name: Browser tests in the Paper style, with the compact layout
+        run: STYLE=paper LAYOUT=compact BASE=http://127.0.0.1:8080 SETUP="$GO_SETUP" STORE="$RUNNER_TEMP/data" node --test test/browser.test.mjs
       - name: Update test, with two builds of the Go server
         run: |
           cp web/sw.js "$RUNNER_TEMP/sw.js"

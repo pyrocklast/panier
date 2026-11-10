@@ -4,7 +4,8 @@
 /* Type: 17px for everything you read or type, 14px for small print, 20px for sheet
    titles, 26px for page titles (20px in the compact layout). Corners: 16px for cards and sheets, 12px for buttons,
    fields and floating items, 5px for tick boxes, round for round things.
-   Layout: one calm column with a named card per section, a row to add sections, the ticked items after them, and undo and redo floating at the bottom within thumb reach. */
+   Layout: one calm column with a named card per section, a row to add sections, the ticked items after them, and undo and redo floating at the bottom within thumb reach.
+   Settings can switch the cards for Paper (at the end) and make every row compact. */
 :root {
   /* Each colour is light-dark(light, dark): the phone's theme picks, unless Settings
      chose one, which sets data-theme on the page. */
@@ -321,6 +322,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 }
 .choices input:checked { border-color: var(--ink); background: radial-gradient(circle, var(--ink) 0 4.5px, transparent 5px); }
 .choices input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.choices.style { margin-top: 12px; padding-top: 6px; border-top: 1px solid var(--line); }
 .switch { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 12px 0 -6px; padding-top: 6px; border-top: 1px solid var(--line); cursor: pointer; --sec: var(--muted); }
 .switch .chk:checked + .box { background: var(--ink); border-color: var(--ink); color: var(--surface); }
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 12px; }
@@ -341,3 +343,58 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 [data-layout="compact"] .add-input { height: 44px; }
 [data-layout="compact"] .sugopt { min-height: 44px; }
 [data-layout="compact"] .basket { gap: 6px; }
+
+/* Paper, chosen in Settings: the list is written on the page itself. No cards: structure
+   comes from type, space and ruled lines, all on one left edge. Only what's lifted above
+   the page has a surface and a shadow: a dragged item or section, undo, the sheets. */
+:root[data-style="paper"] {
+  --bg: light-dark(#ffffff, #111513);      /* the page */
+  --surface: light-dark(#ffffff, #1b201e); /* what's lifted above it */
+  --line: light-dark(#e4e7e4, #2a312e);    /* ruled lines, under names and between items */
+  --tear: light-dark(#cfd5d1, #3b443f);    /* the tear line above what's ticked */
+}
+[data-style="paper"] #list { gap: 28px; }
+[data-style="paper"] :is(#list > .sec, .basket-list) { background: none; box-shadow: none; border-radius: 0; overflow-clip-margin: 16px; }
+[data-style="paper"] .sec-head { padding: 0; background: linear-gradient(var(--line), var(--line)) left bottom / 100% 1px no-repeat; }
+[data-style="paper"] .palette { padding: 2px 0 8px; margin-left: -9px; }
+/* Rows reach 12px into the margins, so a press, a highlight or a dragged slip has room
+   around its text; the ruled lines still run from the text to the right edge. */
+[data-style="paper"] :is(.item, .add, .sugopt) { margin-inline: -12px; padding-inline: 12px; background-color: transparent; background-origin: content-box; }
+[data-style="paper"] .item { grid-template-columns: 38px minmax(0, 1fr); }
+[data-style="paper"] .item.editing { grid-template-columns: 38px minmax(0, 1fr) 48px; }
+[data-style="paper"] :is(.item + .item, .items:not(:empty) ~ .add, .sug:not([hidden]) + .add) { background-size: calc(100% - 38px) 1px; }
+[data-style="paper"] .boxcell { place-items: center start; margin-left: -12px; padding-left: 12px; } /* the margin ticks too */
+[data-style="paper"] .text { padding-right: 0; }
+[data-style="paper"] :is(.add, .add.typing) { padding-right: 12px; }
+[data-style="paper"] .add-plus { width: 38px; place-items: center start; padding-left: 1.5px; box-sizing: border-box; }
+[data-style="paper"] .sug-pick > svg { width: 21px; margin-right: 17px; }
+/* You write on a line: a new item or section, like editing an item */
+[data-style="paper"] .add:focus-within { background-color: transparent; }
+[data-style="paper"] .add-input:focus { box-shadow: inset 0 -2px 0 var(--sec); }
+[data-style="paper"] .add-sec { padding-right: 0; border-radius: 0; }
+[data-style="paper"] .add-sec:focus-within { background: none; box-shadow: none; }
+[data-style="paper"] #add-sec:focus { box-shadow: inset 0 -2px 0 var(--ink); }
+/* Lifted: a slip of paper above the page */
+[data-style="paper"] :is(.item.lifted, .item.hint) { background-color: var(--surface); border-radius: 12px; }
+[data-style="paper"] :is(.ghost, .flying) { box-sizing: border-box; background-color: var(--surface); }
+[data-style="paper"] :is(.sec.lifted, .sec.ghost) { background: var(--surface); border-radius: 4px; box-shadow: 0 0 0 12px var(--surface), var(--float); }
+[data-style="paper"] .item.placeholder { background-color: color-mix(in oklab, var(--sec) 8%, var(--bg)); border-radius: 12px; }
+[data-style="paper"] .item.placeholder.away { background-color: transparent; }
+[data-style="paper"] .sec.placeholder { background-color: color-mix(in oklab, var(--sec) 8%, var(--bg)); border-radius: 4px; box-shadow: 0 0 0 12px color-mix(in oklab, var(--sec) 8%, var(--bg)); }
+[data-style="paper"] .item.flash { animation-name: flash-paper; }
+@keyframes flash-paper { 0%, 35% { background-color: color-mix(in oklab, var(--sec) 16%, var(--bg)); } 100% { background-color: transparent; } }
+/* What's ticked: the stub below a tear line, quieter */
+[data-style="paper"] .basket { margin-top: 12px; padding-top: 16px; background: repeating-linear-gradient(90deg, var(--tear) 0 6px, transparent 6px 12px) left top / 100% 2px no-repeat; }
+[data-style="paper"] #basket-toggle { grid-template-columns: 38px auto auto; }
+[data-style="paper"] #basket-toggle .tickmark { justify-self: start; }
+[data-style="paper"] #basket-list .text { font-size: 0.875rem; padding-block: 12px; }
+[data-style="paper"] #basket-list .box { width: 18px; height: 18px; margin-left: 1.5px; border-radius: 4px; }
+[data-style="paper"] #basket-list .box::after { width: 11px; height: 11px; }
+[data-style="paper"] .drop { padding-left: 0; border-width: 2px 0; border-radius: 0; }
+/* Settings and the welcome page, the same way */
+[data-style="paper"] .page-in { gap: 0; }
+[data-style="paper"] .page-head { margin-bottom: 8px; }
+[data-style="paper"] .set { padding: 18px 0; background: none; box-shadow: none; border-radius: 0; border-top: 1px solid var(--line); }
+[data-style="paper"] .setup input { background: var(--press); box-shadow: none; }
+[data-style="paper"][data-layout="compact"] #list { gap: 20px; }
+[data-style="paper"][data-layout="compact"] .basket { margin-top: 8px; padding-top: 12px; }

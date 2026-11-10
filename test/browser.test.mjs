@@ -5,7 +5,8 @@
 //
 // STORE, optional, is the server's data directory; the tests then check that no item
 // name was ever written to it. BROWSER picks Playwright's chromium (the default) or
-// firefox.
+// firefox. STYLE=paper and LAYOUT=compact run every test in that look, as chosen in
+// Settings; the test of Settings itself then stands aside.
 
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -37,8 +38,14 @@ async function eventually(fn, ms = 6000) {
   }
 }
 
+const LOOK = [process.env.STYLE || "", process.env.LAYOUT || ""];
 async function phone(errors, options = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, ...options });
+  if (LOOK.join("")) {
+    await ctx.addInitScript(([style, layout]) => {
+      try { if (style) localStorage.setItem("panier-style", style); if (layout) localStorage.setItem("panier-layout", layout); } catch (_) {}
+    }, LOOK);
+  }
   const page = await ctx.newPage();
   watch(page, errors);
   return { ctx, page };
@@ -355,7 +362,7 @@ test("the list has a name, at the top, renamed with a tap", async () => {
   const box = await a.locator("#list-name").boundingBox();
   assert.ok(box.height >= 44, "big enough to tap");
   const font = await a.locator("#list-name").evaluate(el => getComputedStyle(el).fontSize);
-  assert.equal(font, "26px", "the size of a page title");
+  assert.equal(font, LOOK[1] === "compact" ? "20px" : "26px", "the size of a page title");
 
   await renameList(a, "Courses");
   assert.equal(await a.locator("#list-name").innerText(), "Courses");
@@ -463,8 +470,8 @@ test("items hold 120 characters, four lines on a phone", async () => {
   await add(t.a, "ess", long + " and more");
   const text = item(t.a, long.slice(0, 120).trim()).locator(".text");
   assert.equal((await text.innerText()).length, 120);
-  const lines = Math.round(((await text.boundingBox()).height - 28) / 23.8);
-  assert.equal(lines, 4);
+  const lines = await text.evaluate(el => { const c = getComputedStyle(el); return Math.round((el.getBoundingClientRect().height - parseFloat(c.paddingTop) - parseFloat(c.paddingBottom)) / parseFloat(c.lineHeight)); });
+  assert.equal(lines, LOOK[0] === "paper" ? 3 : 4, "four lines at most, three on paper's wider rows");
   await t.close();
 });
 
@@ -509,8 +516,8 @@ test("the plus adds a new item and the cross throws it away, with a finger; Esca
   await a.locator("#add-ess").tap();
   await a.keyboard.type("Bananas");
   assert.ok(await x.isVisible(), "a cross once something is typed");
-  const row = await a.locator('.sec[data-sec="ess"] .add').boundingBox(), xb = await x.boundingBox();
-  assert.ok(xb.height >= 44 && Math.abs(xb.x + xb.width - (row.x + row.width)) < 1, "at the end of the row, big enough to tap");
+  const end = await a.locator('.sec[data-sec="ess"] .add').evaluate(el => el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight)), xb = await x.boundingBox();
+  assert.ok(xb.height >= 44 && Math.abs(xb.x + xb.width - end) < 1, "at the end of the row, big enough to tap");
   await x.tap();
   assert.equal(await a.inputValue("#add-ess"), "", "the text goes");
   assert.equal(await a.evaluate(() => document.activeElement.id), "add-ess", "the cursor stays, for the next one");
@@ -919,7 +926,7 @@ test("sections are reordered by dragging their names, folded meanwhile", async (
   await t.close();
 });
 
-test("settings: appearance, keeping the list, its size, export, and about", async () => {
+test("settings: appearance, keeping the list, its size, export, and about", { skip: !!LOOK.join("") }, async () => {
   const t = await pair();
   const { a } = t;
   await add(a, "ess", "Milk");
@@ -954,6 +961,19 @@ test("settings: appearance, keeping the list, its size, export, and about", asyn
   assert.ok(await a.locator("#compact-layout").isChecked());
   await a.locator("#settings .switch").click();
   assert.equal(await row(), 52, "and back");
+
+  const look = () => a.evaluate(() => [document.documentElement.dataset.style || "cards", getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector("#list .sec")).boxShadow]);
+  await a.locator('#settings .choices label', { hasText: "Light" }).click();
+  await a.locator('#settings .choices label', { hasText: "Paper" }).click();
+  assert.deepEqual(await look(), ["paper", "rgb(255, 255, 255)", "none"], "Paper: the list on a white page, without cards");
+  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "#ffffff", "the browser's bars follow");
+  await a.reload();
+  await a.locator("#app").waitFor();
+  assert.equal((await look())[0], "paper", "kept on this phone");
+  await a.click("#settings-open");
+  assert.ok(await a.locator('input[name="style"][value="paper"]').isChecked());
+  await a.locator('#settings .choices label', { hasText: "Cards" }).click();
+  assert.equal((await look())[0], "cards", "and back to cards");
 
   assert.match(await a.locator("#size-text").innerText(), /2 items to get, 1 bought before/);
   assert.ok(await eventually(async () => /browser/.test(await a.locator("#keep-text").innerText())));
