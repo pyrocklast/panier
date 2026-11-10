@@ -658,6 +658,10 @@ test("a × on a suggestion removes that item for good", async () => {
   await sleep(1900);
   assert.ok(await eventually(async () => (await ticked(b)).length === 3));
 
+  await a.fill("#add-ess", "m");
+  assert.equal(await a.locator("#sug-ess").isHidden(), true, "one letter suggests nothing");
+  await a.fill("#add-ess", "mi");
+  assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Mild cheese", "Milk"], "two letters do");
   await a.fill("#add-ess", "mli");
   assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Mlik"]);
   await a.locator("#sug-ess .sug-x").first().click();

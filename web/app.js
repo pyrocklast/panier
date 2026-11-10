@@ -620,7 +620,7 @@ function recolour(id, color, label) {
 
 function suggestions(text) {
   const n = nameKey(text);
-  if (n.length < 3) return [];
+  if (n.length < 2) return []; // from two letters
   const scored = [];
   for (const it of items) {
     if (!it.checked || settling.has(it.id)) continue;

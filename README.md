@@ -39,14 +39,14 @@ Each section is a card with its name at the top. A list starts with three:
 
 ### Suggestions
 
-- From three letters, items bought before are suggested above the field, so the phone keyboard never hides them.
+- From two letters, items bought before are suggested above the field, so the phone keyboard never hides them.
 - Matching ignores accents and case. Matches at the start of the name come first, then the start of a word, then the most recently bought. Five at most, each name once.
 - Tapping a suggestion puts the item back, with the quantity typed so far if there is one: *2 mil*, then a tap on Milk, gives *2 milk*.
 - A × at the end of each suggestion removes that item for good, for typos such as *Mlik*. Undo brings it back.
 
 ### Ticking
 
-- Tap the square to tick. A short vibration confirms it.
+- Tap the square to tick. A short vibration confirms it in browsers that let web pages vibrate, such as Chrome and Samsung Internet on Android. Firefox turned this off in version 129, and Safari never had it.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row move together and the list does not shift under your thumb.
 - They then slide to the ticked group below the lists, always at the same pace, however long the list. When the group is below the screen, they slide out of view at its bottom edge rather than racing all the way down. Its heading reads *3 ticked*, with an arrow to fold it away.
 - The group shows what was ticked in the last 12 hours. Older items are hidden but still suggested.
