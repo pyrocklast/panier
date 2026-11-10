@@ -377,7 +377,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 [data-style="paper"] #add-sec:focus { box-shadow: inset 0 -2px 0 var(--ink); }
 /* Lifted: a slip of paper above the page */
 [data-style="paper"] :is(.item.lifted, .item.hint) { background-color: var(--surface); border-radius: 12px; }
-[data-style="paper"] :is(.ghost, .flying) { box-sizing: border-box; background-color: var(--surface); }
+[data-style="paper"] :is(.ghost, .flying) { margin: 0; box-sizing: border-box; background-color: var(--surface); } /* placed exactly over the row, room included */
 [data-style="paper"] :is(.sec.lifted, .sec.ghost) { background: var(--surface); border-radius: 4px; box-shadow: 0 0 0 12px var(--surface), var(--float); }
 [data-style="paper"] .item.placeholder { background-color: color-mix(in oklab, var(--sec) 8%, var(--bg)); border-radius: 12px; }
 [data-style="paper"] .item.placeholder.away { background-color: transparent; }

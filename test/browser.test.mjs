@@ -838,6 +838,31 @@ test("a ticked item travels at the same pace however long the list, and only as 
   await t.close();
 });
 
+test("an item on the move stays in line with the list, in both styles", async () => {
+  const t = await pair();
+  const { a } = t;
+  for (const x of ["Milk", "Bread", "Eggs", "Tea"]) await add(a, "ess", x);
+  await blur(a);
+  const left = sel => a.evaluate(s => document.querySelector(s).getBoundingClientRect().left, sel);
+  const near = (x, y, msg) => assert.ok(Math.abs(x - y) < 3, `${msg}: ${x.toFixed(1)} and ${y.toFixed(1)}`); // a 12 px shift was the trouble
+  for (const [style, x, drag] of [["", "Milk", "Bread"], ["paper", "Eggs", "Tea"]]) {
+    await a.evaluate(s => { if (s) localStorage.setItem("panier-style", s); else localStorage.removeItem("panier-style"); }, style);
+    await a.reload();
+    await a.locator("#app").waitFor();
+    await still(a);
+    const at = await item(a, x).locator(".text").evaluate(e => e.getBoundingClientRect().left);
+    await item(a, x).locator(".boxcell").click();
+    await a.waitForSelector(".flying");
+    near(await left(".flying .text"), at, (style || "cards") + ": a ticked item flies in line");
+    await still(a);
+    await dragTo(a, item(a, drag), async () => (await a.locator("#list .item").first().boundingBox()).y, { hold: true });
+    near(await left(".ghost .text"), at, (style || "cards") + ": so does a dragged one");
+    await a.mouse.up();
+    await still(a);
+  }
+  await t.close();
+});
+
 test("a section's colour is chosen from a palette while renaming it", async () => {
   const t = await pair();
   const { a, b } = t;
