@@ -410,7 +410,7 @@ test("leaving the Add item field adds the item, and the tap still works", async 
   await t.close();
 });
 
-test("the cross on a new item throws it away, with a finger or with Escape", async () => {
+test("the plus adds a new item and the cross throws it away, with a finger; Escape too", async () => {
   const t = await pair(ENGINE === "firefox" ? { hasTouch: true } : { hasTouch: true, isMobile: true });
   const { a, b } = t;
   const x = a.locator('.sec[data-sec="ess"] .add-x');
@@ -428,11 +428,23 @@ test("the cross on a new item throws it away, with a finger or with Escape", asy
   await a.keyboard.type("Pears");
   await a.keyboard.press("Escape");
   assert.equal(await a.inputValue("#add-ess"), "", "Escape throws it away too");
+
+  await a.keyboard.type("Apples");
+  await a.locator('.sec[data-sec="ess"] .add-plus').tap();
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Apples"), "the plus adds it, like Enter");
+  assert.equal(await a.evaluate(() => document.activeElement.id), "add-ess", "and the cursor stays for the next one");
+  await a.keyboard.type("Pears");
+  await a.keyboard.press("Escape");
+  assert.equal(await a.inputValue("#add-ess"), "", "Escape throws it away too");
   await blur(a);
   await sleep(500);
-  assert.deepEqual(await texts(a, "Essentials"), [], "nothing was added");
+  assert.deepEqual(await texts(a, "Essentials"), ["Apples"], "nothing else was added");
   await add(a, "ess", "Milk");
-  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk"), "the other phone only ever gets Milk");
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Apples,Milk"), "the other phone only ever gets those two");
+
+  await blur(a);
+  await a.locator('.sec[data-sec="look"] .add-plus').tap();
+  assert.equal(await a.evaluate(() => document.activeElement.id), "add-look", "with nothing typed, the plus opens the field");
   await t.close();
 });
 

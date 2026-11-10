@@ -710,8 +710,15 @@ function buildShell(id) {
     type: "button", class: "bin add-x", tabindex: "-1", "aria-label": t("Clear"),
     onpointerdown: keep, onmousedown: keep, onclick: () => { clearAdd(id); input.focus(); },
   }, icon("cross"));
-  const form = h("form", { class: "add", autocomplete: "off", onsubmit: e => { e.preventDefault(); submitAdd(id); } },
-    h("label", { class: "add-plus", for: "add-" + id, "aria-hidden": "true" }, icon("plus")), input, clear);
+  // The plus opens the field; once something is typed, it adds it, like Enter, and the
+  // cursor stays for the next one.
+  const typed = () => !!input.value.trim();
+  const keepIfTyped = e => { if (typed()) e.preventDefault(); };
+  const plus = h("label", {
+    class: "add-plus", for: "add-" + id, "aria-hidden": "true", onpointerdown: keepIfTyped, onmousedown: keepIfTyped,
+    onclick: e => { if (typed()) { e.preventDefault(); submitAdd(id); input.focus(); } },
+  }, icon("plus"));
+  const form = h("form", { class: "add", autocomplete: "off", onsubmit: e => { e.preventDefault(); submitAdd(id); } }, plus, input, clear);
   const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Bought before"), hidden: true });
   const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id } });
   name.addEventListener("click", e => {

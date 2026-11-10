@@ -138,6 +138,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .add-input { margin-right: 4px; }
 .add-x { width: 48px; flex: none; }
 .add:not(.typing) .add-x { display: none; }
+.add.typing .add-plus { cursor: pointer; } /* it adds what's typed */
 
 /* Suggestions */
 .sug { list-style: none; margin: 0; padding: 4px 0; box-shadow: inset 0 1px 0 var(--line); }
