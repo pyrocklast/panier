@@ -30,7 +30,7 @@ Each section is a card with its name at the top. A list starts with three:
 ### Adding
 
 - Every card ends with an *Add item* row. Tapping the row or its `+` opens the field. Items hold up to 120 characters, about four lines.
-- As soon as you type, the `+` becomes a tick box: the row is a new item. A cross appears at the end of the row, where it is when editing an item: tapping it throws the new item away, and the cursor stays in the field. Escape does the same from a keyboard, once any suggestions are closed.
+- As soon as you type, a cross appears at the end of the row, where it is when editing an item: tapping it throws away what you typed, and the cursor stays in the field. The `+` stays as it is, since nothing is on the list until it's added. Escape does the same from a keyboard, once any suggestions are closed.
 - Enter adds the new item and keeps the field open for the next one. Leaving the field adds it too, so nothing typed is lost. A notification or switching apps doesn't cut it short, and text left in the field when the app closes is added the next time it opens.
 - Typing something already on the list highlights it instead of adding a copy.
 - Enter adds just what you typed. Typing the full name of something bought before puts that item back as you typed it, into the section you are typing in, rather than adding a copy. A suggestion only comes back when you tap it.

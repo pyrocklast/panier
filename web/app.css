@@ -132,14 +132,12 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   color: var(--ink); font: inherit;
 }
 .add-input::placeholder { color: var(--muted); }
-/* Once you type, the row is a new item: its plus becomes a tick box, and a cross at the
-   end throws it away, in the same place as when editing an item. */
+/* Once you type, a cross at the end of the row throws the text away, in the same place
+   as when editing an item. The plus stays: nothing is on the list until it's added. */
 .add.typing { padding-right: 0; }
 .add-input { margin-right: 4px; }
 .add-x { width: 48px; flex: none; }
 .add:not(.typing) .add-x { display: none; }
-.add.typing .add-plus svg { display: none; }
-.add.typing .add-plus::before { content: ""; width: 21px; height: 21px; box-sizing: border-box; border: 2px solid var(--sec); border-radius: 5px; }
 
 /* Suggestions */
 .sug { list-style: none; margin: 0; padding: 4px 0; box-shadow: inset 0 1px 0 var(--line); }

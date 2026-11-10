@@ -386,7 +386,8 @@ test("leaving the Add item field adds the item, and the tap still works", async 
   await sleep(1900);
 
   await a.fill("#add-ess", "Lemons");
-  assert.equal(await a.locator('.sec[data-sec="ess"] .add.typing').count(), 1, "typing makes the row an item");
+  assert.ok(await a.locator('.sec[data-sec="ess"] .add-x').isVisible(), "typing shows the cross");
+  assert.ok(await a.locator('.sec[data-sec="ess"] .add-plus svg').isVisible(), "and the plus stays");
   await item(a, "Milk").locator(".boxcell").click();
   await sleep(500);
   assert.ok((await texts(a, "Essentials")).includes("Lemons"), "leaving adds the item");
