@@ -703,8 +703,15 @@ function buildShell(id) {
     role: "combobox", "aria-autocomplete": "list", "aria-haspopup": "grid", "aria-expanded": "false", "aria-controls": "sug-" + id,
     dataset: { fk: "add-" + id },
   });
+  // Once something is typed, a cross at the end of the row throws it away, as one deletes
+  // an item being edited. The cursor stays in the field, ready for the next one.
+  const keep = e => e.preventDefault(); // pressing the cross doesn't leave the field, which would add the item
+  const clear = h("button", {
+    type: "button", class: "bin add-x", tabindex: "-1", "aria-label": t("Clear"),
+    onpointerdown: keep, onmousedown: keep, onclick: () => { clearAdd(id); input.focus(); },
+  }, icon("cross"));
   const form = h("form", { class: "add", autocomplete: "off", onsubmit: e => { e.preventDefault(); submitAdd(id); } },
-    h("label", { class: "add-plus", for: "add-" + id, "aria-hidden": "true" }, icon("plus")), input);
+    h("label", { class: "add-plus", for: "add-" + id, "aria-hidden": "true" }, icon("plus")), input, clear);
   const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Bought before"), hidden: true });
   const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id } });
   name.addEventListener("click", e => {
@@ -734,7 +741,10 @@ function buildShell(id) {
     }, 0);
   });
   input.addEventListener("keydown", e => {
-    if (e.key === "Escape") { closeSug(); return; }
+    if (e.key === "Escape") { // first the suggestions, then what was typed
+      if (ui.sugSec === id) closeSug(); else clearAdd(id);
+      return;
+    }
     if (ui.sugSec !== id || !ui.sug.length) return;
     const n = ui.sug.length, i = ui.sugIndex;
     if (e.key === "ArrowDown") ui.sugIndex = (i + 1) % n;

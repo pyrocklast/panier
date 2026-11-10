@@ -409,6 +409,32 @@ test("leaving the Add item field adds the item, and the tap still works", async 
   await t.close();
 });
 
+test("the cross on a new item throws it away, with a finger or with Escape", async () => {
+  const t = await pair(ENGINE === "firefox" ? { hasTouch: true } : { hasTouch: true, isMobile: true });
+  const { a, b } = t;
+  const x = a.locator('.sec[data-sec="ess"] .add-x');
+  assert.equal(await x.isVisible(), false, "no cross before typing");
+  await a.locator("#add-ess").tap();
+  await a.keyboard.type("Bananas");
+  assert.ok(await x.isVisible(), "a cross once something is typed");
+  const row = await a.locator('.sec[data-sec="ess"] .add').boundingBox(), xb = await x.boundingBox();
+  assert.ok(xb.height >= 44 && Math.abs(xb.x + xb.width - (row.x + row.width)) < 1, "at the end of the row, big enough to tap");
+  await x.tap();
+  assert.equal(await a.inputValue("#add-ess"), "", "the text goes");
+  assert.equal(await a.evaluate(() => document.activeElement.id), "add-ess", "the cursor stays, for the next one");
+  assert.equal(await x.isVisible(), false);
+
+  await a.keyboard.type("Pears");
+  await a.keyboard.press("Escape");
+  assert.equal(await a.inputValue("#add-ess"), "", "Escape throws it away too");
+  await blur(a);
+  await sleep(500);
+  assert.deepEqual(await texts(a, "Essentials"), [], "nothing was added");
+  await add(a, "ess", "Milk");
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk"), "the other phone only ever gets Milk");
+  await t.close();
+});
+
 test("text left in the field when the app closes is added next time", async () => {
   const t = await pair();
   const { A, b } = t;

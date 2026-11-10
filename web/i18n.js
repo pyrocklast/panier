@@ -22,6 +22,7 @@ const FR = {
   "Undo": "Annuler",
   "Redo": "Rétablir",
   "Close": "Fermer",
+  "Clear": "Effacer",
   "Appearance": "Apparence",
   "Same as phone": "Comme le téléphone",
   "Light": "Clair",
