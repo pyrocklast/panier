@@ -139,8 +139,12 @@ test("two phones share changes live", async () => {
   await item(a, "Ripe avocados").locator(".text").click();
   await a.locator(".item .bin").click();
   assert.ok(await eventually(async () => (await texts(b, "Look out for")).length === 0), "a delete reaches the other phone");
+  assert.equal(await a.locator("#undo-what").innerText(), "Ripe avocados", "undo names what it would bring back");
+  assert.equal(await a.locator("#redo").isVisible(), false, "redo only shows once something has been undone");
   await a.click("#undo");
   assert.ok(await eventually(async () => (await texts(b, "Look out for")).join() === "Ripe avocados"), "undo reaches the other phone");
+  assert.equal(await a.locator("#undo-what").isVisible(), false);
+  assert.equal(await a.locator("#redo").isVisible(), true, "and now redo can put the delete back");
 
   await a.click("#pair-open");
   assert.equal(await a.locator("#pair-title").innerText(), "Add someone to this list");
@@ -151,6 +155,77 @@ test("two phones share changes live", async () => {
   assert.ok(await eventually(async () => (await b.locator("#qr svg").count()) === 1), "and draws the code when pairing opens");
   await b.click("#pair-close");
   assert.equal(await a.locator(".item .boxcell svg").count(), 0, "tick boxes draw their tick and grip in CSS");
+  await t.close();
+});
+
+test("what the other phone changes is tinted where it is", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  const tinted = (pg, sel = "#list") => pg.locator(sel + " .item.flash .text").allInnerTexts();
+  for (const x of ["Milk", "Bread", "Eggs"]) await add(a, "ess", x);
+  await blur(a);
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk,Bread,Eggs"));
+  assert.ok(await eventually(async () => (await tinted(b)).length > 0), "items the other phone adds are tinted");
+
+  await item(b, "Eggs").locator(".chk").focus();
+  await b.keyboard.press("Alt+ArrowUp");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Eggs,Bread"));
+  await sleep(300);
+  assert.deepEqual(await tinted(a), [], "a change of order alone isn't");
+  await item(b, "Bread").locator(".boxcell").click();
+  assert.ok(await eventually(async () => (await tinted(a, "#basket-list")).join() === "Bread"), "an item the other phone ticks is, in the ticked group");
+
+  const C = await browser.newContext({ viewport: { width: 390, height: 844 } }), c = await C.newPage();
+  await c.goto(BASE + "/#k=" + t.key);
+  assert.ok(await eventually(async () => (await texts(c, "Essentials")).join() === "Milk,Eggs"));
+  assert.deepEqual(await c.locator(".item.flash").allInnerTexts(), [], "a phone opening the list for the first time sees nothing tinted");
+  await C.close();
+  await t.close();
+});
+
+test("a link to another list asks before this phone leaves its own", async () => {
+  const t = await pair();
+  const { a, A } = t;
+  await add(a, "ess", "Milk");
+  await blur(a);
+  const other = await browser.newContext(), o = await other.newPage();
+  await o.goto(BASE + "/#setup=" + SETUP.toLowerCase());
+  await o.locator("#pair").waitFor();
+  await o.click("#pair-close");
+  await add(o, "ess", "Garden hose");
+  assert.ok(await eventually(() => o.evaluate(() => { // saved, and sent, before that phone closes
+    const st = JSON.parse(localStorage.getItem("panier"));
+    return !st.outbox.length && Object.values(st.items).some(f => f.text && f.text[0] === "Garden hose");
+  })));
+  const key2 = await o.evaluate(() => JSON.parse(localStorage.getItem("panier")).key);
+  await other.close();
+
+  await a.goto("about:blank");
+  await a.goto(BASE + "/#k=" + t.key);
+  await a.locator("#app").waitFor();
+  assert.equal(await a.locator("#switch").isVisible(), false, "its own link opens the list without asking");
+
+  await a.goto("about:blank"); // a link opened from another app loads the page afresh
+  await a.goto(BASE + "/#k=" + key2);
+  await a.locator("#switch").waitFor();
+  assert.equal(await a.locator("#switch-text").innerText(), "This phone will leave “Shopping list” and open the list from the link.");
+  assert.equal(await a.locator("#switch-lost").isVisible(), false);
+  await a.click("#switch-cancel");
+  assert.equal(await a.locator("#switch").isVisible(), false);
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk"], "Cancel keeps the list");
+  assert.equal(await a.evaluate(() => JSON.parse(localStorage.getItem("panier")).key), t.key);
+
+  await offline(A, a);
+  await add(a, "ess", "Bread");
+  await blur(a);
+  await a.goto("about:blank"); // a link opened from another app loads the page afresh
+  await a.goto(BASE + "/#k=" + key2);
+  await a.locator("#switch").waitFor();
+  assert.equal(await a.locator("#switch-lost").innerText(), "1 change made here hasn't been sent yet, and would be lost.");
+  await online(A, a);
+  await a.click("#switch-ok");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Garden hose", 10000), "Switch opens the other list");
+  assert.equal(await a.evaluate(() => JSON.parse(localStorage.getItem("panier")).key), key2);
   await t.close();
 });
 
@@ -211,8 +286,12 @@ test("the server stores no item names", { skip: !process.env.STORE }, async () =
   const walk = dir => {
     for (const f of readdirSync(dir)) {
       const p = join(dir, f);
-      if (statSync(p).isDirectory()) walk(p);
-      else all.push(readFileSync(p));
+      try {
+        if (statSync(p).isDirectory()) walk(p);
+        else all.push(readFileSync(p));
+      } catch (e) {
+        if (e.code !== "ENOENT") throw e; // a database's temporary file, gone as it closed
+      }
     }
   };
   walk(process.env.STORE);
@@ -700,6 +779,7 @@ test("ticked items slide into the ticked group, and taps land meanwhile", async 
   assert.equal(await item(a, "Milk").locator(".chk").isChecked(), true, "a tap during the motion ticks Milk");
   assert.ok(await eventually(async () => (await a.locator(".flying").count()) === 0 && (await ticked(a)).join() === "Eggs"));
   assert.ok(await eventually(async () => (await ticked(a)).join() === "Milk,Eggs", 4000));
+  assert.equal(await a.locator("#basket-toggle").innerText(), "2 ticked", "the group's heading says what it holds");
   await t.close();
 });
 
@@ -887,7 +967,7 @@ test("in French when the phone is in French", async () => {
 
   await a.click("#settings-open");
   assert.equal(await a.locator("#settings-title").innerText(), "Paramètres");
-  assert.equal(await a.locator("#size-text").evaluate(el => el.textContent.split(":").pop().trim()), "1 article à acheter, 0 déjà acheté.", "French counts 0 as one");
+  assert.equal(await a.locator("#size-text").evaluate(el => el.textContent.split(":").pop().trim()), "1 article à acheter, 0 déjà acheté", "French counts 0 as one");
   await a.click("#settings-close");
 
   assert.ok(await eventually(async () => (await texts(b, "Essentiels")).join() === "2 lait"), "sent before going offline");
@@ -900,7 +980,7 @@ test("in French when the phone is in French", async () => {
 
   const shown = await a.evaluate(() => document.body.innerText + " " + [...document.querySelectorAll("[aria-label], [placeholder], [title]")]
     .map(e => ["aria-label", "placeholder", "title"].map(k => e.getAttribute(k) || "").join(" ")).join(" "));
-  for (const en of ["Add item", "Add a section", "Settings", "Essentials", "Add someone", "Ticked items", "Undo", "Close", "Offline", "Edit "]) {
+  for (const en of ["Add item", "Add a section", "Settings", "Essentials", "Add someone", " ticked", "Undo", "Close", "Offline", "Edit "]) {
     assert.ok(!shown.includes(en), "“" + en + "” is in French");
   }
   await online(A, a);

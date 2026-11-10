@@ -13,7 +13,7 @@ const FR = {
   "Renamed the list to {x}": "Liste renommée en {x}",
   "renaming the list {x}": "renommer la liste {x}",
   "Add a section": "Ajouter une section",
-  "Ticked items": "Articles cochés",
+  "{n} ticked": ["{n} coché", "{n} cochés"],
   "Add someone to this list": "Ajouter quelqu’un à cette liste",
   "Settings": "Paramètres",
   "Open the link from a phone that already has the list.": "Ouvrez le lien depuis un téléphone qui a déjà la liste.",
@@ -120,14 +120,22 @@ const FR = {
 
   // Settings
   "Kept on this phone: the browser won't clear the list to free up space.": "Gardée sur ce téléphone" + nb + ": le navigateur n’effacera pas la liste pour libérer de la place.",
-  "The browser may clear the list if this phone runs low on space. Keep the link from {link} somewhere safe, such as a password manager: it brings the list back.":
-    "Le navigateur peut effacer la liste si ce téléphone manque de place. Gardez le lien de {link} en lieu sûr, par exemple dans un gestionnaire de mots de passe" + nb + ": il permet de retrouver la liste.",
-  "On this phone, the list takes {size}: {toGet} to get, {done}.": "Sur ce téléphone, la liste occupe {size}" + nb + ": {toGet} à acheter, {done}.",
+  "If this phone runs low on space, the browser may clear the list; the link from {link} brings it back.":
+    "Si ce téléphone manque de place, le navigateur peut effacer la liste" + nb + "; le lien de {link} permet de la retrouver.",
+  "On this phone": "Sur ce téléphone",
+  "{size}: {toGet} to get, {done}": "{size}" + nb + ": {toGet} à acheter, {done}",
   "{n} items": ["{n} article", "{n} articles"],
   "{n} bought before": ["{n} déjà acheté", "{n} déjà achetés"],
   "{n} bytes": "{n} octets",
   "{n} KB": "{n} Ko",
   "{n} MB": "{n} Mo",
+
+  // Switching lists
+  "Switch to another list?": "Passer à une autre liste" + nb + "?",
+  "This phone will leave {x} and open the list from the link.": "Ce téléphone quittera {x} et ouvrira la liste du lien.",
+  "{n} changes made here haven't been sent yet, and would be lost.": ["{n} modification faite ici n’a pas encore été envoyée et serait perdue.", "{n} modifications faites ici n’ont pas encore été envoyées et seraient perdues."],
+  "Cancel": "Annuler",
+  "Switch": "Changer",
 
   // Starting
   "That setup code didn't work. Check it on the server and try again.": "Ce code d’installation n’a pas fonctionné. Vérifiez-le sur le serveur et réessayez.",

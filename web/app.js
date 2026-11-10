@@ -162,10 +162,12 @@ addEventListener("pointerup", tapEnded, true);
 addEventListener("pointercancel", tapEnded, true);
 const whenTapEnds = fn => { if (pointerIsDown) afterTap.push(fn); else setTimeout(fn, 0); };
 
-// act records one undoable step and redraws.
+// act records one undoable step and redraws. With note, the undo button shows that name
+// for a few seconds: what a tap on it would bring back.
 function act(label, ops, opts = {}) {
   const fk = opts.focusKey || activeFk();
   if (!store.change(label, ops)) return false;
+  noteUndo(opts.note);
   items = store.items();
   if (opts.leaving) whenTapEnds(leftPaint);
   else paint(fk, opts.animate, !!opts.focusKey);
@@ -211,6 +213,7 @@ function refreshFromStore() {
 function step(fn, done, nothing) {
   const r = fn();
   if (!r) return;
+  noteUndo(null);
   announce(r.done ? t(done, { x: r.label }) : t(nothing));
   refreshFromStore();
   scheduleSettle();
@@ -309,7 +312,7 @@ function del(id, opts) {
   const it = find(id);
   settling.delete(id);
   announce(t("Deleted {x}", { x: it.text }));
-  act(t("deleting {x}", { x: q(it.text) }), [[id, "deleted", true]], opts);
+  act(t("deleting {x}", { x: q(it.text) }), [[id, "deleted", true]], { ...opts, note: it.text });
 }
 function nudge(id, dir) {
   const it = find(id);
@@ -350,7 +353,7 @@ const canDelete = id => sections.length > 1 && !items.some(i => i.section === id
 function deleteSection(id) {
   const name = nameOf(id);
   announce(t("Deleted section {x}", { x: name }));
-  act(t("deleting section {x}", { x: q(name) }), [["#" + id, "deleted", true, false]]);
+  act(t("deleting section {x}", { x: q(name) }), [["#" + id, "deleted", true, false]], { note: name });
 }
 
 /* ---------- Editing in place ---------- */
@@ -683,7 +686,7 @@ function closeSug() {
 function forget(id, sec, keyboard = false) {
   const it = find(id), was = ui.sugIndex, name = bare(it.text);
   announce(t("Removed {x} from suggestions", { x: name }));
-  act(t("removing {x} from suggestions", { x: q(name) }), [[id, "deleted", true]], { animate: false });
+  act(t("removing {x} from suggestions", { x: q(name) }), [[id, "deleted", true]], { animate: false, note: name });
   updateSug(sec);
   if (keyboard && ui.sug.length) {
     ui.sugIndex = Math.min(was, ui.sug.length - 1);
@@ -1126,6 +1129,23 @@ function fly(o, to, target) {
 
 /* ---------- Render ---------- */
 
+// Undo floats at the bottom right; redo joins it once something has been undone.
+let undoNote = null, noteTimer = 0;
+function noteUndo(name) {
+  clearTimeout(noteTimer);
+  undoNote = name || null;
+  if (undoNote) noteTimer = setTimeout(() => { undoNote = null; paintDock(); }, 5000);
+}
+function paintDock() {
+  const u = store.undoLabel(), r = store.redoLabel();
+  $("#dock").hidden = !u && !r;
+  setHist($("#undo"), u, "Undo");
+  setHist($("#redo"), r, "Redo");
+  $("#redo").hidden = !r;
+  const named = !!(undoNote && u);
+  $("#undo").classList.toggle("named", named);
+  $("#undo-what").textContent = named ? undoNote : "";
+}
 function setHist(btn, label, verb) {
   btn.setAttribute("aria-disabled", String(!label));
   const text = label ? t(verb + " {x}", { x: label }) : t(verb);
@@ -1189,17 +1209,20 @@ function render() {
   const since = Date.now() - TRIP_MS;
   const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= since).sort((a, b) => b.checkedAt - a.checkedAt);
   $("#basket").classList.toggle("empty", basket.length === 0);
-  $("#basket-count").textContent = String(basket.length);
+  // "3 ticked": true while shopping and after, unlike a basket; only the last 12 hours show
+  $("#basket-count").textContent = plural(basket.length, "{n} ticked", "{n} ticked");
   $("#basket-toggle").setAttribute("aria-expanded", String(ui.basketOpen));
   const bl = $("#basket-list");
   bl.replaceChildren(...basket.map(itemEl));
   bl.hidden = !ui.basketOpen;
-  const u = store.undoLabel(), r = store.redoLabel();
-  $("#dock").hidden = !u && !r;
-  setHist($("#undo"), u, "Undo");
-  setHist($("#redo"), r, "Redo");
+  paintDock();
   paintStatus();
 
+  // What the other phone changed is tinted where it is, without scrolling to it.
+  for (const id of store.takeFresh()) {
+    const li = document.querySelector('.item[data-id="' + id + '"]');
+    if (li) li.classList.add("flash");
+  }
   if (flashId) {
     const li = document.querySelector('.item[data-id="' + flashId + '"]');
     flashId = null;
@@ -1302,14 +1325,14 @@ async function paintSettings() {
   let bytes = 0;
   try { bytes = new Blob([localStorage.getItem("panier") || ""]).size; } catch (_) {}
   const toGet = items.filter(i => !i.checked).length;
-  $("#size-text").textContent = t("On this phone, the list takes {size}: {toGet} to get, {done}.", {
+  $("#size-text").textContent = t("{size}: {toGet} to get, {done}", {
     size: size(bytes), toGet: plural(toGet, "{n} item", "{n} items"), done: plural(items.length - toGet, "{n} bought before", "{n} bought before"),
   });
   $("#about-server").textContent = location.host;
   const [kept, keys] = await Promise.all([isKept(), caches.keys().catch(() => [])]);
   $("#keep-text").textContent = kept
     ? t("Kept on this phone: the browser won't clear the list to free up space.")
-    : t("The browser may clear the list if this phone runs low on space. Keep the link from {link} somewhere safe, such as a password manager: it brings the list back.", { link: q(t("Add someone to this list")) });
+    : t("If this phone runs low on space, the browser may clear the list; the link from {link} brings it back.", { link: q(t("Add someone to this list")) });
   $("#keep-btn").hidden = kept !== false;
   const k = keys.find(k => k.startsWith("panier-") && !k.startsWith("panier-static-"));
   $("#about-version").textContent = k ? k.slice(7) : "dev";
@@ -1414,11 +1437,33 @@ $("#setup-form").addEventListener("submit", async e => {
   }
 });
 
+// A link to another list, on a phone that already has one, asks first: until there can
+// be several lists, switching means this phone leaves the one it has.
+function askSwitch(key) {
+  const waiting = store.status().waiting;
+  $("#switch-text").textContent = t("This phone will leave {x} and open the list from the link.", { x: q(listName()) });
+  $("#switch-lost").textContent = waiting ? plural(waiting, "{n} change made here hasn't been sent yet, and would be lost.", "{n} changes made here haven't been sent yet, and would be lost.") : "";
+  $("#switch-lost").hidden = !waiting;
+  $("#switch-ok").onclick = async () => {
+    await store.join(key);
+    location.reload();
+  };
+  openSheet($("#switch"));
+}
+$("#switch-cancel").addEventListener("click", () => $("#switch").close());
+
 async function init() {
   const params = new URLSearchParams(location.hash.slice(1));
   if (location.hash) history.replaceState(null, "", location.pathname); // keep keys out of history
   try {
-    if (params.get("k")) { await store.join(params.get("k")); keepList(); }
+    const k = params.get("k");
+    if (k && store.linkKind(k) === "other") {
+      showList();
+      store.start();
+      askSwitch(k);
+      return;
+    }
+    if (k) { await store.join(k); keepList(); }
     else if (params.get("setup") && !store.hasList()) {
       await store.createList(params.get("setup"));
       showList();

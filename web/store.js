@@ -234,9 +234,14 @@ export async function createList(code) {
   start();
 }
 
+// What a pairing link would do here: "bad" if incomplete, "first" on a phone without a
+// list, "same" for the list this phone has, "other" for another one.
+const KEY = /^[A-Za-z0-9_-]{43}$/;
+export const linkKind = key => (!KEY.test(key) ? "bad" : !s.key ? "first" : key === s.key ? "same" : "other");
+
 // join switches this phone to the list whose key is in a pairing link.
 export async function join(key) {
-  if (!/^[A-Za-z0-9_-]{43}$/.test(key)) throw new Error("link");
+  if (!KEY.test(key)) throw new Error("link");
   if (key === s.key) return;
   stop();
   s = blank(key, s.dev);
@@ -270,14 +275,20 @@ function flushSoon() {
   flushTimer = setTimeout(flush, 150);
 }
 
+// A download or a send still under way when this phone switches lists is dropped, so
+// nothing from one list ends up in the other.
+const still = (st, current) => s === st && session === current;
+
 async function flush() {
   if (!session || flushing || !s.outbox.length) return;
   flushing = true;
+  const st = s, current = session;
   try {
     const batch = s.outbox.slice(0, 100);
     const changes = await Promise.all(batch.map(seal));
     const res = await api("/changes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes }) });
     const { latest } = await res.json();
+    if (!still(st, current)) return;
     s.outbox.splice(0, batch.length);
     // Nothing else arrived in between: the server holds just what this phone already has.
     if (latest === s.seq + batch.length) s.seq = latest;
@@ -294,28 +305,46 @@ async function flush() {
   if (s.outbox.length && state === "online") flushSoon();
 }
 
+// Items the other phone added, renamed, moved to another section, ticked or unticked,
+// for the page to point out. Not on a phone's first download of a list, when everything
+// is new; s.pulled records that it has had one.
+let fresh = new Set();
+export function takeFresh() {
+  const ids = fresh;
+  fresh = new Set();
+  return ids;
+}
+const NOTED = new Set(["text", "section", "checked"]);
+
 function pull() {
   if (!session) return Promise.resolve();
   if (pulling) { pullAgain = true; return pulling; }
   pulling = (async () => {
     let changed = false;
+    const known = s.seq > 0 || !!s.pulled;
+    const st = s, current = session;
     do {
       pullAgain = false;
       for (;;) {
         const { changes, latest } = await (await api("/changes?since=" + s.seq)).json();
+        if (!still(st, current)) return;
         for (const c of changes) {
-          try {
-            const ch = await open(c.data);
-            for (const [id, field, value, t] of ch.o) {
-              s.clock = Math.max(s.clock, t);
-              if (put(id, field, value, t, ch.d)) changed = true;
+          let ch = null;
+          try { ch = await open(c.data); } catch (_) { /* unreadable change: written with another key, skip it */ }
+          if (!still(st, current)) return;
+          if (ch) for (const [id, field, value, t] of ch.o) {
+            s.clock = Math.max(s.clock, t);
+            if (put(id, field, value, t, ch.d)) {
+              changed = true;
+              if (known && NOTED.has(field) && id[0] !== "#" && id[0] !== "@") fresh.add(id);
             }
-          } catch (_) { /* unreadable change: written with another key, skip it */ }
+          }
           s.seq = c.seq;
         }
         if (!changes.length || s.seq >= latest) break;
       }
     } while (pullAgain);
+    s.pulled = 1;
     save();
     setState("online");
     if (changed) emit("remote");

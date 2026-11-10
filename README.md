@@ -48,7 +48,7 @@ Each section is a card with its name at the top. A list starts with three:
 
 - Tap the square to tick. A short vibration confirms it.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row move together and the list does not shift under your thumb.
-- They then slide to the ticked group below the lists. Its header is a filled tick box, a count and a collapse arrow.
+- They then slide to the ticked group below the lists. Its heading reads *3 ticked*, with an arrow to fold it away.
 - The group shows what was ticked in the last 12 hours. Older items are hidden but still suggested.
 - Dragging an item down onto the drop zone that appears under the ticked group's heading ticks it straight away; the item shows as ticked while it's over the group. The heading shows during the drag even when nothing is ticked yet.
 - Tapping a ticked square puts the item back at the end of its section, or of the first section if its own was deleted. Dragging a ticked item into a section puts it back right where you drop it.
@@ -72,21 +72,23 @@ Each section is a card with its name at the top. A list starts with three:
 
 ### Undo and redo
 
-- Every change can be undone. A small undo/redo pill appears at the bottom right after the first change and hides while you type.
+- Every change can be undone. An undo button appears at the bottom right after the first change and hides while you type. Redo joins it once something has been undone.
+- For a few seconds after deleting an item, a section or a suggestion, the undo button shows its name: what a tap would bring back.
 - With two people, each person will undo only their own changes.
 
 ### Pairing and sync
 
 - The first phone starts the list with the server's setup code. *Add someone to this list*, at the bottom of the list, shows a QR code and a link for the second phone.
-- Changes appear on the other phone within a second. Without signal, the app keeps working and shows *Offline* with the number of changes waiting; they are sent when the connection returns.
+- Changes appear on the other phone within a second. What the other phone adds, renames, moves to another section, ticks or unticks is tinted briefly where it is, without anything moving. A phone opening a list for the first time sees nothing tinted. Without signal, the app keeps working and shows *Offline* with the number of changes waiting; they are sent when the connection returns.
+- Opening the link to a different list, on a phone that already has one, asks first: until there can be several lists, the phone would leave the one it has. It also says if changes made on it haven't been sent yet.
 
 ### Settings
 
 *Settings*, at the bottom of the list, opens a page of its own; the phone's back gesture closes it.
 
 - **Appearance:** the same as the phone, light or dark, chosen on each phone.
-- **Data:** whether the browser keeps the list even when the phone runs low on space. Panier asks for this when you start or join a list; Firefox asks you once, Chrome decides for itself. If it isn't kept, a button asks again, with a reminder to keep the pairing link somewhere safe. Below, how much space the list takes on the phone, and *Export the list*, which saves it as a text checklist named after the list: each section's items to get, then everything bought before, by name.
-- **About:** the version, the server, and what the server can and can't see.
+- **Data:** whether the browser keeps the list even when the phone runs low on space. Panier asks for this when you start or join a list; Firefox asks you once, Chrome decides for itself. If it isn't kept, a button asks again, with a reminder that the pairing link brings the list back. Then *Export the list*, which saves it as a text checklist named after the list: each section's items to get, then everything bought before, by name.
+- **About:** the version, the server, how much space the list takes on this phone, and what the server can and can't see.
 
 ### Keyboard and accessibility
 
