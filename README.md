@@ -6,6 +6,11 @@ A private, collaborative shopping list. Minimal, end-to-end encrypted, on Cloudf
 
 ## How it behaves
 
+### The list's name
+
+- The list's name is the title at the top, *Shopping list* to start with (*Liste de courses* in French). Tap it to rename it; both phones see the new name. It also names the exported file.
+- Like everything else on the list, it's encrypted: the server can't read it.
+
 ### Sections
 
 Each section is a card with its name at the top. A list starts with three:
@@ -27,13 +32,15 @@ Each section is a card with its name at the top. A list starts with three:
 - Every card ends with an *Add item* row. Tapping the row or its `+` opens the field. Items hold up to 120 characters, about four lines.
 - As soon as you type, the `+` becomes a tick box: the row is a new item. Enter adds it and keeps the field open for the next one. Leaving the field adds it too, so nothing typed is lost. A notification or switching apps doesn't cut it short, and text left in the field when the app closes is added the next time it opens.
 - Typing something already on the list highlights it instead of adding a copy.
-- Typing something bought before puts it back, into the section you are typing in.
-- **Quantities.** A number at the start, such as *2 milk*, *2× milk*, *500 g flour* or *1.5kg potatoes*, is shown slightly apart from the name, in bold. It's left out when comparing names, so *2 milk* is still Milk: typing it when Milk is on the list, or was bought before, gives that item the new quantity, and *2 mil* suggests Milk.
+- Enter adds just what you typed. Typing the full name of something bought before puts that item back as you typed it, into the section you are typing in, rather than adding a copy. A suggestion only comes back when you tap it.
+- **Quantities.** A number at the start, such as *2 milk*, *2× milk*, *500 g flour*, *1.5kg potatoes*, *2 litres of milk* or *3 paquets de pâtes*, is shown slightly apart from the name, in bold. It's left out when comparing names, so *2 litres of milk* is still Milk: typing *3 milk* while it's on the list gives it the new quantity, and *mil* suggests Milk.
+- A quantity is for one shop. The ticked group still shows it, so unticking a mistake puts the item back as it was, but suggestions show the name alone and bring it back without the old quantity.
 
 ### Suggestions
 
 - From three letters, items bought before are suggested above the field, so the phone keyboard never hides them.
-- Matching ignores accents and case. Matches at the start of the name come first, then the start of a word, then the most recently bought. Five at most.
+- Matching ignores accents and case. Matches at the start of the name come first, then the start of a word, then the most recently bought. Five at most, each name once.
+- Tapping a suggestion puts the item back, with the quantity typed so far if there is one: *2 mil*, then a tap on Milk, gives *2 milk*.
 - A × at the end of each suggestion removes that item for good, for typos such as *Mlik*. Undo brings it back.
 
 ### Ticking
@@ -77,7 +84,7 @@ Each section is a card with its name at the top. A list starts with three:
 *Settings*, at the bottom of the list, opens a page of its own; the phone's back gesture closes it.
 
 - **Appearance:** the same as the phone, light or dark, chosen on each phone.
-- **Data:** whether the browser keeps the list even when the phone runs low on space. Panier asks for this when you start or join a list; Firefox asks you once, Chrome decides for itself. If it isn't kept, a button asks again, with a reminder to keep the pairing link somewhere safe. Below, how much space the list takes on the phone, and *Export the list*, which saves it as a text checklist: each section's items to get, then everything bought before.
+- **Data:** whether the browser keeps the list even when the phone runs low on space. Panier asks for this when you start or join a list; Firefox asks you once, Chrome decides for itself. If it isn't kept, a button asks again, with a reminder to keep the pairing link somewhere safe. Below, how much space the list takes on the phone, and *Export the list*, which saves it as a text checklist named after the list: each section's items to get, then everything bought before, by name.
 - **About:** the version, the server, and what the server can and can't see.
 
 ### Keyboard and accessibility

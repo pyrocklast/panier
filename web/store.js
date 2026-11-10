@@ -88,12 +88,14 @@ function tick() {
   return s.clock;
 }
 
-// Items and sections share one map. A section's key is "#" followed by its id; the
-// three default sections ("ess", "look", "long") are only stored once changed.
+// Items, sections and the list's own name share one map. A section's key is "#" followed
+// by its id; the three default sections ("ess", "look", "long") are only stored once
+// changed. The list's name is under "@list", once it has been given one. Item ids never
+// start with either sign, and earlier versions pass over "@list", which has no text.
 export function items() {
   const out = [];
   for (const [id, f] of Object.entries(s.items)) {
-    if (id[0] === "#" || !f.text || (f.deleted && f.deleted[0])) continue;
+    if (id[0] === "#" || id[0] === "@" || !f.text || (f.deleted && f.deleted[0])) continue;
     out.push({
       id,
       text: f.text[0],
@@ -120,6 +122,7 @@ export function sections() {
   }
   return out;
 }
+export const listName = () => valueOf("@list", "name");
 
 /* ---------- Local changes and undo ---------- */
 

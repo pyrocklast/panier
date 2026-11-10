@@ -89,6 +89,13 @@ async function renameSection(pg, from, to) {
   await pg.keyboard.press("Enter");
 }
 
+async function renameList(pg, to) {
+  await pg.click("#list-name");
+  await pg.keyboard.press("Control+A");
+  await pg.keyboard.type(to);
+  await pg.keyboard.press("Enter");
+}
+
 // Waits until nothing is gliding (see Motion in app.js), so positions measured next are final.
 const still = pg => pg.waitForFunction(() => !document.getAnimations().some(a => (a.id === "glide" || a.id === "fly") && a.playState === "running"));
 
@@ -197,6 +204,9 @@ test("the server stores no item names", { skip: !process.env.STORE }, async () =
   const words = ["Camembert", "Baguette tradition", "Persil frais"];
   for (const w of words) await add(t.a, "ess", w);
   assert.ok(await eventually(async () => (await texts(t.b, "Essentials")).length === 3));
+  await renameList(t.a, "Marché du samedi");
+  words.push("Marché du samedi");
+  assert.ok(await eventually(async () => (await t.b.locator("#list-name").innerText()) === "Marché du samedi"));
   const all = [];
   const walk = dir => {
     for (const f of readdirSync(dir)) {
@@ -243,6 +253,37 @@ test("sections can be renamed, added, and deleted once empty", async () => {
   assert.ok(await eventually(async () => !(await names(b)).includes("Temp")), "deleting reaches the other phone");
   await a.click("#undo");
   assert.ok(await eventually(async () => (await names(b)).includes("Temp")), "undo brings it back");
+  await t.close();
+});
+
+test("the list has a name, at the top, renamed with a tap", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  assert.equal(await a.locator("#list-name").innerText(), "Shopping list", "a new list has a name to start with");
+  assert.equal(await a.title(), "Shopping list");
+  const box = await a.locator("#list-name").boundingBox();
+  assert.ok(box.height >= 44, "big enough to tap");
+  const font = await a.locator("#list-name").evaluate(el => getComputedStyle(el).fontSize);
+  assert.equal(font, "26px", "the size of a page title");
+
+  await renameList(a, "Courses");
+  assert.equal(await a.locator("#list-name").innerText(), "Courses");
+  assert.ok(await eventually(async () => (await b.locator("#list-name").innerText()) === "Courses"), "both phones see the new name");
+  assert.equal(await b.title(), "Courses");
+  assert.equal(await a.getAttribute("#undo", "aria-label"), "Undo renaming the list “Shopping list”");
+
+  await a.click("#list-name");
+  await a.keyboard.press("Control+A");
+  await a.keyboard.press("Backspace");
+  await blur(a);
+  assert.equal(await a.locator("#list-name").innerText(), "Courses", "an emptied name goes back to the old one");
+  await a.click("#list-name");
+  await a.keyboard.type(" du samedi");
+  await a.keyboard.press("Escape");
+  assert.equal(await a.locator("#list-name").innerText(), "Courses", "Escape cancels");
+
+  await a.click("#undo");
+  assert.ok(await eventually(async () => (await b.locator("#list-name").innerText()) === "Shopping list"), "undo brings the first name back");
   await t.close();
 });
 
@@ -356,7 +397,8 @@ test("leaving the Add item field adds the item, and the tap still works", async 
   await a.fill("#add-ess", "bread");
   await blur(a);
   await sleep(400);
-  assert.equal((await texts(a, "Essentials")).filter(x => x === "Bread").length, 1, "a name bought before brings that item back");
+  assert.deepEqual((await texts(a, "Essentials")).filter(x => x.toLowerCase() === "bread"), ["bread"], "a name bought before brings that item back, as typed");
+  assert.ok(!(await ticked(a)).includes("Bread"), "rather than adding a copy");
 
   await a.fill("#add-look", "MILK");
   await blur(a);
@@ -670,7 +712,7 @@ test("a quantity at the start is shown apart and ignored when matching names", a
   await item(a, "3× milk").locator(".boxcell").click();
   await sleep(1900);
   await a.fill("#add-look", "2 mil");
-  assert.deepEqual(await a.locator("#sug-look .t").allInnerTexts(), ["3× milk"], "suggestions match the name, not the quantity");
+  assert.deepEqual(await a.locator("#sug-look .t").allInnerTexts(), ["Milk"], "suggestions match the name, not the quantity, and show the name alone");
   await a.locator("#sug-look .sug-pick").first().click();
   assert.ok(await eventually(async () => (await texts(a, "Look out for")).join() === "2 milk"), "picked, it takes the quantity typed");
 
@@ -678,6 +720,37 @@ test("a quantity at the start is shown apart and ignored when matching names", a
   assert.equal((await editing(a)).text, "2 milk", "while editing, the text is plain");
   await a.keyboard.press("Escape");
   assert.equal(await item(a, "2 milk").locator(".qty").innerText(), "2", "and the quantity shows apart again after");
+  await t.close();
+});
+
+test("Enter adds just what was typed; a suggestion comes back when tapped, without its old quantity", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await add(a, "ess", "2 litres of milk");
+  await add(a, "ess", "500 g flour");
+  await add(a, "look", "2 kg de pommes");
+  await blur(a);
+  assert.deepEqual(await a.locator("#list .items .qty").allInnerTexts(), ["2 litres", "500 g", "2 kg"], "longer units count as quantities too, in French as well");
+  for (const x of ["2 litres of milk", "500 g flour", "2 kg de pommes"]) await item(a, x).locator(".boxcell").click();
+  await sleep(1900);
+  assert.deepEqual(await ticked(a), ["2 kg de pommes", "500 g flour", "2 litres of milk"], "the ticked group still shows what was bought");
+
+  await a.fill("#add-ess", "mil");
+  assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Milk"], "suggested by name alone");
+  await a.press("#add-ess", "Enter");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "mil"), "Enter adds what was typed, not the suggestion");
+  assert.deepEqual(await ticked(a), ["2 kg de pommes", "500 g flour", "2 litres of milk"]);
+
+  await add(a, "ess", "Flour");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "mil,Flour"), "typed in full, it comes back as typed");
+  assert.deepEqual(await ticked(a), ["2 kg de pommes", "2 litres of milk"], "the same item, not a copy");
+  assert.equal(await a.getAttribute("#undo", "aria-label"), "Undo adding “Flour”");
+
+  await a.fill("#add-look", "pom");
+  assert.deepEqual(await a.locator("#sug-look .t").allInnerTexts(), ["Pommes"]);
+  await a.locator("#sug-look .sug-pick").first().click();
+  assert.ok(await eventually(async () => (await texts(a, "Look out for")).join() === "Pommes"), "tapped, it comes back without its old quantity");
+  assert.ok(await eventually(async () => (await texts(b, "Look out for")).join() === "Pommes"));
   await t.close();
 });
 
@@ -742,8 +815,9 @@ test("settings: appearance, keeping the list, its size, export, and about", asyn
   assert.match(await a.locator("#size-text").innerText(), /2 items to get, 1 bought before/);
   assert.ok(await eventually(async () => /browser/.test(await a.locator("#keep-text").innerText())));
   const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
-  assert.match(dl.suggestedFilename(), /^panier-\d{4}-\d{2}-\d{2}\.txt$/);
+  assert.match(dl.suggestedFilename(), /^shopping-list-\d{4}-\d{2}-\d{2}\.txt$/, "named after the list");
   const text = readFileSync(await dl.path(), "utf8");
+  assert.match(text, /^Shopping list, /);
   assert.match(text, /\nEssentials\n- \[ \] 2 eggs\n/);
   assert.match(text, /\nLook out for\n- \[ \] Ripe avocados\n/);
   assert.match(text, /\nBought before\n- \[x\] Milk\n/);
@@ -765,6 +839,7 @@ test("in French when the phone is in French", async () => {
   const nb = " ";
   assert.equal(await a.evaluate(() => document.documentElement.lang), "fr");
   assert.deepEqual(await names(a), ["Essentiels", "À l’occasion", "À long terme"]);
+  assert.equal(await a.locator("#list-name").innerText(), "Liste de courses");
   assert.equal(await a.getAttribute("#add-ess", "placeholder"), "Ajouter un article");
   assert.equal(await a.getAttribute("#add-sec", "placeholder"), "Ajouter une section");
   await add(a, "ess", "2 lait");

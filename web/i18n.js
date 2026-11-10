@@ -9,6 +9,9 @@ export const lang = preferred.map(l => String(l).slice(0, 2).toLowerCase()).find
 const nb = " "; // French puts a narrow no-break space before : and inside « »
 const FR = {
   // The page
+  "Shopping list": "Liste de courses",
+  "Renamed the list to {x}": "Liste renommée en {x}",
+  "renaming the list {x}": "renommer la liste {x}",
   "Add a section": "Ajouter une section",
   "Ticked items": "Articles cochés",
   "Add someone to this list": "Ajouter quelqu’un à cette liste",

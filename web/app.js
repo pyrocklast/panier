@@ -12,7 +12,9 @@ const COLORS = [["ess", "Green"], ["teal", "Teal"], ["blue", "Blue"], ["long", "
 const PALETTE = ["teal", "rose", "blue", "olive", "plum", "ess", "look", "long"]; // new sections take the first unused
 const colorOk = (c, fallback) => (COLORS.some(([id]) => id === c) ? c : fallback);
 const MAX_ITEM = 120; // four lines on a phone
-const MAX_SECTION = 40;
+const MAX_SECTION = 40; // and the list's name
+const LIST = "@list"; // where the list's own name is kept, among items and sections
+const listName = () => store.listName() || t("Shopping list");
 const SETTLE_MS = 1500;
 const TRIP_MS = 12 * 3600 * 1000;
 const LONG_PRESS_MS = 450;
@@ -24,23 +26,40 @@ const PLAIN = (() => { try { const d = document.createElement("div"); d.contentE
 
 const fold = s => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const keyOf = s => fold(s).replace(/\s+/g, " ").trim();
-// A quantity at the start of an item, such as "2", "2×", "500 g" or "1.5kg", is shown
-// apart from the name and left out when comparing names, so "2 milk" is still Milk.
-const QTY = /^((?:\d+(?:[.,]\d+)?|[½¼¾⅓⅔])\s*(?:[x×]|(?:kg|g|mg|ml|cl|dl|l|lb|oz)\b)?)\s+(?=\S)/i;
+// A quantity at the start of an item, such as "2", "2×", "500 g", "1.5kg", "2 litres of"
+// or "3 paquets de", is shown apart from the name and left out when comparing names, so
+// "2 litres of milk" is still Milk.
+const UNITS = "kg|kilos?|kilogram(?:me)?s?|g|grams?|grammes?|mg|ml|cl|dl|l|lit(?:re|er)s?|lbs?|pounds?|oz|ounces?|" +
+  "packs?|packets?|bottles?|cans?|tins?|jars?|bags?|box(?:es)?|cartons?|slices?|bunch(?:es)?|" +
+  "paquets?|bouteilles?|bo[iî]tes?|pots?|sachets?|tranches?|briques?|bottes?|canettes?|sacs?";
+const QTY = new RegExp("^((?:\\d+(?:[.,]\\d+)?|[½¼¾⅓⅔])\\s*(?:[x×]|(" + UNITS + ")(?![\\p{L}\\d]))?)\\s+(?=\\S)", "iu");
+const OF = /^(?:(?:of|de)\s+|d['’]\s*)(?=\S)/i; // after a unit: "2 litres of milk", "1 l d’huile"
 function splitQty(text) {
   const m = QTY.exec(text);
-  return m ? { qty: m[1], name: text.slice(m[0].length) } : { qty: "", name: text };
+  if (!m) return { qty: "", sep: "", name: text };
+  let sep = m[0].slice(m[1].length), name = text.slice(m[0].length);
+  const of = m[2] && OF.exec(name);
+  if (of) { sep += of[0]; name = name.slice(of[0].length); }
+  return { qty: m[1], sep, name };
 }
 const nameKey = s => keyOf(splitQty(s).name);
+// An item's name without its quantity, with a capital, as if typed on its own.
+function bare(text) {
+  const { qty, name } = splitQty(text);
+  return qty ? name.charAt(0).toLocaleUpperCase(lang) + name.slice(1) : text;
+}
 // An item's text after typing typed for it: a quantity typed replaces its quantity.
 function retext(old, typed) {
-  const q = splitQty(typed).qty;
-  return q ? q + " " + splitQty(old).name : old;
+  const n = splitQty(typed);
+  return n.qty ? n.qty + n.sep + splitQty(old).name : old;
 }
+// What an item bought before comes back as from its suggestion: its name, with the
+// quantity typed so far, if any. Its old quantity stays behind.
+const fromHint = (old, typed) => (splitQty(typed).qty ? retext(old, typed) : bare(old));
 // Fills an item's text: the quantity in its own span, the name after it.
 function fillText(el, text) {
-  const { qty, name } = splitQty(text);
-  el.replaceChildren(...(qty ? [h("span", { class: "qty" }, qty.replace(/x$/i, "×")), " "] : []), name);
+  const { qty, sep, name } = splitQty(text);
+  el.replaceChildren(...(qty ? [h("span", { class: "qty" }, qty.replace(/^([\d.,½¼¾⅓⅔]+\s*)x$/i, "$1×")), sep] : []), name);
 }
 const clean = (s, max = MAX_ITEM) => s.replace(/\s+/g, " ").trim().slice(0, max);
 const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} };
@@ -245,24 +264,31 @@ function clearAdd(sec) {
   saveDraft(sec, "");
   closeSug();
 }
-function revive(id, sec, opts = {}, typed = "") {
+// Puts an item bought before back on the list as text, into sec: picked from its
+// suggestion, or, when added, typed in full.
+function revive(id, sec, text, opts = {}, added = false) {
   clearAdd(sec);
-  const it = find(id), text = retext(it.text, typed);
+  text = clean(text);
   settling.delete(id);
   flashId = id;
-  announce(t("{x} back on the list", { x: text }));
-  act(t("putting back {x}", { x: q(it.text) }), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "checked", false], [id, "checkedAt", 0]], opts);
+  announce(added ? t("Added {x}", { x: text }) : t("{x} back on the list", { x: text }));
+  act(added ? t("adding {x}", { x: q(text) }) : t("putting back {x}", { x: q(text) }),
+    [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "checked", false], [id, "checkedAt", 0]], opts);
 }
 // submitAdd adds what was typed into a section's "Add item" field: on Enter, or, with
-// leaving, when you leave the field or reopen the app with text still in it.
+// leaving, when you leave the field or reopen the app with text still in it. It adds
+// just what was typed: a suggestion comes back only when tapped, or picked with the
+// arrow keys.
 function submitAdd(sec, leaving = false) {
   const opts = leaving ? { leaving: true } : {};
   const text = clean(shells[sec].input.value);
   const pick = !leaving && ui.sugSec === sec && ui.sugIndex >= 0 && ui.sug[ui.sugIndex];
-  if (pick) return ui.sugCol ? forget(pick.id, sec, true) : revive(pick.id, sec, {}, text);
+  if (pick) return ui.sugCol ? forget(pick.id, sec, true) : revive(pick.id, sec, fromHint(pick.text, text));
   if (!text) { clearAdd(sec); return; }
-  const ex = items.find(i => nameKey(i.text) === nameKey(text));
-  if (ex && ex.checked && !settling.has(ex.id)) return revive(ex.id, sec, opts, text);
+  const same = items.filter(i => nameKey(i.text) === nameKey(text));
+  const ex = same.find(inList) || same[0];
+  // The same name bought before: that item comes back, as typed, rather than a copy.
+  if (ex && ex.checked && !settling.has(ex.id)) return revive(ex.id, sec, text, opts, true);
   clearAdd(sec);
   if (ex) { // already on the list: highlighted, with the quantity just typed, if any
     flashId = ex.id;
@@ -516,7 +542,7 @@ function splitItem(id, first, second, glue) {
   const d2 = dupOf(second);
   if (nameKey(second) === nameKey(first)) { /* "milk milk": one is enough */ }
   else if (d2 && inList(d2)) { flashId = d2.id; msg = t("{x} is already on the list", { x: d2.text }); }
-  else if (d2) { ops.push(...here(d2.id)); next = d2.id; }
+  else if (d2) { ops.push([d2.id, "text", second], ...here(d2.id)); next = d2.id; } // bought before: back as typed
   else {
     next = store.newId();
     ops.push([next, "text", second], ...here(next), [next, "deleted", false]);
@@ -569,6 +595,17 @@ function editSection(span, id, x, y) {
     onSave: name => renameSection(id, name),
   });
 }
+// The list's name, at the top, is renamed the same way as a section's.
+function editListName(span, x, y) {
+  const orig = listName();
+  editInPlace(span, {
+    key: LIST, row: span.parentNode, orig, max: MAX_SECTION, x, y,
+    onSave: name => {
+      announce(t("Renamed the list to {x}", { x: name }));
+      act(t("renaming the list {x}", { x: q(orig) }), [[LIST, "name", name, t("Shopping list")]], { leaving: true });
+    },
+  });
+}
 function recolour(id, color, label) {
   const fallback = (DEFAULTS.find(d => d.id === id) || {}).color;
   announce(t("{x} is now {y}", { x: nameOf(id), y: t(label).toLowerCase() }));
@@ -590,7 +627,15 @@ function suggestions(text) {
     scored.push({ it, score: at === 0 ? 0 : wordStart ? 1 : 2 });
   }
   scored.sort((a, b) => a.score - b.score || b.it.checkedAt - a.it.checkedAt);
-  return scored.slice(0, 5).map(x => x.it);
+  // Shown by name only, so one name is suggested once, even if it was bought twice.
+  const seen = new Set(), out = [];
+  for (const { it } of scored) {
+    const k = nameKey(it.text);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    if (out.push(it) === 5) break;
+  }
+  return out;
 }
 function highlight(text, query) {
   const nfc = text.normalize("NFC");
@@ -603,6 +648,7 @@ function highlight(text, query) {
 }
 // Each suggestion is a row of two cells: the item, which brings it back, and a × that
 // removes it for good. With the keyboard, arrows move between them and Enter picks.
+// Suggestions show the name alone: the quantity bought last time stays behind.
 const sugCellId = (sec, i, col) => "sug-" + sec + "-" + i + (col ? "-x" : "");
 function paintSug(sec, list) {
   const sh = shells[sec], query = splitQty(sh.input.value).name;
@@ -611,10 +657,10 @@ function paintSug(sec, list) {
   sh.sug.replaceChildren(...list.map((it, i) => h("li", { role: "row", class: "sugopt" + (i === active ? " active" : ""), onpointerdown: keep, onmousedown: keep },
     h("span", {
       role: "gridcell", class: "sug-pick", id: sugCellId(sec, i, 0), "aria-selected": String(i === active && !ui.sugCol),
-      onclick: () => revive(it.id, sec, {}, sh.input.value),
-    }, icon("back"), h("span", { class: "t" }, highlight(it.text, query))),
+      onclick: () => revive(it.id, sec, fromHint(it.text, sh.input.value)),
+    }, icon("back"), h("span", { class: "t" }, highlight(bare(it.text), query))),
     h("span", { role: "gridcell", class: "sug-x-cell", id: sugCellId(sec, i, 1), "aria-selected": String(i === active && !!ui.sugCol) },
-      h("button", { type: "button", class: "sug-x", tabindex: "-1", "aria-label": t("Remove {x} from suggestions", { x: it.text }), onclick: () => forget(it.id, sec) }, icon("cross"))))));
+      h("button", { type: "button", class: "sug-x", tabindex: "-1", "aria-label": t("Remove {x} from suggestions", { x: bare(it.text) }), onclick: () => forget(it.id, sec) }, icon("cross"))))));
   sh.sug.hidden = !list.length;
   sh.input.setAttribute("aria-expanded", String(list.length > 0));
   if (list.length && active >= 0) sh.input.setAttribute("aria-activedescendant", sugCellId(sec, active, ui.sugCol));
@@ -635,9 +681,9 @@ function closeSug() {
 }
 // The × on a suggestion deletes that item, so a typo such as "Mlik" stops coming back.
 function forget(id, sec, keyboard = false) {
-  const it = find(id), was = ui.sugIndex;
-  announce(t("Removed {x} from suggestions", { x: it.text }));
-  act(t("removing {x} from suggestions", { x: q(it.text) }), [[id, "deleted", true]], { animate: false });
+  const it = find(id), was = ui.sugIndex, name = bare(it.text);
+  announce(t("Removed {x} from suggestions", { x: name }));
+  act(t("removing {x} from suggestions", { x: q(name) }), [[id, "deleted", true]], { animate: false });
   updateSug(sec);
   if (keyboard && ui.sug.length) {
     ui.sugIndex = Math.min(was, ui.sug.length - 1);
@@ -1116,6 +1162,10 @@ addEventListener("online", paintStatus);
 addEventListener("offline", paintStatus);
 
 function render() {
+  const name = listName(), title = $("#list-name");
+  if (editingId !== LIST && title.textContent !== name) title.textContent = name;
+  title.setAttribute("aria-label", t("{x}, rename", { x: name }));
+  document.title = name;
   computeSections();
   syncShells();
   for (const s of sections) shells[s.id].ul.replaceChildren(...shown(s.id).map(itemEl));
@@ -1202,7 +1252,7 @@ function openPair() {
 $("#pair-open").addEventListener("click", openPair);
 $("#pair-close").addEventListener("click", () => $("#pair").close());
 $("#share-link").addEventListener("click", () => {
-  navigator.share({ title: "Panier", url: store.pairingLink() }).catch(() => {});
+  navigator.share({ title: listName(), url: store.pairingLink() }).catch(() => {});
 });
 $("#copy-link").addEventListener("click", async e => {
   const b = e.currentTarget;
@@ -1247,19 +1297,21 @@ async function paintSettings() {
   const k = keys.find(k => k.startsWith("panier-") && !k.startsWith("panier-static-"));
   $("#about-version").textContent = k ? k.slice(7) : "dev";
 }
-// The list as a plain-text checklist: each section's items to get, then everything bought before.
+// The list as a plain-text checklist, named after it: each section's items to get, then
+// everything bought before, by name, as suggested.
 function exportList() {
-  const now = new Date();
-  const lines = ["Panier, " + now.toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })];
+  const now = new Date(), name = listName();
+  const lines = [name + ", " + now.toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })];
   for (const s of sections) {
     const list = items.filter(i => i.section === s.id && !i.checked).sort((a, b) => a.pos - b.pos);
     if (list.length) lines.push("", s.name, ...list.map(i => "- [ ] " + i.text));
   }
   const done = items.filter(i => i.checked).sort((a, b) => b.checkedAt - a.checkedAt);
-  if (done.length) lines.push("", t("Bought before"), ...done.map(i => "- [x] " + i.text));
+  if (done.length) lines.push("", t("Bought before"), ...done.map(i => "- [x] " + bare(i.text)));
   const url = URL.createObjectURL(new Blob([lines.join("\n") + "\n"], { type: "text/plain;charset=utf-8" }));
   const day = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map(n => String(n).padStart(2, "0")).join("-");
-  const a = h("a", { href: url, download: "panier-" + day + ".txt", hidden: true });
+  const file = keyOf(name).replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "panier";
+  const a = h("a", { href: url, download: file + "-" + day + ".txt", hidden: true });
   document.body.append(a);
   a.click();
   a.remove();
@@ -1279,6 +1331,11 @@ $("#export-btn").addEventListener("click", exportList);
 /* ---------- Wiring and start ---------- */
 
 $("#add-sec-form").addEventListener("submit", e => { e.preventDefault(); addSection($("#add-sec").value); });
+$("#list-name").addEventListener("click", e => { if (editingId !== LIST) editListName(e.currentTarget, e.clientX, e.clientY); });
+$("#list-name").addEventListener("keydown", e => {
+  if (editingId === LIST) return;
+  if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editListName(e.currentTarget); }
+});
 $("#undo").addEventListener("click", undo);
 $("#redo").addEventListener("click", redo);
 document.addEventListener("keydown", e => {
