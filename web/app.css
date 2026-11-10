@@ -1,5 +1,5 @@
-@font-face { font-family: "Atkinson Hyperlegible"; src: url("fonts/atkinson-hyperlegible-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "Atkinson Hyperlegible"; src: url("fonts/atkinson-hyperlegible-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("fonts/atkinson-hyperlegible-next-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("fonts/atkinson-hyperlegible-next-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
 
 /* Type: 17px for everything you read or type, 14px for small print, 20px for sheet
    titles, 26px for page titles. Corners: 16px for cards and sheets, 12px for buttons,
@@ -26,7 +26,7 @@
   --danger: light-dark(#c0392b, #ff8a80);
   --shadow: 0 1px 2px light-dark(rgb(20 30 25 / 0.05), transparent), 0 0 0 1px light-dark(rgb(20 30 25 / 0.05), #242b28);
   --float: 0 14px 34px -10px light-dark(rgb(20 30 25 / 0.28), rgb(0 0 0 / 0.6)), 0 0 0 1px light-dark(rgb(20 30 25 / 0.06), #2f3733);
-  --ff: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ff: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
   --r: 16px;
 }
 :root[data-theme="light"] { color-scheme: light; }
@@ -137,8 +137,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .add.typing { padding-right: 0; }
 .add-input { margin-right: 4px; }
 .add-x { width: 48px; flex: none; }
-.add:not(.typing) .add-x { display: none; }
-.add.typing .add-plus { cursor: pointer; } /* it adds what's typed */
+.add-sec.typing { padding-right: 0; }
+:is(.add, .add-sec):not(.typing) .add-x { display: none; }
+:is(.add, .add-sec).typing .add-plus { cursor: pointer; } /* it adds what's typed */
 
 /* Suggestions */
 .sug { list-style: none; margin: 0; padding: 4px 0; box-shadow: inset 0 1px 0 var(--line); }

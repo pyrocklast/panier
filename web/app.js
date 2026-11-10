@@ -334,6 +334,7 @@ function addSection(raw) {
   const name = clean(raw, MAX_SECTION);
   if (!name) return;
   $("#add-sec").value = "";
+  $("#add-sec-form").classList.remove("typing");
   const id = store.newId(), key = "#" + id;
   const usedColors = new Set(sections.map(s => s.color));
   const color = PALETTE.find(c => !usedColors.has(c)) || PALETTE[sectionInfo.size % PALETTE.length];
@@ -1371,6 +1372,23 @@ $("#export-btn").addEventListener("click", exportList);
 /* ---------- Wiring and start ---------- */
 
 $("#add-sec-form").addEventListener("submit", e => { e.preventDefault(); addSection($("#add-sec").value); });
+// Like an Add item row: once a name is typed, the plus adds the section, as Enter does,
+// and a cross clears it. Pressing either doesn't leave the field.
+{
+  const input = $("#add-sec"), form = $("#add-sec-form"), plus = form.querySelector(".add-plus");
+  const typed = () => !!input.value.trim();
+  const clear = () => { input.value = ""; form.classList.remove("typing"); };
+  input.addEventListener("input", () => form.classList.toggle("typing", typed()));
+  input.addEventListener("keydown", e => { if (e.key === "Escape") clear(); });
+  const keepIfTyped = e => { if (typed()) e.preventDefault(); };
+  plus.addEventListener("pointerdown", keepIfTyped);
+  plus.addEventListener("mousedown", keepIfTyped);
+  plus.addEventListener("click", e => { if (typed()) { e.preventDefault(); addSection(input.value); } });
+  const x = $("#add-sec-x"), keep = e => e.preventDefault();
+  x.addEventListener("pointerdown", keep);
+  x.addEventListener("mousedown", keep);
+  x.addEventListener("click", () => { clear(); input.focus(); });
+}
 $("#list-name").addEventListener("click", e => { if (editingId !== LIST) editListName(e.currentTarget, e.clientX, e.clientY); });
 $("#list-name").addEventListener("keydown", e => {
   if (editingId === LIST) return;

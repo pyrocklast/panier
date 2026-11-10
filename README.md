@@ -23,7 +23,7 @@ Each section is a card with its name at the top. A list starts with three:
 
 - Tap a section's name to rename it. Both phones see the new name.
 - While you rename a section, its colours show under the name: eight, the same in light and dark themes. A tap recolours the section at once, and undo puts the old colour back.
-- *Add a section*, below the cards, adds one at the end with its own colour. Its name is typed like a section name, and the cursor then moves to its *Add item* field.
+- *Add a section*, below the cards, adds one at the end with its own colour. Its name is typed like a section name; Enter or the `+` adds it, a cross clears it, and the cursor then moves to its *Add item* field.
 - While you rename a section that has nothing left to get, a cross appears to delete it. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 - Tick boxes take their section's colour.
 
@@ -103,6 +103,7 @@ Panier is in English and French, following the phone's language. The default sec
 ## How it works
 
 - **App:** an installable web app in plain HTML, CSS and JavaScript ([`web/`](web/)), with no framework and no build step. A service worker keeps it working offline, and an update downloads only the app's own files: fonts, icons and the QR code library (loaded only for pairing) are kept across updates. The list is stored on the phone, written once per burst of changes.
+- **Font:** Atkinson Hyperlegible Next, designed to keep letters such as I, l and 1 apart, under the SIL Open Font License ([`web/fonts/OFL.txt`](web/fonts/OFL.txt)).
 - **One secret per list.** The first phone creates a random 256-bit key. From it, each phone derives (HKDF-SHA-256) the list's id, an access token and an AES-GCM encryption key. The pairing link carries the key after `#`, so it never reaches the server.
 - **End-to-end encryption.** Every change is encrypted on the phone before it is sent. The server stores the encrypted changes and a SHA-256 hash of the access token; it never sees item names.
 - **Merging.** Each field of each item (name, section, position, ticked) and of each section (name, position, colour) keeps the most recent write, so two phones can edit offline and end up identical. Undo only reverses fields that still hold what you set; if the other phone changed one since, its change stands. Deleted items are remembered for about six months, so a late change from a phone that was offline can't bring them back, then forgotten.

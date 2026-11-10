@@ -1,4 +1,6 @@
-Copyright 2020 Braille Institute of America, Inc. AtkinsonHyperlegible-Italic.ttf: Copyright 2020 Braille Institute of America, Inc. AtkinsonHyperlegible-Bold.ttf: Copyright 2020 Braille Institute of America, Inc. AtkinsonHyperlegible-BoldItalic.ttf: Copyright 2020 Braille Institute of America, Inc.
+Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors (https://github.com/googlefonts/atkinson-hyperlegible-next)
+
+Panier ships the regular and bold weights, cut down to Latin characters and with hinting added (ttfautohint).
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

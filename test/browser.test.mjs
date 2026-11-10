@@ -325,6 +325,17 @@ test("sections can be renamed, added, and deleted once empty", async () => {
   assert.equal(await a.locator(".sec-head .bin").count(), 0, "no bin while a section has items");
   await a.keyboard.press("Escape");
 
+  await a.fill("#add-sec", "Drinks");
+  await a.click("#add-sec-form .add-plus");
+  assert.ok((await names(a)).includes("Drinks"), "the plus adds a section, like Enter");
+  assert.equal(await a.evaluate(() => document.activeElement.getAttribute("aria-label")), "Add item to Drinks", "and moves the cursor to it");
+  await a.click("#add-sec");
+  await a.keyboard.type("Oops");
+  await a.click("#add-sec-x");
+  assert.equal(await a.inputValue("#add-sec"), "", "the cross clears a section name being typed");
+  assert.equal(await a.evaluate(() => document.activeElement.id), "add-sec", "keeping the cursor there");
+  assert.ok(!(await names(a)).includes("Oops"));
+
   await a.fill("#add-sec", "Temp");
   await a.press("#add-sec", "Enter");
   await blur(a);
