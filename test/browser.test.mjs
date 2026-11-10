@@ -47,7 +47,8 @@ function watch(page, errors) {
   page.on("pageerror", e => errors.push(String(e)));
   page.on("console", m => {
     // Being offline is expected in some tests: Chromium and Firefox each log it in their own words.
-    if (m.type() === "error" && !/ERR_INTERNET_DISCONNECTED|Failed to load resource|can.t establish a connection to the server/.test(m.text())) errors.push(m.text());
+    // So is Firefox noting a live connection cut short when a test reloads the page.
+    if (m.type() === "error" && !/ERR_INTERNET_DISCONNECTED|Failed to load resource|can.t establish a connection to the server|was interrupted while the page was loading/.test(m.text())) errors.push(m.text());
   });
 }
 
