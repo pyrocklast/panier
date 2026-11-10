@@ -262,7 +262,7 @@ function clearAdd(sec) {
   shells[sec].input.value = "";
   shells[sec].form.classList.remove("typing");
   saveDraft(sec, "");
-  closeSug();
+  if (ui.sugSec === sec) closeSug(); // not another field's, typed into just after leaving this one
 }
 // Puts an item bought before back on the list as text, into sec: picked from its
 // suggestion, or, when added, typed in full.
