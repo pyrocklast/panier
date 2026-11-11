@@ -213,7 +213,8 @@ function paint(fk, animate, move = false, snap = null) {
     const t = document.querySelector('[data-fk="' + fk + '"]');
     const now = document.activeElement;
     const untouched = now === was || !now || now === document.body;
-    if (t && t !== now && untouched && (move || !was || !was.isConnected)) t.focus({ preventScroll: true });
+    // A row that changed place lost the cursor on the way; it gets it back.
+    if (t && t !== now && untouched && (move || !was || !was.isConnected || was === t)) t.focus({ preventScroll: true });
   }
   if (snap) glide(snap);
 }
@@ -499,6 +500,7 @@ function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSave, onD
     span.removeEventListener("paste", onPaste);
     span.removeEventListener("blur", onSpanBlur);
     for (const t of tools) { t.removeEventListener("focusout", onToolsOut); t.remove(); }
+    if (rows.has(key)) rows.get(key).shown = null; // typed into: rewritten at the next redraw
     span.contentEditable = "false";
     span.classList.remove("editing");
     span.setAttribute("role", "button");
@@ -795,35 +797,61 @@ function syncShells() {
 
 /* ---------- Items ---------- */
 
-function itemEl(it) {
-  const li = h("li", {
-    class: "item" + (it.checked ? " done" : ""), "data-id": it.id,
-    style: "--sec:var(--" + colorOf(it.section) + ")",
-  });
-  const chk = h("input", { type: "checkbox", class: "chk", id: "chk-" + it.id, "aria-label": it.text, dataset: { fk: "chk-" + it.id } });
-  chk.checked = it.checked;
-  chk.addEventListener("change", () => toggle(it.id, chk.checked));
+// Each item keeps its row from one redraw to the next: only what changed is written,
+// and only rows that changed place are moved, so a tap doesn't rebuild the whole list
+// and the cursor stays where it is. A row is built anew only for its tint, which plays
+// once, when the row appears.
+const rows = new Map(); // item id → { li, chk, text, shown: the text written in it }
+function rowOf(it, tint) {
+  let r = rows.get(it.id);
+  if (!r || tint) rows.set(it.id, (r = itemEl(it.id)));
+  const cls = "item" + (it.checked ? " done" : "") + (tint ? " flash" : ""), sec = "var(--" + colorOf(it.section) + ")";
+  if (r.li.className !== cls) r.li.className = cls; // also clears what a drag or a press left
+  if (r.li.style.length !== 1 || r.li.style.getPropertyValue("--sec") !== sec) r.li.style.cssText = "--sec:" + sec;
+  if (r.chk.checked !== it.checked) r.chk.checked = it.checked;
+  if (r.shown !== it.text) {
+    r.shown = it.text;
+    fillText(r.text, it.text);
+    r.chk.setAttribute("aria-label", it.text);
+    r.text.setAttribute("aria-label", t("Edit {x}", { x: it.text }));
+  }
+  return r.li;
+}
+// Puts rows into ul in this order, moving only those not already in place.
+function setRows(ul, list) {
+  let at = ul.firstElementChild;
+  for (const li of list) {
+    if (li === at) at = at.nextElementSibling;
+    else ul.insertBefore(li, at);
+  }
+  while (at) { const next = at.nextElementSibling; at.remove(); at = next; }
+}
+// A row's parts and what they do; rowOf fills in the item's text, colour and tick.
+function itemEl(id) {
+  const li = h("li", { "data-id": id });
+  const chk = h("input", { type: "checkbox", class: "chk", id: "chk-" + id, dataset: { fk: "chk-" + id } });
+  chk.addEventListener("change", () => toggle(id, chk.checked));
   chk.addEventListener("keydown", e => {
-    if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown") && inList(it)) { e.preventDefault(); nudge(it.id, e.key === "ArrowUp" ? -1 : 1); }
-    else if (e.key === "Delete") { e.preventDefault(); del(it.id); }
+    const it = find(id);
+    if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown") && it && inList(it)) { e.preventDefault(); nudge(id, e.key === "ArrowUp" ? -1 : 1); }
+    else if (e.key === "Delete") { e.preventDefault(); del(id); }
   });
-  const cell = h("label", { class: "boxcell", for: "chk-" + it.id },
+  const cell = h("label", { class: "boxcell", for: "chk-" + id },
     chk, h("span", { class: "box", "aria-hidden": "true" }), h("span", { class: "grip", "aria-hidden": "true" }));
   cell.addEventListener("click", e => { if (suppressClick) { e.preventDefault(); suppressClick = false; } });
-  const text = h("span", { class: "text", id: "txt-" + it.id, role: "button", tabindex: "0", "aria-label": t("Edit {x}", { x: it.text }), dataset: { fk: "txt-" + it.id } });
-  fillText(text, it.text);
+  const text = h("span", { class: "text", id: "txt-" + id, role: "button", tabindex: "0", dataset: { fk: "txt-" + id } });
   text.addEventListener("click", e => {
     if (suppressClick) { suppressClick = false; return; }
-    if (editingId !== it.id) editItem(text, it.id, e.clientX, e.clientY);
+    if (editingId !== id) editItem(text, id, e.clientX, e.clientY);
   });
   text.addEventListener("keydown", e => {
-    if (editingId === it.id) return;
-    if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editItem(text, it.id); }
-    else if (e.key === "Delete") { e.preventDefault(); del(it.id); }
+    if (editingId === id) return;
+    if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editItem(text, id); }
+    else if (e.key === "Delete") { e.preventDefault(); del(id); }
   });
   li.append(cell, text);
-  bindPress(li, { can: () => !!li.closest("#list .items, #basket-list"), start: (offY, y) => startDrag(li, it.id, offY, y) });
-  return li;
+  bindPress(li, { can: () => !!li.closest("#list .items, #basket-list"), start: (offY, y) => startDrag(li, id, offY, y) });
+  return { li, chk, text, shown: null };
 }
 
 /* Press and hold, then move, to drag; with a mouse, just move. look is what lifts. */
@@ -1077,7 +1105,7 @@ const PARTS = "#list > .sec, #basket-list";
 const ITEMS = "#list .item[data-id], #basket-list .item[data-id]";
 const ADDS = "#list > .sec > .add";
 const flights = new Map(); // each flying item's animation, and how it lands
-const glides = new WeakMap(); // each element's latest glide, so a newer one can take over
+const glides = new Set(); // the glides under way, so a newer change takes over from them
 function landAll() {
   for (const [a, land] of [...flights]) { a.cancel(); land(); }
 }
@@ -1090,6 +1118,10 @@ function snapshot() {
 }
 function glide(snap) {
   const seen = r => r && r.height > 0;
+  // Where things are now, without the last change's motion: each glides on from where
+  // the snapshot saw it.
+  for (const a of glides) a.cancel();
+  glides.clear();
   // Measure everything before moving anything.
   const parts = rectsOf(PARTS), adds = rectsOf(ADDS);
   const now = [...document.querySelectorAll(ITEMS)].map(li => ({ li, rect: li.getBoundingClientRect(), part: li.closest(PARTS) }));
@@ -1097,9 +1129,9 @@ function glide(snap) {
   // How far something moved within its card, leaving out the card's own movement.
   const inside = (wasRect, nowRect, part) => (wasRect.top - snap.parts.get(part).top) - (nowRect.top - parts.get(part).top);
   const run = (el, frames, opts = MOTION) => {
-    const was = glides.get(el);
-    if (was) was.cancel(); // a newer change takes over from here
-    glides.set(el, el.animate(frames, { ...opts, id: "glide" }));
+    const a = el.animate(frames, { ...opts, id: "glide" });
+    glides.add(a);
+    a.finished.then(() => glides.delete(a), () => {});
   };
   const slide = (el, dy) => { if (Math.abs(dy) > 0.5) run(el, [{ transform: `translateY(${dy}px)` }, { transform: "none" }]); };
   for (const [p, r] of parts) {
@@ -1121,13 +1153,15 @@ function glide(snap) {
   }
   for (const [id, o] of snap.items) if (!kept.has(id) && seen(o.rect)) fly(o, o.rect, null); // deleted
 }
-// The item's old element (or the drag ghost) travels from its old place to the new one,
-// over everything, and the real item shows when it lands. With no target, it fades away.
+// A copy of the item (or the drag ghost) travels from its old place to the new one, over
+// everything, and the real item shows when it lands; a deleted item's own row, gone from
+// the list, travels itself. With no target, it fades away.
 // It only travels as far as the screen shows: a place beyond the edge is reached at the
 // edge, where the item slips out of view without slowing down, so a long list doesn't
 // make it rush.
 function fly(o, to, target) {
-  const el = o.li, h = o.rect.height;
+  const el = o.li.isConnected && !o.li.classList.contains("ghost") ? o.li.cloneNode(true) : o.li;
+  const h = o.rect.height;
   const top = Math.min(Math.max(to.top, -h - 8), innerHeight + 8), leaving = top !== to.top;
   const dx = to.left - o.rect.left, dy = top - o.rect.top;
   const ms = target ? Math.round(Math.max(SHORTEST, Math.hypot(dx, dy) / PACE)) : 320;
@@ -1224,7 +1258,12 @@ function render() {
   document.title = name;
   computeSections();
   syncShells();
-  for (const s of sections) shells[s.id].ul.replaceChildren(...shown(s.id).map(itemEl));
+  // What the other phone changed is tinted where it is, without scrolling to it.
+  const tint = store.takeFresh();
+  if (flashId) tint.add(flashId);
+  const kept = new Set();
+  const fill = (ul, list) => { for (const i of list) kept.add(i.id); setRows(ul, list.map(i => rowOf(i, tint.has(i.id)))); };
+  for (const s of sections) fill(shells[s.id].ul, shown(s.id));
   const since = Date.now() - TRIP_MS;
   const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= since).sort((a, b) => b.checkedAt - a.checkedAt);
   $("#basket").classList.toggle("empty", basket.length === 0);
@@ -1232,21 +1271,16 @@ function render() {
   $("#basket-count").textContent = plural(basket.length, "{n} ticked", "{n} ticked");
   $("#basket-toggle").setAttribute("aria-expanded", String(ui.basketOpen));
   const bl = $("#basket-list");
-  bl.replaceChildren(...basket.map(itemEl));
+  fill(bl, basket);
+  for (const id of rows.keys()) if (!kept.has(id)) rows.delete(id);
   bl.hidden = !ui.basketOpen;
   paintDock();
   paintStatus();
 
-  // What the other phone changed is tinted where it is, without scrolling to it.
-  for (const id of store.takeFresh()) {
-    const li = document.querySelector('.item[data-id="' + id + '"]');
-    if (li) li.classList.add("flash");
-  }
   if (flashId) {
-    const li = document.querySelector('.item[data-id="' + flashId + '"]');
+    const li = rows.has(flashId) && rows.get(flashId).li;
     flashId = null;
     if (li) {
-      li.classList.add("flash");
       const rect = li.getBoundingClientRect();
       if (!pointerIsDown && (rect.top < 0 || rect.bottom > innerHeight - 80)) {
         window.scrollBy({ top: rect.top - innerHeight / 3, behavior: reduceMotion.matches ? "auto" : "smooth" });

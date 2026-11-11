@@ -829,6 +829,63 @@ test("ticked items slide into the ticked group, and taps land meanwhile", async 
   await t.close();
 });
 
+test("a tick redraws only that item, which keeps the cursor all the way to the ticked group and back", async () => {
+  const t = await pair();
+  const { a } = t;
+  for (const w of ["Milk", "Bread"]) await add(a, "ess", w);
+  await blur(a);
+  await still(a);
+  // Each row is marked, to tell whether it's still the same one afterwards.
+  await a.evaluate(() => document.querySelectorAll("#list .item").forEach(li => { li.mark = li.textContent; }));
+  const marks = () => a.evaluate(() => [...document.querySelectorAll("#list .item, #basket-list .item")].map(li => li.mark || "new"));
+  const cursor = () => a.evaluate(() => { const li = document.activeElement.closest(".item"); return li && li.mark + (li.closest("#basket-list") ? ", ticked" : ""); });
+  await item(a, "Milk").locator(".chk").focus();
+  await a.keyboard.press("Space");
+  assert.deepEqual(await marks(), ["Milk", "Bread"], "ticked, Milk stays put for a moment, and no row is redrawn");
+  assert.equal(await cursor(), "Milk", "the cursor stays on Milk");
+  assert.ok(await eventually(async () => (await ticked(a)).join() === "Milk"));
+  await still(a);
+  assert.equal(await a.locator(".flying").count(), 0, "the copy that flew is gone");
+  assert.deepEqual(await marks(), ["Bread", "Milk"], "Milk's own row moved to the ticked group");
+  assert.equal(await cursor(), "Milk, ticked", "and took the cursor with it");
+  await a.keyboard.press("Space");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Bread,Milk"));
+  await still(a);
+  assert.deepEqual(await marks(), ["Bread", "Milk"], "unticked, it comes back, still the same row");
+  assert.equal(await cursor(), "Milk", "with the cursor");
+  await t.close();
+});
+
+test("opening the app, or coming back to it, with nothing new writes nothing", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await add(a, "ess", "Milk");
+  await blur(a);
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk"));
+  await sleep(800); // sent, and saved
+  await t.A.addInitScript(() => {
+    window.writes = 0;
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) { if (k === "panier") window.writes++; return set.call(this, k, v); };
+  });
+  const caughtUp = () => a.waitForResponse(r => r.url().includes("/changes?since="));
+  let pulled = caughtUp();
+  await a.reload();
+  await pulled;
+  await sleep(800);
+  assert.equal(await a.evaluate(() => window.writes), 0, "opened: it checked for news, found none, wrote nothing");
+  pulled = caughtUp();
+  await a.evaluate(() => document.dispatchEvent(new Event("visibilitychange"))); // back from another app
+  await pulled;
+  await sleep(800);
+  assert.equal(await a.evaluate(() => window.writes), 0, "the same when coming back to it");
+  await add(b, "ess", "Bread");
+  await blur(b);
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Bread"));
+  assert.ok(await eventually(() => a.evaluate(() => window.writes > 0)), "news is written down");
+  await t.close();
+});
+
 test("a ticked item travels at the same pace however long the list, and only as far as the screen", async () => {
   const t = await pair();
   const { a } = t;

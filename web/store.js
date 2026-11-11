@@ -331,7 +331,7 @@ function pull() {
   if (pulling) { pullAgain = true; return pulling; }
   pulling = (async () => {
     let changed = false;
-    const known = s.seq > 0 || !!s.pulled;
+    const known = s.seq > 0 || !!s.pulled, from = s.seq;
     const st = s, current = session;
     do {
       pullAgain = false;
@@ -354,8 +354,8 @@ function pull() {
         if (!changes.length || s.seq >= latest) break;
       }
     } while (pullAgain);
-    s.pulled = 1;
-    save();
+    // Written only when something came in: opening the app usually brings nothing new.
+    if (changed || s.seq !== from || !s.pulled) { s.pulled = 1; save(); }
     setState("online");
     if (changed) emit("remote");
   })().catch(() => setState("offline")).finally(() => { pulling = null; });
