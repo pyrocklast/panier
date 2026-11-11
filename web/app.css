@@ -165,6 +165,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .basket.empty #basket-count, .basket.empty .chev { display: none; }
 .basket-head { margin: 0; font-size: inherit; }
 .basket-list:empty { display: none; }
+/* Five days of ticked items can make a long list: the phone skips drawing those off screen. */
+#basket-list .item { content-visibility: auto; contain-intrinsic-size: auto 52px; }
+:is([data-layout="compact"], [data-style="paper"]) #basket-list .item { contain-intrinsic-size: auto 44px; }
 #basket-toggle {
   display: grid; grid-template-columns: 54px auto auto; align-items: center; min-height: 44px; padding: 0 8px 0 0;
   border: 0; border-radius: 12px; background: none; color: var(--muted); font-weight: 700; cursor: pointer;

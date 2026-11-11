@@ -17,7 +17,7 @@ const MAX_SECTION = 40; // and the list's name
 const LIST = "@list"; // where the list's own name is kept, among items and sections
 const listName = () => store.listName() || t("Shopping list");
 const SETTLE_MS = 1500;
-const TRIP_MS = 12 * 3600 * 1000;
+const RECENT_MS = 5 * 24 * 3600 * 1000; // ticked items show in the ticked group for five days
 const LONG_PRESS_MS = 450;
 const HINT_KEY = "panier-dragged-once";
 const DRAFTS_KEY = "panier-drafts"; // text typed into "Add item" fields, kept until added
@@ -131,7 +131,7 @@ const isShown = id => sections.some(s => s.id === id);
 const inList = i => !i.checked || settling.has(i.id);
 const shown = sec => items.filter(i => i.section === sec && inList(i)).sort((a, b) => a.pos - b.pos || (a.id < b.id ? -1 : 1));
 const maxPos = sec => shown(sec).reduce((m, i) => Math.max(m, i.pos), 0);
-const onScreen = i => inList(i) || i.checkedAt >= Date.now() - TRIP_MS;
+const onScreen = i => inList(i) || i.checkedAt >= Date.now() - RECENT_MS;
 function between(a, b) {
   if (a == null && b == null) return 1;
   if (a == null) return b - 1;
@@ -1158,16 +1158,20 @@ function glide(snap) {
     const was = snap.adds.get(f), part = f.closest(PARTS);
     if (seen(was) && snap.parts.has(part)) slide(f, inside(was, r, part));
   }
+  // Only items on screen, before or after, move: the rest are simply in their new place,
+  // so a long list costs no more than a short one.
+  const H = innerHeight, near = r => r.bottom > -100 && r.top < H + 100; // read once: each read can redo the layout
   const kept = new Set();
   for (const n of now) {
     const o = snap.items.get(n.li.dataset.id);
     kept.add(n.li.dataset.id);
-    if (!o || !seen(o.rect)) { if (seen(n.rect)) n.li.animate([{ opacity: 0 }, { opacity: 1 }], MOTION); }
+    if (!o || !seen(o.rect)) { if (seen(n.rect) && near(n.rect)) n.li.animate([{ opacity: 0 }, { opacity: 1 }], MOTION); }
     else if (!seen(n.rect)) fly(o, head, null); // into the folded ticked group
+    else if (!near(o.rect) && !near(n.rect)) continue;
     else if (o.part === n.part) slide(n.li, inside(o.rect, n.rect, n.part));
     else fly(o, n.rect, n.li);
   }
-  for (const [id, o] of snap.items) if (!kept.has(id) && seen(o.rect)) fly(o, o.rect, null); // deleted
+  for (const [id, o] of snap.items) if (!kept.has(id) && seen(o.rect) && near(o.rect)) fly(o, o.rect, null); // deleted
 }
 // A copy of the item (or the drag ghost) travels from its old place to the new one, over
 // everything, and the real item shows when it lands; a deleted item's own row, gone from
@@ -1280,10 +1284,10 @@ function render() {
   const kept = new Set();
   const fill = (ul, list) => { for (const i of list) kept.add(i.id); setRows(ul, list.map(i => rowOf(i, tint.has(i.id)))); };
   for (const s of sections) fill(shells[s.id].ul, shown(s.id));
-  const since = Date.now() - TRIP_MS;
+  const since = Date.now() - RECENT_MS;
   const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= since).sort((a, b) => b.checkedAt - a.checkedAt);
   $("#basket").classList.toggle("empty", basket.length === 0);
-  // "3 ticked": true while shopping and after, unlike a basket; only the last 12 hours show
+  // "3 ticked": true while shopping and after, unlike a basket; the last five days show, newest first
   $("#basket-count").textContent = plural(basket.length, "{n} ticked", "{n} ticked");
   $("#basket-toggle").setAttribute("aria-expanded", String(ui.basketOpen));
   const bl = $("#basket-list");

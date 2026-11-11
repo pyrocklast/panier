@@ -83,7 +83,8 @@ const add = async (pg, sec, text) => { await pg.fill("#add-" + sec, text); await
 const section = (pg, name) => pg.locator(`#list .sec:has(.sec-name:text-is("${name}"))`);
 const texts = (pg, name) => section(pg, name).locator(".items .text").allInnerTexts();
 const names = pg => pg.locator("#list .sec-name").allInnerTexts();
-const ticked = pg => pg.locator("#basket-list .text").allInnerTexts();
+// Ticked rows off screen aren't laid out (see app.css), so their text is read as written.
+const ticked = async pg => (await pg.locator("#basket-list .text").allTextContents()).map(x => x.trim());
 // An item by its whole text, including a quantity shown apart from the name.
 const exactly = text => new RegExp("^\\s*" + text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*$");
 const item = (pg, text) => pg.locator("#list .item").filter({ has: pg.locator(".text", { hasText: exactly(text) }) });
@@ -1256,6 +1257,34 @@ test("in French when the phone is in French", async () => {
 });
 
 const stored = pg => pg.evaluate(() => JSON.parse(localStorage.getItem("panier")));
+
+test("the ticked group shows the last five days, the latest first; older items are still suggested", async () => {
+  const t = await pair();
+  let { a } = t;
+  const ages = { Plums: 6, Figs: 4, Dates: 0.6, Pears: 0 }; // days since ticked
+  for (const w of Object.keys(ages)) await add(a, "ess", w);
+  for (const w of Object.keys(ages)) await item(a, w).locator(".boxcell").click();
+  await blur(a);
+  assert.ok(await eventually(async () => (await ticked(a)).length === 4, 4000));
+  await sleep(800); // saved
+  // Ticked days ago, as if: set while the app isn't running.
+  await a.close();
+  a = await t.A.newPage();
+  watch(a, t.errors);
+  await a.goto(BASE + "/api/lists");
+  await a.evaluate(ages => {
+    const s = JSON.parse(localStorage.getItem("panier"));
+    for (const f of Object.values(s.items)) if (f.text && f.text[0] in ages) f.checkedAt[0] = Date.now() - ages[f.text[0]] * 864e5 - 1000;
+    localStorage.setItem("panier", JSON.stringify(s));
+  }, ages);
+  await a.goto(BASE + "/");
+  await a.locator("#app").waitFor();
+  assert.deepEqual(await ticked(a), ["Pears", "Dates", "Figs"], "ticked today, 14 hours ago and 4 days ago; not 6 days ago");
+  assert.equal(await a.locator("#basket-toggle").innerText(), "3 ticked");
+  await a.fill("#add-ess", "pl");
+  assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Plums"], "the one from 6 days ago is still suggested");
+  await t.close();
+});
 
 test("the stored list names each phone once and forgets items deleted over six months ago", async () => {
   const t = await pair();
