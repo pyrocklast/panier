@@ -17,7 +17,8 @@ env:
   WRANGLER_SEND_METRICS: "false"
 
 jobs:
-  test:
+  # The Go server's own checks, and an update from one build to the next in a browser.
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,33 +31,10 @@ jobs:
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race ./...
-      - name: Install Playwright, Chromium and Firefox for the browser tests
+      - name: Install Playwright and Chromium
         run: |
           npm install --no-save --no-audit --no-fund "$PLAYWRIGHT"
-          npx playwright install --with-deps chromium firefox
-      - name: Start the Go server
-        run: |
-          go build -o panier .
-          echo "GO_SETUP=$(./panier -data "$RUNNER_TEMP/data" -setup-code)" >> "$GITHUB_ENV"
-          ./panier -data "$RUNNER_TEMP/data" > "$RUNNER_TEMP/go.log" 2>&1 &
-          for i in $(seq 30); do curl -sf -o /dev/null http://127.0.0.1:8080/ && break; sleep 1; done
-      - name: Start the Cloudflare Worker locally
-        run: |
-          npx --yes "$WRANGLER" dev --ip 127.0.0.1 --port 8787 --persist-to "$RUNNER_TEMP/worker" \
-            --var SETUP_CODE:TEST-CODE-1234 --var MAX_LOG_BYTES:1048576 > "$RUNNER_TEMP/wrangler.log" 2>&1 &
-          for i in $(seq 120); do curl -sf -o /dev/null http://127.0.0.1:8787/ && break; sleep 1; done
-      - name: API tests, both servers
-        run: |
-          BASE=http://127.0.0.1:8080 SETUP="$GO_SETUP" node --test test/api.test.mjs
-          BASE=http://127.0.0.1:8787 SETUP=TEST-CODE-1234 FULL=1 node --test test/api.test.mjs
-      - name: Browser tests, both servers
-        run: |
-          BASE=http://127.0.0.1:8080 SETUP="$GO_SETUP" STORE="$RUNNER_TEMP/data" node --test test/browser.test.mjs
-          BASE=http://127.0.0.1:8787 SETUP=TEST-CODE-1234 STORE="$RUNNER_TEMP/worker" node --test test/browser.test.mjs
-      - name: Browser tests in Firefox
-        run: BROWSER=firefox BASE=http://127.0.0.1:8080 SETUP="$GO_SETUP" STORE="$RUNNER_TEMP/data" node --test test/browser.test.mjs
-      - name: Browser tests in the Paper style, with the compact layout
-        run: STYLE=paper LAYOUT=compact BASE=http://127.0.0.1:8080 SETUP="$GO_SETUP" STORE="$RUNNER_TEMP/data" node --test test/browser.test.mjs
+          npx playwright install --with-deps chromium
       - name: Update test, with two builds of the Go server
         run: |
           cp web/sw.js "$RUNNER_TEMP/sw.js"
@@ -66,15 +44,64 @@ jobs:
           done
           cp "$RUNNER_TEMP/sw.js" web/sw.js
           PANIER_OLD="$RUNNER_TEMP/panier-old" PANIER_NEW="$RUNNER_TEMP/panier-new" node --test test/update.test.mjs
-      - name: Server logs
+
+  # The API and the app in a browser, side by side: each server in Chromium, and Firefox
+  # in the other style and layout, so both browsers and both looks are covered.
+  browser:
+    name: Browser tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: "Go server, Chromium", server: go, browser: chromium }
+          - { name: "Cloudflare Worker, Chromium", server: worker, browser: chromium }
+          - { name: "Go server, Firefox, Paper and compact", server: go, browser: firefox, style: paper, layout: compact }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: matrix.server == 'go'
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright and ${{ matrix.browser }}
+        run: |
+          npm install --no-save --no-audit --no-fund "$PLAYWRIGHT"
+          npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Start the Go server
+        if: matrix.server == 'go'
+        run: |
+          go build -o panier .
+          { echo "BASE=http://127.0.0.1:8080"; echo "SETUP=$(./panier -data "$RUNNER_TEMP/data" -setup-code)"; echo "STORE=$RUNNER_TEMP/data"; } >> "$GITHUB_ENV"
+          ./panier -data "$RUNNER_TEMP/data" > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 30); do curl -sf -o /dev/null http://127.0.0.1:8080/ && break; sleep 1; done
+      - name: Start the Cloudflare Worker locally
+        if: matrix.server == 'worker'
+        run: |
+          { echo "BASE=http://127.0.0.1:8787"; echo "SETUP=TEST-CODE-1234"; echo "STORE=$RUNNER_TEMP/worker"; echo "FULL=1"; } >> "$GITHUB_ENV"
+          npx --yes "$WRANGLER" dev --ip 127.0.0.1 --port 8787 --persist-to "$RUNNER_TEMP/worker" \
+            --var SETUP_CODE:TEST-CODE-1234 --var MAX_LOG_BYTES:1048576 > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 120); do curl -sf -o /dev/null http://127.0.0.1:8787/ && break; sleep 1; done
+      - name: API tests
+        if: matrix.browser == 'chromium'
+        run: node --test test/api.test.mjs
+      - name: Browser tests
+        env:
+          BROWSER: ${{ matrix.browser }}
+          STYLE: ${{ matrix.style }}
+          LAYOUT: ${{ matrix.layout }}
+        run: node --test test/browser.test.mjs
+      - name: Server log
         if: failure()
-        run: cat "$RUNNER_TEMP/go.log" "$RUNNER_TEMP/wrangler.log"
+        run: cat "$RUNNER_TEMP/server.log"
 
   # Deploys to Cloudflare after the tests pass, once the repository's secrets are set
   # (see docs/cloudflare.md). Without them, this job does nothing.
   deploy:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: test
+    needs: [checks, browser]
     runs-on: ubuntu-latest
     concurrency: deploy
     env:
@@ -110,7 +137,7 @@ jobs:
 
   release:
     if: github.event_name == 'release'
-    needs: test
+    needs: [checks, browser]
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -237,6 +237,28 @@ test("a link to another list asks before this phone leaves its own", async () =>
   await t.close();
 });
 
+test("an added item, a tick and a put-back each fit in one 256-byte block", async () => {
+  const t = await pair();
+  const { a, A } = t;
+  await offline(A, a);
+  await add(a, "ess", "Wholemeal bread");
+  await item(a, "Wholemeal bread").locator(".boxcell").click();
+  await sleep(1900);
+  await add(a, "ess", "Wholemeal bread");
+  await blur(a);
+  assert.ok(await eventually(async () => (await stored(a)).outbox.length === 3));
+  const sizes = (await stored(a)).outbox.map(c => new TextEncoder().encode(JSON.stringify(c)).length);
+  assert.ok(sizes.every(n => n < 256), "sizes: " + sizes.join(", "));
+  assert.deepEqual(await texts(a, "Essentials"), ["Wholemeal bread"]);
+  await online(A, a);
+  await a.click("#undo");
+  assert.deepEqual(await ticked(a), ["Wholemeal bread"], "undoing the put-back ticks it again");
+  await a.click("#undo");
+  await a.click("#undo");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).length === 0 && (await ticked(a)).length === 0), "and undoing the add removes it");
+  await t.close();
+});
+
 test("undo leaves the other phone's later change alone", async () => {
   const t = await pair();
   const { a, b } = t;
@@ -338,7 +360,7 @@ test("sections can be renamed, added, and deleted once empty", async () => {
   assert.equal(await a.evaluate(() => document.activeElement.getAttribute("aria-label")), "Add item to Drinks", "and moves the cursor to it");
   await a.click("#add-sec");
   await a.keyboard.type("Oops");
-  await a.click("#add-sec-x");
+  await a.click("#add-sec-form .add-x");
   assert.equal(await a.inputValue("#add-sec"), "", "the cross clears a section name being typed");
   assert.equal(await a.evaluate(() => document.activeElement.id), "add-sec", "keeping the cursor there");
   assert.ok(!(await names(a)).includes("Oops"));
@@ -516,6 +538,7 @@ test("the plus adds a new item and the cross throws it away, with a finger; Esca
   await a.locator("#add-ess").tap();
   await a.keyboard.type("Bananas");
   assert.ok(await x.isVisible(), "a cross once something is typed");
+  assert.ok((await a.locator("#add-ess").boundingBox()).width > 200, "and the field keeps its width");
   const end = await a.locator('.sec[data-sec="ess"] .add').evaluate(el => el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight)), xb = await x.boundingBox();
   assert.ok(xb.height >= 44 && Math.abs(xb.x + xb.width - end) < 1, "at the end of the row, big enough to tap");
   await x.tap();

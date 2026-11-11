@@ -74,7 +74,17 @@ const emit = kind => listeners.forEach(fn => fn(kind));
 // The latest write wins; on a tie, the device id decides, the same way on every phone.
 const newer = (a, b) => !b || a[1] > b[1] || (a[1] === b[1] && s.devs[a[2]] > s.devs[b[2]]);
 
+// The keys of the sections, found once per list and kept up to date as they're written,
+// so drawing the page doesn't look through every item to find them.
+const sectionKeys = new WeakMap();
+const keysOfSections = () => {
+  let k = sectionKeys.get(s);
+  if (!k) sectionKeys.set(s, (k = new Set(Object.keys(s.items).filter(id => id[0] === "#"))));
+  return k;
+};
+
 function put(id, field, value, t, dev) {
+  if (id[0] === "#" && sectionKeys.has(s)) sectionKeys.get(s).add(id);
   const item = (s.items[id] ||= {});
   const cand = [value, t, devNo(s, dev)];
   if (!newer(cand, item[field])) return false;
@@ -110,8 +120,8 @@ export function items() {
 
 export function sections() {
   const out = [];
-  for (const [key, f] of Object.entries(s.items)) {
-    if (key[0] !== "#") continue;
+  for (const key of keysOfSections()) {
+    const f = s.items[key];
     out.push({
       id: key.slice(1),
       name: f.name ? f.name[0] : undefined,

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -459,5 +460,46 @@ func TestFailedWriteIsRolledBack(t *testing.T) {
 	l.add([]string{"TU5P"})
 	if _, err := l.add([]string{"UFFS"}); !errors.Is(err, errBroken) {
 		t.Fatalf("after a failed rollback: got %v, want errBroken", err)
+	}
+}
+
+func TestFilesAreGzipped(t *testing.T) {
+	js := strings.Repeat("const a = 1;\n", 200)
+	web := fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>Panier</title>")}, "app.js": {Data: []byte(js)}, "icon.png": {Data: []byte("png")}}
+	ts := httptest.NewServer(staticFiles(web))
+	defer ts.Close()
+	tr := &http.Transport{DisableCompression: true} // see the response as sent
+	get := func(path, enc string) (*http.Response, []byte) {
+		req, _ := http.NewRequest("GET", ts.URL+path, nil)
+		if enc != "" {
+			req.Header.Set("Accept-Encoding", enc)
+		}
+		res, err := tr.RoundTrip(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return res, b
+	}
+	res, body := get("/app.js", "gzip, br")
+	if res.Header.Get("Content-Encoding") != "gzip" || !strings.HasPrefix(res.Header.Get("Content-Type"), "text/javascript") {
+		t.Fatalf("app.js: %v", res.Header)
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain, _ := io.ReadAll(zr); string(plain) != js || len(body) >= len(js)/4 {
+		t.Fatalf("app.js: %d bytes gzipped, decompressing to the file: %v", len(body), string(plain) == js)
+	}
+	if res, body := get("/app.js", ""); res.Header.Get("Content-Encoding") != "" || string(body) != js {
+		t.Fatalf("without gzip: %v", res.Header)
+	}
+	if res, _ := get("/", "gzip"); res.Header.Get("Content-Encoding") != "gzip" || !strings.HasPrefix(res.Header.Get("Content-Type"), "text/html") {
+		t.Fatalf("the page: %v", res.Header)
+	}
+	if res, _ := get("/icon.png", "gzip"); res.Header.Get("Content-Encoding") != "" {
+		t.Fatalf("an image is sent as it is: %v", res.Header)
 	}
 }

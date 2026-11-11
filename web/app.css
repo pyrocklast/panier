@@ -43,6 +43,9 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 button { font: inherit; color: inherit; }
 button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Icons drawn once in index.html: lines 1.75 px wide at any size */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.icon { fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .wrap {
   max-width: 34rem; margin-inline: auto; box-sizing: border-box;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
@@ -130,16 +133,14 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .add:focus-within { background-color: color-mix(in oklab, var(--sec) 6%, var(--surface)); }
 .add-plus { width: 54px; align-self: stretch; flex: none; display: grid; place-items: center; color: var(--sec); cursor: text; }
 .add-input {
-  flex: 1; min-width: 0; height: 52px; padding: 0; border: 0; outline: none; background: none;
+  flex: 1; min-width: 0; height: 52px; padding: 0; margin-right: 4px; border: 0; outline: none; background: none;
   color: var(--ink); font: inherit;
 }
 .add-input::placeholder { color: var(--muted); }
 /* Once you type, a cross at the end of the row throws the text away, in the same place
    as when editing an item. The plus stays: nothing is on the list until it's added. */
-.add.typing { padding-right: 0; }
-.add-input { margin-right: 4px; }
+.add.typing, .add-sec.typing { padding-right: 0; }
 .add-x { width: 48px; flex: none; }
-.add-sec.typing { padding-right: 0; }
 :is(.add, .add-sec):not(.typing) .add-x { display: none; }
 :is(.add, .add-sec).typing .add-plus { cursor: pointer; } /* it adds what's typed */
 
@@ -169,10 +170,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   border: 0; border-radius: 12px; background: none; color: var(--muted); font-weight: 700; cursor: pointer;
 }
 #basket-toggle .tickmark { justify-self: center; }
-#basket-toggle .chev { margin-left: 6px; }
+#basket-toggle .chev { margin-left: 6px; transition: transform 0.15s; }
 #basket-count { font-variant-numeric: tabular-nums; }
 .tickmark { width: 21px; height: 21px; border-radius: 5px; background: var(--muted); color: var(--bg); display: grid; place-items: center; }
-#basket-toggle .chev { transition: transform 0.15s; }
 #basket-toggle[aria-expanded="false"] .chev { transform: rotate(-90deg); }
 
 .foot { margin: 8px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 12px; }

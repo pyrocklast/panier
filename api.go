@@ -41,7 +41,7 @@ func (sv *server) routes() http.Handler {
 	mux.HandleFunc("POST /api/lists/{id}/changes", sv.withList(sv.postChanges, false))
 	mux.HandleFunc("GET /api/lists/{id}/live", sv.withList(sv.live, true))
 	mux.Handle("/api/", http.NotFoundHandler())
-	mux.Handle("/", http.FileServerFS(sv.web))
+	mux.Handle("/", staticFiles(sv.web))
 	return securityHeaders(mux)
 }
 

@@ -43,7 +43,17 @@ function splitQty(text) {
   if (of) { sep += of[0]; name = name.slice(of[0].length); }
   return { qty: m[1], sep, name };
 }
-const nameKey = s => keyOf(splitQty(s).name);
+// Each text's key is worked out once: names are compared with every past item on every
+// keystroke.
+const nameKeys = new Map();
+function nameKey(s) {
+  let k = nameKeys.get(s);
+  if (k === undefined) {
+    if (nameKeys.size > 5000) nameKeys.clear();
+    nameKeys.set(s, (k = keyOf(splitQty(s).name)));
+  }
+  return k;
+}
 // An item's name without its quantity, with a capital, as if typed on its own.
 function bare(text) {
   const { qty, name } = splitQty(text);
@@ -92,17 +102,26 @@ function h(tag, attrs, ...kids) {
   }
   return e;
 }
-const SVG = (w, body, extra = "") => '<svg viewBox="0 0 20 20" width="' + w + '" height="' + w + '" aria-hidden="true"' + extra + '>' + body + "</svg>";
-const STROKE = 'fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"';
-const ICONS = {
-  plus: SVG(18, '<path d="M10 4v12M4 10h12" ' + STROKE + ' stroke-width="1.95"/>'),
-  back: SVG(16, '<path d="M7.5 4.4L3.1 8.75l4.4 4.35M3.75 8.75h8.75a4.4 4.4 0 0 1 0 8.75H10" ' + STROKE + ' stroke-width="2.2"/>'),
-  cross: SVG(16, '<path d="M5.5 5.5l9 9M14.5 5.5l-9 9" ' + STROKE + ' stroke-width="2.2"/>'),
-};
+// Icons are drawn once, in index.html, and placed by name at their size.
+const ICON_SIZES = { plus: 18, back: 16, cross: 16 };
 function icon(name) {
-  const t = document.createElement("template");
-  t.innerHTML = ICONS[name];
+  const t = document.createElement("template"), w = ICON_SIZES[name];
+  t.innerHTML = `<svg class="icon" width="${w}" height="${w}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
   return t.content.firstChild;
+}
+// An "add" row: a plus, a field and, once something is typed, a cross. The plus adds what
+// was typed, like Enter, and the cross or Escape throws it away. Pressing either doesn't
+// leave the field, which would add it. With nothing typed, the plus just opens the field.
+function addRow(form, input, { add, clear, escape = clear }) {
+  const plus = form.querySelector(".add-plus"), x = form.querySelector(".add-x");
+  const typed = () => !!input.value.trim();
+  const keep = e => e.preventDefault(), keepIfTyped = e => { if (typed()) e.preventDefault(); };
+  for (const ev of ["pointerdown", "mousedown"]) { plus.addEventListener(ev, keepIfTyped); x.addEventListener(ev, keep); }
+  plus.addEventListener("click", e => { if (typed()) { e.preventDefault(); add(); } });
+  x.addEventListener("click", () => { clear(); input.focus(); });
+  form.addEventListener("submit", e => { e.preventDefault(); add(); });
+  input.addEventListener("input", () => form.classList.toggle("typing", typed()));
+  input.addEventListener("keydown", e => { if (e.key === "Escape") escape(); });
 }
 
 const find = id => items.find(i => i.id === id);
@@ -269,7 +288,8 @@ function clearAdd(sec) {
   if (ui.sugSec === sec) closeSug(); // not another field's, typed into just after leaving this one
 }
 // Puts an item bought before back on the list as text, into sec: picked from its
-// suggestion, or, when added, typed in full.
+// suggestion, or, when added, typed in full. When it was ticked doesn't matter once it's
+// back, so it isn't written: the change stays under 256 bytes (see store.js).
 function revive(id, sec, text, opts = {}, added = false) {
   clearAdd(sec);
   text = clean(text);
@@ -277,7 +297,7 @@ function revive(id, sec, text, opts = {}, added = false) {
   flashId = id;
   announce(added ? t("Added {x}", { x: text }) : t("{x} back on the list", { x: text }));
   act(added ? t("adding {x}", { x: q(text) }) : t("putting back {x}", { x: q(text) }),
-    [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "checked", false], [id, "checkedAt", 0]], opts);
+    [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "checked", false]], opts);
 }
 // submitAdd adds what was typed into a section's "Add item" field: on Enter, or, with
 // leaving, when you leave the field or reopen the app with text still in it. It adds
@@ -306,8 +326,8 @@ function submitAdd(sec, leaving = false) {
   const id = store.newId();
   flashId = id;
   announce(t("Added {x}", { x: text }));
-  act(t("adding {x}", { x: q(text) }), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1],
-    [id, "checked", false], [id, "checkedAt", 0], [id, "deleted", false]], opts);
+  // A new item is unticked without saying so; "deleted: false" is what lets undo remove it.
+  act(t("adding {x}", { x: q(text) }), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "deleted", false]], opts);
 }
 function del(id, opts) {
   const it = find(id);
@@ -708,22 +728,15 @@ function buildShell(id) {
     role: "combobox", "aria-autocomplete": "list", "aria-haspopup": "grid", "aria-expanded": "false", "aria-controls": "sug-" + id,
     dataset: { fk: "add-" + id },
   });
-  // Once something is typed, a cross at the end of the row throws it away, as one deletes
-  // an item being edited. The cursor stays in the field, ready for the next one.
-  const keep = e => e.preventDefault(); // pressing the cross doesn't leave the field, which would add the item
-  const clear = h("button", {
-    type: "button", class: "bin add-x", tabindex: "-1", "aria-label": t("Clear"),
-    onpointerdown: keep, onmousedown: keep, onclick: () => { clearAdd(id); input.focus(); },
-  }, icon("cross"));
-  // The plus opens the field; once something is typed, it adds it, like Enter, and the
-  // cursor stays for the next one.
-  const typed = () => !!input.value.trim();
-  const keepIfTyped = e => { if (typed()) e.preventDefault(); };
-  const plus = h("label", {
-    class: "add-plus", for: "add-" + id, "aria-hidden": "true", onpointerdown: keepIfTyped, onmousedown: keepIfTyped,
-    onclick: e => { if (typed()) { e.preventDefault(); submitAdd(id); input.focus(); } },
-  }, icon("plus"));
-  const form = h("form", { class: "add", autocomplete: "off", onsubmit: e => { e.preventDefault(); submitAdd(id); } }, plus, input, clear);
+  const form = h("form", { class: "add", autocomplete: "off" },
+    h("label", { class: "add-plus", for: "add-" + id, "aria-hidden": "true" }, icon("plus")), input,
+    h("button", { type: "button", class: "bin add-x", tabindex: "-1", "aria-label": t("Clear") }, icon("cross")));
+  // Adding keeps the cursor here for the next item; Escape closes the suggestions first.
+  addRow(form, input, {
+    add: () => { submitAdd(id); input.focus(); },
+    clear: () => clearAdd(id),
+    escape: () => (ui.sugSec === id ? closeSug() : clearAdd(id)),
+  });
   const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Bought before"), hidden: true });
   const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id } });
   name.addEventListener("click", e => {
@@ -739,7 +752,6 @@ function buildShell(id) {
   const el = h("section", { class: "sec", "data-sec": id, "aria-labelledby": "h-" + id }, head, ul, sug, form);
   bindPress(head, { look: el, can: () => sections.length > 1, start: (offY, y) => startSectionDrag(id, y) });
   input.addEventListener("input", () => {
-    form.classList.toggle("typing", !!input.value.trim());
     saveDraft(id, input.value.trim() ? input.value : "");
     updateSug(id);
   });
@@ -753,10 +765,6 @@ function buildShell(id) {
     }, 0);
   });
   input.addEventListener("keydown", e => {
-    if (e.key === "Escape") { // first the suggestions, then what was typed
-      if (ui.sugSec === id) closeSug(); else clearAdd(id);
-      return;
-    }
     if (ui.sugSec !== id || !ui.sug.length) return;
     const n = ui.sug.length, i = ui.sugIndex;
     if (e.key === "ArrowDown") ui.sugIndex = (i + 1) % n;
@@ -1069,6 +1077,7 @@ const PARTS = "#list > .sec, #basket-list";
 const ITEMS = "#list .item[data-id], #basket-list .item[data-id]";
 const ADDS = "#list > .sec > .add";
 const flights = new Map(); // each flying item's animation, and how it lands
+const glides = new WeakMap(); // each element's latest glide, so a newer one can take over
 function landAll() {
   for (const [a, land] of [...flights]) { a.cancel(); land(); }
 }
@@ -1088,8 +1097,9 @@ function glide(snap) {
   // How far something moved within its card, leaving out the card's own movement.
   const inside = (wasRect, nowRect, part) => (wasRect.top - snap.parts.get(part).top) - (nowRect.top - parts.get(part).top);
   const run = (el, frames, opts = MOTION) => {
-    for (const x of el.getAnimations()) if (x.id === "glide") x.cancel(); // a newer change takes over from here
-    el.animate(frames, { ...opts, id: "glide" });
+    const was = glides.get(el);
+    if (was) was.cancel(); // a newer change takes over from here
+    glides.set(el, el.animate(frames, { ...opts, id: "glide" }));
   };
   const slide = (el, dy) => { if (Math.abs(dy) > 0.5) run(el, [{ transform: `translateY(${dy}px)` }, { transform: "none" }]); };
   for (const [p, r] of parts) {
@@ -1264,7 +1274,15 @@ function qrSvg(textToEncode) {
   qr.make();
   const n = qr.getModuleCount(), pad = 4;
   let d = "";
-  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += "M" + (c + pad) + " " + (r + pad) + "h1v1h-1z";
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (!qr.isDark(r, c)) continue;
+      let w = 1; // a run of dark squares is drawn as one
+      while (c + w < n && qr.isDark(r, c + w)) w++;
+      d += "M" + (c + pad) + " " + (r + pad) + "h" + w + "v1h-" + w + "z";
+      c += w;
+    }
+  }
   const t = document.createElement("template");
   t.innerHTML = '<svg viewBox="0 0 ' + (n + 2 * pad) + " " + (n + 2 * pad) + '" shape-rendering="crispEdges" aria-hidden="true"><rect width="100%" height="100%" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>';
   return t.content.firstChild;
@@ -1395,24 +1413,11 @@ $("#export-btn").addEventListener("click", exportList);
 
 /* ---------- Wiring and start ---------- */
 
-$("#add-sec-form").addEventListener("submit", e => { e.preventDefault(); addSection($("#add-sec").value); });
-// Like an Add item row: once a name is typed, the plus adds the section, as Enter does,
-// and a cross clears it. Pressing either doesn't leave the field.
-{
-  const input = $("#add-sec"), form = $("#add-sec-form"), plus = form.querySelector(".add-plus");
-  const typed = () => !!input.value.trim();
-  const clear = () => { input.value = ""; form.classList.remove("typing"); };
-  input.addEventListener("input", () => form.classList.toggle("typing", typed()));
-  input.addEventListener("keydown", e => { if (e.key === "Escape") clear(); });
-  const keepIfTyped = e => { if (typed()) e.preventDefault(); };
-  plus.addEventListener("pointerdown", keepIfTyped);
-  plus.addEventListener("mousedown", keepIfTyped);
-  plus.addEventListener("click", e => { if (typed()) { e.preventDefault(); addSection(input.value); } });
-  const x = $("#add-sec-x"), keep = e => e.preventDefault();
-  x.addEventListener("pointerdown", keep);
-  x.addEventListener("mousedown", keep);
-  x.addEventListener("click", () => { clear(); input.focus(); });
-}
+// Adding a section moves the cursor to its Add item field.
+addRow($("#add-sec-form"), $("#add-sec"), {
+  add: () => addSection($("#add-sec").value),
+  clear: () => { $("#add-sec").value = ""; $("#add-sec-form").classList.remove("typing"); },
+});
 $("#list-name").addEventListener("click", e => { if (editingId !== LIST) editListName(e.currentTarget, e.clientX, e.clientY); });
 $("#list-name").addEventListener("keydown", e => {
   if (editingId === LIST) return;
