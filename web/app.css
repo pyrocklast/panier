@@ -80,10 +80,9 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16px; }
 /* The list's name, a page title: in the same place as Settings' own, renamed with a tap */
-.list-head {
-  margin: -4px 0 0; display: flex; font-size: 1.625rem; line-height: 1.4; color: var(--title);
-  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-}
+/* Names and rows are tapped, held and dragged rather than selected */
+:is(.list-head, .sec-head, .item) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.list-head { margin: -4px 0 0; display: flex; font-size: 1.625rem; line-height: 1.4; color: var(--title); }
 .list-name { flex: 1; min-width: 0; padding: 4px 0; overflow-wrap: anywhere; cursor: text; outline: none; border-radius: 5px; }
 .list-name:focus-visible { box-shadow: 0 0 0 2px var(--ink); }
 .list-name.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 currentColor; border-radius: 0; }
@@ -94,7 +93,6 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sec-head {
   margin: 0; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; font-size: inherit;
   background: linear-gradient(var(--line), var(--line)) left bottom / 100% 1px no-repeat;
-  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 .sec-name {
   flex: 1; min-width: 0; padding: 12px 0; font-weight: 700; overflow-wrap: anywhere; cursor: text; outline: none; border-radius: 5px;
@@ -115,12 +113,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 
 /* Items. Rows reach 12px into the margins, so a press, a highlight or a dragged slip has
    room around its text; the ruled lines still run from the text to the right edge. */
+:is(.item, .add, .sugopt) { margin-inline: -12px; padding-inline: 12px; background-origin: content-box; }
 .items { list-style: none; margin: 0; padding: 0; }
-.item {
-  display: grid; grid-template-columns: 38px minmax(0, 1fr); list-style: none; margin-inline: -12px; padding-inline: 12px;
-  background-origin: content-box; transition: background-color 0.2s;
-  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-}
+.item { display: grid; grid-template-columns: 38px minmax(0, 1fr); list-style: none; transition: background-color 0.2s; }
 .item + .item, .items:not(:empty) ~ .add, .sug:not([hidden]) + .add {
   background-image: linear-gradient(var(--line), var(--line));
   background-size: calc(100% - 38px) 1px; background-position: right top; background-repeat: no-repeat;
@@ -134,7 +129,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .boxcell > .box, .boxcell > .grip { grid-area: 1 / 1; }
 .grip { display: grid; place-items: center; color: var(--sec); opacity: 0; transition: opacity 0.15s; }
 /* The tick and the grip's dots are drawn here rather than in each item, in the current colour */
-.box::after, .grip::after { content: ""; background: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+.box::after, .grip::after { content: ""; background: currentColor; mask: var(--icon) center / contain no-repeat; }
 .box::after { width: 13px; height: 13px; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.5 10.5l3.7 3.7 7.3-8.7' fill='none' stroke='%23000' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 .grip::after { width: 18px; height: 18px; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg%3E%3Ccircle cx='7' cy='4.5' r='1.6'/%3E%3Ccircle cx='13' cy='4.5' r='1.6'/%3E%3Ccircle cx='7' cy='10' r='1.6'/%3E%3Ccircle cx='13' cy='10' r='1.6'/%3E%3Ccircle cx='7' cy='15.5' r='1.6'/%3E%3Ccircle cx='13' cy='15.5' r='1.6'/%3E%3C/g%3E%3C/svg%3E"); }
 .item.lifted .box, .item.hint .box, .ghost .box { opacity: 0; }
@@ -164,7 +159,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .bin:focus-visible { outline-offset: -6px; border-radius: 12px; }
 
 /* Add row: you write on a line, as when editing an item */
-.add { display: flex; align-items: center; min-height: 52px; margin-inline: -12px; padding-inline: 12px; background-origin: content-box; }
+.add { display: flex; align-items: center; min-height: 52px; }
 .add-plus { width: 38px; align-self: stretch; flex: none; box-sizing: border-box; padding-left: 1.5px; display: grid; place-items: center start; color: var(--sec); cursor: text; }
 .add-input {
   flex: 1; min-width: 0; height: 52px; padding: 0; margin-right: 4px; border: 0; outline: none; background: none;
@@ -185,7 +180,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* Suggestions */
 .sug { list-style: none; margin: 0; padding: 4px 0; box-shadow: inset 0 1px 0 var(--line); }
 .items:empty + .sug { box-shadow: none; }
-.sugopt { display: flex; min-height: 46px; margin-inline: -12px; padding-inline: 12px; background-origin: content-box; color: var(--muted); }
+.sugopt { display: flex; min-height: 46px; color: var(--muted); }
 .sugopt.active { background-color: var(--press); }
 .sug-pick { flex: 1; min-width: 0; display: flex; align-items: center; padding-block: 6px; cursor: pointer; }
 .sug-pick > svg { width: 21px; margin-right: 17px; flex: none; }
@@ -252,11 +247,13 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 #undo.named { width: auto; grid-auto-flow: column; gap: 8px; padding: 0 16px 0 12px; border-radius: 999px; }
 #undo.named .undo-what { display: block; }
 
-/* Drag: the ghost is placed exactly over the row, room included */
-.ghost {
+/* Floating copies, a dragged item's ghost or an item on its way, placed exactly over the
+   row, room included */
+:is(.ghost, .flying) {
   position: fixed; z-index: 20; margin: 0; box-sizing: border-box; pointer-events: none;
-  background-color: var(--surface); background-image: none !important; border-radius: 12px; box-shadow: var(--float);
+  background-color: var(--surface); background-image: none !important;
 }
+.ghost { border-radius: 12px; box-shadow: var(--float); }
 .item.placeholder { background-color: color-mix(in oklab, var(--sec) 8%, var(--bg)); border-radius: 12px; }
 .item.placeholder > * { visibility: hidden; }
 .item.placeholder.away { background-color: transparent; } /* heading for the ticked items: its slot empties, nothing moves */
@@ -272,10 +269,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 
 /* An item on its way to its new place lifts off, travels and lands; a dragged one lands
    where it was let go. app.js sets the duration to match the trip. */
-.flying {
-  position: fixed; z-index: 20; margin: 0; box-sizing: border-box; pointer-events: none;
-  background-color: var(--surface); background-image: none !important; animation: lift ease-in-out both;
-}
+.flying { animation: lift ease-in-out both; }
 .ghost.landing { animation: land ease-in both; }
 @keyframes lift { 0%, 100% { box-shadow: none; border-radius: 0; } 25%, 75% { box-shadow: var(--float); border-radius: 12px; } }
 @keyframes land { 0%, 40% { box-shadow: var(--float); border-radius: 12px; } 100% { box-shadow: none; border-radius: 0; } }
@@ -364,7 +358,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .choices { display: flex; flex-direction: column; margin: -6px 0; }
 .choices label { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; }
 .choices input {
-  -webkit-appearance: none; appearance: none; width: 21px; height: 21px; margin: 0; flex: none; box-sizing: border-box;
+  appearance: none; width: 21px; height: 21px; margin: 0; flex: none; box-sizing: border-box;
   border: 2px solid var(--muted); border-radius: 50%; background: none; cursor: pointer; transition: border-color 0.15s;
 }
 .choices input:checked { border-color: var(--ink); background: radial-gradient(circle, var(--ink) 0 4.5px, transparent 5px); }

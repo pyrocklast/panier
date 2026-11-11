@@ -83,12 +83,14 @@ const keysOfSections = () => {
   return k;
 };
 
+const touched = new Set(); // ids written since items() last looked
 function put(id, field, value, t, dev) {
   if (id[0] === "#" && sectionKeys.has(s)) sectionKeys.get(s).add(id);
   const item = (s.items[id] ||= {});
   const cand = [value, t, devNo(s, dev)];
   if (!newer(cand, item[field])) return false;
   item[field] = cand;
+  touched.add(id);
   return true;
 }
 const valueOf = (id, field) => (s.items[id] && s.items[id][field] ? s.items[id][field][0] : undefined);
@@ -102,20 +104,38 @@ function tick() {
 // by its id; the three default sections ("ess", "look", "long") are only stored once
 // changed. The list's name is under "@list", once it has been given one. Item ids never
 // start with either sign, and earlier versions pass over "@list", which has no text.
+//
+// The items are worked out once per list and then kept up to date: a change redoes only
+// the items it touched, so a tap costs the same however long the list has grown. Each
+// item has a slot in the order the map holds them, kept while it's deleted, so the list
+// comes out in the same order as when worked out afresh. Item objects are only read.
+let view = null, list = null; // for s: id → item, or null for a deleted one; the items in order
+function itemOf(id, f) {
+  if (!f.text || (f.deleted && f.deleted[0])) return null;
+  return {
+    id,
+    text: f.text[0],
+    section: f.section ? f.section[0] : "ess",
+    pos: f.pos ? f.pos[0] : 0,
+    checked: !!(f.checked && f.checked[0]),
+    checkedAt: f.checkedAt ? f.checkedAt[0] : 0,
+  };
+}
+const isItem = id => id[0] !== "#" && id[0] !== "@";
 export function items() {
-  const out = [];
-  for (const [id, f] of Object.entries(s.items)) {
-    if (id[0] === "#" || id[0] === "@" || !f.text || (f.deleted && f.deleted[0])) continue;
-    out.push({
-      id,
-      text: f.text[0],
-      section: f.section ? f.section[0] : "ess",
-      pos: f.pos ? f.pos[0] : 0,
-      checked: !!(f.checked && f.checked[0]),
-      checkedAt: f.checkedAt ? f.checkedAt[0] : 0,
-    });
+  if (!view || view.of !== s) {
+    view = new Map();
+    view.of = s;
+    for (const [id, f] of Object.entries(s.items)) if (isItem(id)) view.set(id, itemOf(id, f));
+    touched.clear();
+    list = null;
   }
-  return out;
+  if (touched.size) {
+    for (const id of touched) if (isItem(id)) view.set(id, itemOf(id, s.items[id]));
+    touched.clear();
+    list = null;
+  }
+  return list || (list = [...view.values()].filter(Boolean));
 }
 
 export function sections() {

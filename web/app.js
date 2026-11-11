@@ -16,7 +16,7 @@ const colorOk = (c, fallback) => (COLORS.some(([id]) => id === c) ? c : fallback
 // colours but ink.
 const LIST_COLORS = [["", "White"], ...COLORS.filter(([id]) => id !== "ess")];
 const listColor = () => { const c = store.listColor(); return LIST_COLORS.some(([id]) => id === c) ? c : ""; };
-const MAX_ITEM = 120; // four lines on a phone
+const MAX_ITEM = 120; // three lines on a phone
 const MAX_SECTION = 40; // and the list's name
 const LIST = "@list"; // where the list's own name is kept, among items and sections
 const listName = () => store.listName() || t("Shopping list");
@@ -106,12 +106,16 @@ function h(tag, attrs, ...kids) {
   }
   return e;
 }
-// Icons are drawn once, in index.html, and placed by name at their size.
-const ICON_SIZES = { plus: 18, back: 16, cross: 16 };
+// Icons are drawn once, in index.html, and placed by name at their size: each is made
+// once, then copied, as suggestions place several on every keystroke.
+const ICON_SIZES = { plus: 18, back: 16, cross: 16 }, icons = {};
 function icon(name) {
-  const t = document.createElement("template"), w = ICON_SIZES[name];
-  t.innerHTML = `<svg class="icon" width="${w}" height="${w}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
-  return t.content.firstChild;
+  if (!icons[name]) {
+    const t = document.createElement("template"), w = ICON_SIZES[name];
+    t.innerHTML = `<svg class="icon" width="${w}" height="${w}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+    icons[name] = t.content.firstChild;
+  }
+  return icons[name].cloneNode(true);
 }
 // An "add" row: a plus, a field and, once something is typed, a cross. The plus adds what
 // was typed, like Enter, and the cross or Escape throws it away. Pressing either doesn't
