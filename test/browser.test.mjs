@@ -530,6 +530,28 @@ test("leaving the Add item field adds the item, and the tap still works", async 
   await t.close();
 });
 
+test("tapping an item to edit it while typing a new one shows the new one at once, and the tapped item stays put", async () => {
+  const t = await pair();
+  const { a } = t;
+  await add(a, "ess", "Milk");
+  await add(a, "look", "Ripe avocados");
+  for (const w of ["Bike lights", "Picture frame", "Doormat", "Light bulbs", "Batteries", "Hose", "Paint", "Rope"]) await add(a, "long", w);
+  await blur(a);
+  await still(a);
+  await a.fill("#add-ess", "Lemons"); // a page longer than the screen, so it can scroll to keep things in place
+  const avocados = section(a, "Look out for").locator(".items .text");
+  const was = (await avocados.boundingBox()).y;
+  await avocados.click();
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Lemons", 1000), "Lemons shows right away");
+  assert.equal(await a.locator(".text.editing").innerText(), "Ripe avocados", "while Ripe avocados is being edited");
+  assert.ok(Math.abs((await avocados.boundingBox()).y - was) < 1, "which stays where it was tapped, though Lemons landed above it");
+  await a.keyboard.press("End");
+  await a.keyboard.type(" (soft)");
+  await a.keyboard.press("Enter");
+  assert.deepEqual(await texts(a, "Look out for"), ["Ripe avocados (soft)"], "and the edit carries on as usual");
+  await t.close();
+});
+
 test("the plus adds a new item and the cross throws it away, with a finger; Escape too", async () => {
   const t = await pair(ENGINE === "firefox" ? { hasTouch: true } : { hasTouch: true, isMobile: true });
   const { a, b } = t;
@@ -1095,6 +1117,36 @@ test("sections are reordered by dragging their names, folded meanwhile", async (
   await a.keyboard.press("Alt+ArrowDown");
   assert.deepEqual(await names(a), ["Look out for", "Essentials", "Long term"], "Alt+↓ moves a section down");
   assert.equal(await a.evaluate(() => document.activeElement.textContent), "Essentials", "keeping the focus on its name");
+  await t.close();
+});
+
+test("a section let go stays where it was dropped, and unfolds from there", async () => {
+  const t = await pair();
+  const { a } = t;
+  for (const w of ["Milk", "Bread", "Eggs", "Butter", "Coffee"]) await add(a, "ess", w);
+  for (const w of ["Ripe avocados", "Strawberries", "Asparagus", "Figs", "Mangoes", "Chestnuts"]) await add(a, "look", w);
+  for (const w of ["Bike lights", "Picture frame", "Doormat", "Light bulbs"]) await add(a, "long", w);
+  await blur(a);
+  await still(a);
+  const name = () => section(a, "Long term").locator(".sec-name");
+  await a.evaluate(() => scrollBy(0, 400));
+  const box = await name().boundingBox();
+  const x = box.x + 20, y = box.y + box.height / 2;
+  await a.mouse.move(x, y);
+  await a.mouse.down();
+  await a.mouse.move(x, y - 10);
+  const ess = await section(a, "Essentials").boundingBox(); // folded
+  const to = ess.y + ess.height + 8; // just under Essentials
+  for (let i = 1; i <= 10; i++) { await a.mouse.move(x, y - 10 + (to - (y - 10)) * i / 10); await sleep(20); }
+  await sleep(150);
+  const dropped = (await a.locator(".sec.ghost").boundingBox()).y;
+  await a.mouse.up();
+  assert.deepEqual(await names(a), ["Essentials", "Long term", "Look out for"]);
+  const at = async () => (await section(a, "Long term").boundingBox()).y;
+  assert.ok(Math.abs((await at()) - dropped) < 2, "it stays where it was let go, though Essentials unfolds above it");
+  await still(a);
+  assert.ok(Math.abs((await at()) - dropped) < 2, "and is still there once everything has unfolded");
+  assert.ok(await eventually(async () => (await a.locator(".ghost").count()) === 0));
   await t.close();
 });
 

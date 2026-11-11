@@ -31,7 +31,7 @@ Each section is a card with its name at the top. A list starts with three:
 
 - Every card ends with an *Add item* row. Tapping the row or its `+` opens the field. Items hold up to 120 characters, about four lines.
 - As soon as you type, a cross appears at the end of the row, where it is when editing an item: tapping it throws away what you typed, and the cursor stays in the field. The `+` stays as it is, since nothing is on the list until it's added. Escape does the same from a keyboard, once any suggestions are closed.
-- Enter, or the `+`, adds the new item and keeps the field open for the next one. Leaving the field adds it too, so nothing typed is lost. A notification or switching apps doesn't cut it short, and text left in the field when the app closes is added the next time it opens.
+- Enter, or the `+`, adds the new item and keeps the field open for the next one. Leaving the field adds it too, at once, so nothing typed is lost; what you tapped to leave it stays where it is on screen. A notification or switching apps doesn't cut it short, and text left in the field when the app closes is added the next time it opens.
 - Typing something already on the list highlights it instead of adding a copy.
 - Enter adds just what you typed. Typing the full name of something bought before puts that item back as you typed it, into the section you are typing in, rather than adding a copy. A suggestion only comes back when you tap it.
 - **Quantities.** A number at the start, such as *2 milk*, *2× milk*, *500 g flour*, *1.5kg potatoes*, *2 litres of milk* or *3 paquets de pâtes*, is shown slightly apart from the name, in bold. It's left out when comparing names, so *2 litres of milk* is still Milk: typing *3 milk* while it's on the list gives it the new quantity, and *mil* suggests Milk.
@@ -65,7 +65,7 @@ Each section is a card with its name at the top. A list starts with three:
 ### Reordering
 
 - Hold an item for about half a second: it lifts and its tick box turns into a grip. Move to drag it, including into another section; the grip takes the colour of the section it is over. Releasing without moving does nothing.
-- Sections move the same way, held by their name. While one moves, every section folds down to its name, so even long ones are easy to reorder; they unfold when it's let go.
+- Sections move the same way, held by their name. While one moves, every section folds down to its name, so even long ones are easy to reorder; they unfold when it's let go, and the one you moved stays where you dropped it.
 - When you let go, the item glides into its place. Things that move after a change glide too, without ever getting in the way of a tap.
 - With a mouse, dragging starts as soon as you move.
 - Until someone has dragged once, the first item lifts briefly when the app opens, to show that items can move.

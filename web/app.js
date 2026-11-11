@@ -193,11 +193,15 @@ function act(label, ops, opts = {}) {
   else paint(fk, opts.animate, !!opts.focusKey);
   return true;
 }
-// The redraw after leaving a field waits for anything that tap started, such as editing
-// another item, so the item being edited isn't redrawn under the cursor.
+// The redraw after leaving a field shows what was added at once, and leaves alone what
+// that tap started: an item being edited isn't touched, and what the cursor went to stays
+// put on screen, even when the new item lands above it. A drag is left to finish first.
 function leftPaint() {
-  if (editingId || drag) renderPending = true;
-  else paint(null, false);
+  if (drag) { renderPending = true; return; }
+  const held = document.activeElement !== document.body && document.activeElement;
+  const before = held && held.getBoundingClientRect().top;
+  paint(null, false);
+  if (held && held.isConnected) window.scrollBy(0, held.getBoundingClientRect().top - before);
 }
 // paint redraws, keeping the cursor where it was: on the redrawn copy of the focused
 // element, or on fk when the action asked to move it. If you've moved the cursor
@@ -804,6 +808,7 @@ function syncShells() {
 const rows = new Map(); // item id → { li, chk, text, shown: the text written in it }
 function rowOf(it, tint) {
   let r = rows.get(it.id);
+  if (r && editingId === it.id) return r.li; // being edited: left just as it is
   if (!r || tint) rows.set(it.id, (r = itemEl(it.id)));
   const cls = "item" + (it.checked ? " done" : "") + (tint ? " flash" : ""), sec = "var(--" + colorOf(it.section) + ")";
   if (r.li.className !== cls) r.li.className = cls; // also clears what a drag or a press left
@@ -817,14 +822,16 @@ function rowOf(it, tint) {
   }
   return r.li;
 }
-// Puts rows into ul in this order, moving only those not already in place.
+// Puts rows into ul in this order: those that left go first, so the rest only move if
+// their order changed.
 function setRows(ul, list) {
+  const want = new Set(list);
+  for (const li of [...ul.children]) if (!want.has(li)) li.remove();
   let at = ul.firstElementChild;
   for (const li of list) {
     if (li === at) at = at.nextElementSibling;
     else ul.insertBefore(li, at);
   }
-  while (at) { const next = at.nextElementSibling; at.remove(); at = next; }
 }
 // A row's parts and what they do; rowOf fills in the item's text, colour and tick.
 function itemEl(id) {
@@ -1063,16 +1070,25 @@ function placeSection(y) {
   }
   if (drag.el.nextElementSibling !== before) list.insertBefore(drag.el, before);
 }
+// Let go, the section stays where it was dropped, as far as the page allows: the sections
+// above it unfold at once, upwards, out of the way, and it unfolds downwards with those
+// below it.
 function endSectionDrag() {
-  const { id, el } = drag;
+  const { id, el, ghost } = drag;
   const order = [...$("#list").children].map(c => c.dataset.sec);
+  const dropped = ghost.getBoundingClientRect().top;
   const snap = letGo(); // folded: the cards unfold from here
   el.classList.remove("placeholder");
   if (store.change(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order))) announce(t("Section moved: {x}", { x: nameOf(id) }));
   sync();
   render();
-  const head = el.querySelector(".sec-head");
+  const head = el.querySelector(".sec-head"), page = document.documentElement;
+  window.scrollBy(0, head.getBoundingClientRect().top - dropped);
   if (snap) {
+    for (const p of snap.parts.keys()) if (p.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) snap.parts.delete(p);
+    // The page keeps its full length while the cards below unfold, so it can stay scrolled.
+    page.style.minHeight = page.scrollHeight + "px";
+    setTimeout(() => { page.style.minHeight = ""; }, MOTION.duration + 100);
     const to = head.getBoundingClientRect(); // where it ends up, measured before anything glides
     glide(snap);
     fly(snap.ghost, to, head);
