@@ -2,23 +2,29 @@
 @font-face { font-family: "Atkinson Hyperlegible Next"; src: url("fonts/atkinson-hyperlegible-next-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
 
 /* Type: 17px for everything you read or type, 14px for small print, 20px for sheet
-   titles, 26px for page titles (20px in the compact layout). Corners: 16px for cards and sheets, 12px for buttons,
-   fields and floating items, 5px for tick boxes, round for round things.
-   Layout: one calm column with a named card per section, a row to add sections, the ticked items after them, and undo and redo floating at the bottom within thumb reach.
-   Settings can switch the cards for Paper (at the end) and make every row compact. */
+   titles, 26px for page titles (20px in the compact layout). Corners: 16px for sheets,
+   12px for buttons, fields and floating items, 5px for tick boxes, round for round things.
+   Layout: the list is written on the page itself, like paper. No cards: structure comes
+   from type, space and ruled lines, all on one left edge; a row to add sections, the
+   ticked items below a tear line, and undo and redo floating at the bottom within thumb
+   reach. Only what's lifted above the page has a surface and a shadow: a dragged item or
+   section, undo, the sheets. The paper takes a tint of the list's colour, if it has one.
+   Settings can make every row compact. */
 :root {
   /* Each colour is light-dark(light, dark): the phone's theme picks, unless Settings
      chose one, which sets data-theme on the page. */
   color-scheme: light dark;
-  --bg: light-dark(#f4f5f3, #111513);
-  --surface: light-dark(#ffffff, #1a1f1d);
+  --bg: light-dark(#ffffff, #111513);      /* the page */
+  --surface: light-dark(#ffffff, #1b201e); /* what's lifted above it */
   --press: light-dark(#eef0ee, #242a27);
   --ink: light-dark(#1d2421, #e6ebe8);
+  --title: var(--ink);                     /* the list's name */
   --muted: light-dark(#646e69, #98a39d);
-  --line: light-dark(#e4e7e4, #272e2b);
+  --line: light-dark(#e4e7e4, #2a312e);    /* ruled lines, under names and between items */
+  --tear: light-dark(#cfd5d1, #3b443f);    /* the tear line above what's ticked */
   --ess: light-dark(#1d2421, #e6ebe8); /* ink: Essentials, and the app's buttons */
   --green: light-dark(#468039, #86c877);
-  --look: light-dark(#c27b1a, #e9ae58);
+  --look: light-dark(#b5711a, #e9ae58);
   --long: light-dark(#676bc0, #a7abf2);
   --teal: light-dark(#1a7f84, #6cc9cc);
   --rose: light-dark(#b84d6e, #f08fac);
@@ -26,13 +32,31 @@
   --olive: light-dark(#747822, #c4c86a);
   --plum: light-dark(#8a52a6, #cfa0e6);
   --danger: light-dark(#c0392b, #ff8a80);
-  --shadow: 0 1px 2px light-dark(rgb(20 30 25 / 0.05), transparent), 0 0 0 1px light-dark(rgb(20 30 25 / 0.05), #242b28);
   --float: 0 14px 34px -10px light-dark(rgb(20 30 25 / 0.28), rgb(0 0 0 / 0.6)), 0 0 0 1px light-dark(rgb(20 30 25 / 0.06), #2f3733);
   --ff: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --r: 16px;
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
+/* The list's colour, chosen under its name while renaming it (theme.js sets data-list
+   before the page draws): the paper, its lines and its quiet text take a tint of it, the
+   title its deep shade. Without one, the paper is white. */
+:root[data-list] {
+  --bg: light-dark(color-mix(in oklab, var(--list) 11%, #ffffff), color-mix(in oklab, var(--list) 9%, #111513));
+  --surface: light-dark(color-mix(in oklab, var(--list) 5%, #ffffff), color-mix(in oklab, var(--list) 11%, #1b201e));
+  --press: light-dark(color-mix(in oklab, var(--list) 20%, #ffffff), color-mix(in oklab, var(--list) 17%, #111513));
+  --line: light-dark(color-mix(in oklab, var(--list) 24%, #ffffff), color-mix(in oklab, var(--list) 20%, #111513));
+  --tear: light-dark(color-mix(in oklab, var(--list) 42%, #ffffff), color-mix(in oklab, var(--list) 34%, #111513));
+  --muted: light-dark(color-mix(in oklab, var(--list) 55%, #1d2421), color-mix(in oklab, var(--list) 45%, #e6ebe8));
+  --title: light-dark(color-mix(in oklab, var(--list) 62%, #000000), var(--list));
+}
+:root[data-list="green"] { --list: var(--green); }
+:root[data-list="teal"] { --list: var(--teal); }
+:root[data-list="blue"] { --list: var(--blue); }
+:root[data-list="long"] { --list: var(--long); }
+:root[data-list="plum"] { --list: var(--plum); }
+:root[data-list="rose"] { --list: var(--rose); }
+:root[data-list="look"] { --list: var(--look); }
+:root[data-list="olive"] { --list: var(--olive); }
 
 body {
   margin: 0; background: var(--bg); color: var(--ink); font: 400 1.0625rem/1.4 var(--ff); -webkit-tap-highlight-color: transparent;
@@ -55,16 +79,19 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16px; }
 /* The list's name, a page title: in the same place as Settings' own, renamed with a tap */
 .list-head {
-  margin: -4px 0 0; display: flex; font-size: 1.625rem; line-height: 1.4;
+  margin: -4px 0 0; display: flex; font-size: 1.625rem; line-height: 1.4; color: var(--title);
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 .list-name { flex: 1; min-width: 0; padding: 4px 0; overflow-wrap: anywhere; cursor: text; outline: none; border-radius: 5px; }
 .list-name:focus-visible { box-shadow: 0 0 0 2px var(--ink); }
-.list-name.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 var(--ink); border-radius: 0; }
-#list { display: flex; flex-direction: column; gap: 16px; }
-.sec, .basket-list { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: clip; } /* clip: never scrolled from inside, even while a card changes height */
+.list-name.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 currentColor; border-radius: 0; }
+#list { display: flex; flex-direction: column; gap: 28px; }
+/* clip: never scrolled from inside, even while a section changes height; the margin
+   leaves room around a lifted row */
+.sec, .basket-list { overflow: clip; overflow-clip-margin: 16px; }
 .sec-head {
-  margin: 0; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px; font-size: inherit;
+  margin: 0; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; font-size: inherit;
+  background: linear-gradient(var(--line), var(--line)) left bottom / 100% 1px no-repeat;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 .sec-name {
@@ -73,29 +100,35 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sec-name:focus-visible { box-shadow: 0 0 0 2px var(--ink); }
 .sec-name.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 var(--sec); border-radius: 0; }
 .sec-head .bin { width: 44px; height: 44px; margin-right: -12px; }
-/* A section's colours, under its name while it is edited */
-.palette { display: flex; padding: 2px 8px 8px; }
+/* Colours to choose from, under a section's name or the list's while it is renamed */
+.palette { display: flex; padding: 2px 0 8px; margin-left: -10px; }
 .swatch { flex: 0 1 44px; min-width: 32px; height: 44px; padding: 0; border: 0; background: none; display: grid; place-items: center; cursor: pointer; }
 .swatch::before { content: ""; width: 22px; height: 22px; border-radius: 50%; background: var(--c); }
-.swatch[aria-pressed="true"]::before { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--c); }
+.swatch[aria-pressed="true"]::before { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--c); }
 .swatch:focus-visible { outline: 2px solid var(--ink); outline-offset: -3px; border-radius: 12px; }
+/* White, the list without a colour: a ring shows where it is */
+.swatch.plain { --c: var(--muted); }
+.swatch.plain::before { background: #ffffff; box-shadow: inset 0 0 0 1.5px var(--c); }
+.swatch.plain[aria-pressed="true"]::before { box-shadow: inset 0 0 0 1.5px var(--c), 0 0 0 2px var(--bg), 0 0 0 4px var(--c); }
 
-/* Items */
+/* Items. Rows reach 12px into the margins, so a press, a highlight or a dragged slip has
+   room around its text; the ruled lines still run from the text to the right edge. */
 .items { list-style: none; margin: 0; padding: 0; }
 .item {
-  display: grid; grid-template-columns: 54px minmax(0, 1fr); list-style: none;
-  background-color: var(--surface); transition: background-color 0.2s;
+  display: grid; grid-template-columns: 38px minmax(0, 1fr); list-style: none; margin-inline: -12px; padding-inline: 12px;
+  background-origin: content-box; transition: background-color 0.2s;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 .item + .item, .items:not(:empty) ~ .add, .sug:not([hidden]) + .add {
   background-image: linear-gradient(var(--line), var(--line));
-  background-size: calc(100% - 54px) 1px; background-position: right top; background-repeat: no-repeat;
+  background-size: calc(100% - 38px) 1px; background-position: right top; background-repeat: no-repeat;
 }
 .item.pressing { background-color: var(--press); transition: background-color 0.3s 0.12s; }
-.item.lifted, .item.hint { position: relative; z-index: 2; background-color: var(--surface); box-shadow: var(--float); transform: scale(1.02); transition: transform 0.15s, box-shadow 0.15s; }
+/* Lifted: a slip of paper above the page */
+.item.lifted, .item.hint { position: relative; z-index: 2; background-color: var(--surface); border-radius: 12px; box-shadow: var(--float); transform: scale(1.02); transition: transform 0.15s, box-shadow 0.15s; }
 .item.hint { animation: hint 1.8s ease-in-out; }
 @keyframes hint { 0%, 100% { transform: none; box-shadow: none; } 20%, 80% { transform: scale(1.02); box-shadow: var(--float); } }
-.boxcell { position: relative; display: grid; place-items: center; cursor: pointer; }
+.boxcell { position: relative; display: grid; place-items: center start; margin-left: -12px; padding-left: 12px; cursor: pointer; } /* the margin ticks too */
 .boxcell > .box, .boxcell > .grip { grid-area: 1 / 1; }
 .grip { display: grid; place-items: center; color: var(--sec); opacity: 0; transition: opacity 0.15s; }
 /* The tick and the grip's dots are drawn here rather than in each item, in the current colour */
@@ -115,7 +148,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .chk:checked + .box { background: var(--muted); border-color: var(--muted); color: var(--surface); }
 .chk:focus-visible + .box { outline: 2px solid var(--ink); outline-offset: 3px; }
 .text {
-  min-width: 0; padding: 14px 16px 14px 0; overflow-wrap: anywhere; cursor: text;
+  min-width: 0; padding: 14px 0; overflow-wrap: anywhere; cursor: text;
   border-radius: 5px; outline: none;
 }
 .text:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
@@ -123,23 +156,22 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .text.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 var(--sec); border-radius: 0; }
 .item.done .text { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .item.done .text.editing { color: var(--ink); text-decoration: none; }
-.item.editing { grid-template-columns: 54px minmax(0, 1fr) 48px; }
+.item.editing { grid-template-columns: 38px minmax(0, 1fr) 48px; }
 .item.editing .text { padding-right: 4px; }
 .bin { display: grid; place-items: center; align-self: stretch; padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; }
 .bin:focus-visible { outline-offset: -6px; border-radius: 12px; }
 
-/* Add row */
-.add { display: flex; align-items: center; min-height: 52px; padding-right: 16px; background-color: var(--surface); }
-.add:focus-within { background-color: color-mix(in oklab, var(--sec) 6%, var(--surface)); }
-.add-plus { width: 54px; align-self: stretch; flex: none; display: grid; place-items: center; color: var(--sec); cursor: text; }
+/* Add row: you write on a line, as when editing an item */
+.add { display: flex; align-items: center; min-height: 52px; margin-inline: -12px; padding-inline: 12px; background-origin: content-box; }
+.add-plus { width: 38px; align-self: stretch; flex: none; box-sizing: border-box; padding-left: 1.5px; display: grid; place-items: center start; color: var(--sec); cursor: text; }
 .add-input {
   flex: 1; min-width: 0; height: 52px; padding: 0; margin-right: 4px; border: 0; outline: none; background: none;
   color: var(--ink); font: inherit;
 }
 .add-input::placeholder { color: var(--muted); }
+.add-input:focus { box-shadow: inset 0 -2px 0 var(--sec); }
 /* Once you type, a cross at the end of the row throws the text away, in the same place
    as when editing an item. The plus stays: nothing is on the list until it's added. */
-.add.typing, .add-sec.typing { padding-right: 0; }
 .add-x { width: 48px; flex: none; }
 :is(.add, .add-sec):not(.typing) .add-x { display: none; }
 :is(.add, .add-sec).typing .add-plus { cursor: pointer; } /* it adds what's typed */
@@ -147,32 +179,36 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* Suggestions */
 .sug { list-style: none; margin: 0; padding: 4px 0; box-shadow: inset 0 1px 0 var(--line); }
 .items:empty + .sug { box-shadow: none; }
-.sugopt { display: flex; min-height: 46px; color: var(--muted); }
-.sugopt.active { background: var(--press); }
+.sugopt { display: flex; min-height: 46px; margin-inline: -12px; padding-inline: 12px; background-origin: content-box; color: var(--muted); }
+.sugopt.active { background-color: var(--press); }
 .sug-pick { flex: 1; min-width: 0; display: flex; align-items: center; padding-block: 6px; cursor: pointer; }
-.sug-pick > svg { width: 54px; flex: none; }
+.sug-pick > svg { width: 21px; margin-right: 17px; flex: none; }
 .sug-x-cell { display: flex; flex: none; }
 .sug-x { width: 48px; padding: 0; border: 0; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .sug-x-cell[aria-selected="true"] .sug-x { color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); border-radius: 12px; }
-@media (hover: hover) { .sugopt:hover, .ib:hover { background: var(--press); } .bin:hover, .sug-x:hover { color: var(--danger); } }
+@media (hover: hover) { .sugopt:hover, .ib:hover { background-color: var(--press); } .bin:hover, .sug-x:hover { color: var(--danger); } }
 .sugopt .t { color: var(--ink); overflow-wrap: anywhere; }
 .sugopt mark { background: none; color: inherit; font-weight: 700; }
 
-/* Basket */
-.basket { display: flex; flex-direction: column; gap: 8px; }
+/* What's ticked: the stub below a tear line, quieter */
+.basket {
+  display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 16px;
+  background: repeating-linear-gradient(90deg, var(--tear) 0 6px, transparent 6px 12px) left top / 100% 2px no-repeat;
+}
 .basket.empty { display: none; }
 :root.dragging .basket.empty { display: flex; } /* its heading shows during a drag, to drop under */
 .basket.empty #basket-count, .basket.empty .chev { display: none; }
 .basket-head { margin: 0; font-size: inherit; }
 .basket-list:empty { display: none; }
 /* Five days of ticked items can make a long list: the phone skips drawing those off screen. */
-#basket-list .item { content-visibility: auto; contain-intrinsic-size: auto 52px; }
-:is([data-layout="compact"], [data-style="paper"]) #basket-list .item { contain-intrinsic-size: auto 44px; }
+#basket-list .item { content-visibility: auto; contain-intrinsic-size: auto 44px; }
+#basket-list .text { font-size: 0.875rem; padding-block: 12px; }
+#basket-list .box { width: 18px; height: 18px; margin-left: 1.5px; border-radius: 4px; }
+#basket-list .box::after { width: 11px; height: 11px; }
 #basket-toggle {
-  display: grid; grid-template-columns: 54px auto auto; align-items: center; min-height: 44px; padding: 0 8px 0 0;
+  display: grid; grid-template-columns: 38px auto auto; align-items: center; min-height: 44px; padding: 0 8px 0 0;
   border: 0; border-radius: 12px; background: none; color: var(--muted); font-weight: 700; cursor: pointer;
 }
-#basket-toggle .tickmark { justify-self: center; }
 #basket-toggle .chev { margin-left: 6px; transition: transform 0.15s; }
 #basket-count { font-variant-numeric: tabular-nums; }
 .tickmark { width: 21px; height: 21px; border-radius: 5px; background: var(--muted); color: var(--bg); display: grid; place-items: center; }
@@ -210,54 +246,55 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 #undo.named { width: auto; grid-auto-flow: column; gap: 8px; padding: 0 16px 0 12px; border-radius: 999px; }
 #undo.named .undo-what { display: block; }
 
-/* Drag */
+/* Drag: the ghost is placed exactly over the row, room included */
 .ghost {
-  position: fixed; z-index: 20; margin: 0; pointer-events: none; background-image: none !important;
-  border-radius: 12px; box-shadow: var(--float);
+  position: fixed; z-index: 20; margin: 0; box-sizing: border-box; pointer-events: none;
+  background-color: var(--surface); background-image: none !important; border-radius: 12px; box-shadow: var(--float);
 }
-.item.placeholder { background-color: color-mix(in oklab, var(--sec) 10%, var(--surface)); }
+.item.placeholder { background-color: color-mix(in oklab, var(--sec) 8%, var(--bg)); border-radius: 12px; }
 .item.placeholder > * { visibility: hidden; }
-.item.placeholder.away { background-color: var(--surface); } /* heading for the ticked items: its slot empties, nothing moves */
+.item.placeholder.away { background-color: transparent; } /* heading for the ticked items: its slot empties, nothing moves */
 
 /* Dropping an item here, under the ticked group's heading, ticks it: an empty ticked row */
 .drop {
-  display: none; align-items: center; min-height: 52px; box-sizing: border-box; padding-left: 14.5px; --sec: var(--muted);
-  border: 2px dashed var(--line); border-radius: var(--r); transition: background-color 0.15s, border-color 0.15s;
+  display: none; align-items: center; min-height: 52px; box-sizing: border-box; --sec: var(--muted);
+  border: 0 dashed var(--line); border-width: 2px 0; transition: background-color 0.15s, border-color 0.15s;
 }
 :root.dragging:not(.drag-ticked) .drop { display: flex; }
-.drop.over { border-style: solid; border-color: var(--muted); background-color: color-mix(in oklab, var(--muted) 12%, var(--surface)); }
+.drop.over { border-style: solid; border-color: var(--muted); background-color: color-mix(in oklab, var(--muted) 12%, var(--bg)); }
 .drop.over .box { background: var(--muted); color: var(--surface); }
 
 /* An item on its way to its new place lifts off, travels and lands; a dragged one lands
    where it was let go. app.js sets the duration to match the trip. */
 .flying {
-  position: fixed; z-index: 20; margin: 0; pointer-events: none; background-image: none !important;
-  animation: lift ease-in-out both;
+  position: fixed; z-index: 20; margin: 0; box-sizing: border-box; pointer-events: none;
+  background-color: var(--surface); background-image: none !important; animation: lift ease-in-out both;
 }
 .ghost.landing { animation: land ease-in both; }
 @keyframes lift { 0%, 100% { box-shadow: none; border-radius: 0; } 25%, 75% { box-shadow: var(--float); border-radius: 12px; } }
 @keyframes land { 0%, 40% { box-shadow: var(--float); border-radius: 12px; } 100% { box-shadow: none; border-radius: 0; } }
 
 /* Adding a section */
-.add-sec { display: flex; align-items: center; min-height: 48px; padding-right: 16px; border-radius: var(--r); color: var(--muted); }
-.add-sec:focus-within { background: var(--surface); box-shadow: var(--shadow); color: var(--ink); }
+.add-sec { display: flex; align-items: center; min-height: 48px; color: var(--muted); }
+.add-sec:focus-within { color: var(--ink); }
 .add-sec .add-plus { color: var(--muted); }
 #add-sec { font-weight: 700; } /* typed like a section name */
 #add-sec::placeholder { font-weight: 400; }
+#add-sec:focus { box-shadow: inset 0 -2px 0 var(--ink); }
 :root.dragging, :root.dragging *, :root.sorting, :root.sorting * { cursor: grabbing !important; }
 
 /* Reordering sections: hold a name, then move; meanwhile each section folds to its heading */
 :root.sorting #list > .sec > :not(.sec-head) { display: none; }
 :root.sorting #list > .sec > .sec-head { padding-bottom: 4px; }
 .sec.pressing > .sec-head { background-color: var(--press); transition: background-color 0.3s 0.12s; }
-.sec.lifted { position: relative; z-index: 2; box-shadow: var(--float); transform: scale(1.01); transition: transform 0.15s, box-shadow 0.15s; }
-.sec.placeholder { background-color: color-mix(in oklab, var(--sec) 10%, var(--surface)); box-shadow: none; }
+.sec.lifted, .sec.ghost { background: var(--surface); border-radius: 4px; box-shadow: 0 0 0 12px var(--surface), var(--float); }
+.sec.lifted { position: relative; z-index: 2; transform: scale(1.01); transition: transform 0.15s, box-shadow 0.15s; }
+.sec.placeholder { background-color: color-mix(in oklab, var(--sec) 8%, var(--bg)); border-radius: 4px; box-shadow: 0 0 0 12px color-mix(in oklab, var(--sec) 8%, var(--bg)); }
 .sec.placeholder > * { visibility: hidden; }
-.sec.ghost { border-radius: var(--r); }
-.sec.ghost.landing { animation-name: land-card; }
-@keyframes land-card { 0%, 40% { box-shadow: var(--float); } 100% { box-shadow: none; } }
+.sec.ghost.landing { animation-name: land-section; }
+@keyframes land-section { 0%, 40% { box-shadow: var(--float); } 100% { box-shadow: none; } }
 .item.flash { animation: flash 1.4s ease-out; }
-@keyframes flash { 0%, 35% { background-color: color-mix(in oklab, var(--sec) 20%, var(--surface)); } 100% { background-color: var(--surface); } }
+@keyframes flash { 0%, 35% { background-color: color-mix(in oklab, var(--sec) 16%, var(--bg)); } 100% { background-color: transparent; } }
 
 /* Motion: items glide from app.js; this only turns the rest off when asked */
 @media (prefers-reduced-motion: reduce) {
@@ -273,7 +310,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .setup-row { display: flex; gap: 8px; }
 .setup input {
   flex: 1; min-width: 0; height: 48px; padding: 0 14px; box-sizing: border-box; border: 0; border-radius: 12px;
-  background: var(--surface); box-shadow: var(--shadow); color: var(--ink); font: inherit; font-size: 1.0625rem; letter-spacing: 0.04em;
+  background: var(--press); color: var(--ink); font: inherit; font-size: 1.0625rem; letter-spacing: 0.04em;
 }
 .setup input:focus { outline: 2px solid var(--ess); outline-offset: 0; }
 
@@ -286,7 +323,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 
 /* Pairing sheet */
 .sheet {
-  width: min(360px, calc(100vw - 32px)); box-sizing: border-box; padding: 24px; border: 0; border-radius: var(--r);
+  width: min(360px, calc(100vw - 32px)); box-sizing: border-box; padding: 24px; border: 0; border-radius: 16px;
   background: var(--surface); color: var(--ink); box-shadow: var(--float);
 }
 .sheet:focus { outline: none; }
@@ -300,18 +337,18 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .actions .btn { flex: 1; }
 .close { position: absolute; top: 14px; right: 14px; }
 
-/* Settings: a page of its own over the list */
+/* Settings: a page of its own over the list, its parts between ruled lines */
 .sheet.page {
   width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border-radius: 0;
   background: var(--bg); box-shadow: none;
 }
 .page-in {
-  max-width: 34rem; margin-inline: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px;
+  max-width: 34rem; margin-inline: auto; box-sizing: border-box; display: flex; flex-direction: column;
   padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(32px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
-.page-head { display: flex; align-items: center; justify-content: space-between; margin-right: -6px; }
+.page-head { display: flex; align-items: center; justify-content: space-between; margin: 0 -6px 8px 0; }
 .page-head h2 { margin: 0; font-size: 1.625rem; }
-.set { padding: 16px; border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow); }
+.set { padding: 18px 0; border-top: 1px solid var(--line); }
 .set h3 { margin: 0 0 12px; font-size: inherit; }
 .set p { margin: 0 0 12px; }
 .set .btn { margin-bottom: 16px; }
@@ -326,17 +363,16 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 }
 .choices input:checked { border-color: var(--ink); background: radial-gradient(circle, var(--ink) 0 4.5px, transparent 5px); }
 .choices input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-.choices.style { margin-top: 12px; padding-top: 6px; border-top: 1px solid var(--line); }
 .switch { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 12px 0 -6px; padding-top: 6px; border-top: 1px solid var(--line); cursor: pointer; --sec: var(--muted); }
 .switch .chk:checked + .box { background: var(--ink); border-color: var(--ink); color: var(--surface); }
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 12px; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 
-/* Compact layout, chosen in Settings: every row 44 px, gaps of 12 px, titles of 20 px.
+/* Compact layout, chosen in Settings: every row 44 px, tighter gaps, titles of 20 px.
    Everything you tap stays at least 44 px tall. */
 [data-layout="compact"] main.wrap { padding-top: 12px; gap: 12px; }
-[data-layout="compact"] #list { gap: 12px; }
+[data-layout="compact"] #list { gap: 20px; }
 [data-layout="compact"] .list-head { margin: 0; font-size: 1.25rem; }
 [data-layout="compact"] .list-name { padding: 8px 0; }
 [data-layout="compact"] .page-head h2 { font-size: 1.25rem; }
@@ -346,59 +382,4 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 [data-layout="compact"] :is(.add, .add-sec, .drop) { min-height: 44px; }
 [data-layout="compact"] .add-input { height: 44px; }
 [data-layout="compact"] .sugopt { min-height: 44px; }
-[data-layout="compact"] .basket { gap: 6px; }
-
-/* Paper, chosen in Settings: the list is written on the page itself. No cards: structure
-   comes from type, space and ruled lines, all on one left edge. Only what's lifted above
-   the page has a surface and a shadow: a dragged item or section, undo, the sheets. */
-:root[data-style="paper"] {
-  --bg: light-dark(#ffffff, #111513);      /* the page */
-  --surface: light-dark(#ffffff, #1b201e); /* what's lifted above it */
-  --line: light-dark(#e4e7e4, #2a312e);    /* ruled lines, under names and between items */
-  --tear: light-dark(#cfd5d1, #3b443f);    /* the tear line above what's ticked */
-}
-[data-style="paper"] #list { gap: 28px; }
-[data-style="paper"] :is(#list > .sec, .basket-list) { background: none; box-shadow: none; border-radius: 0; overflow-clip-margin: 16px; }
-[data-style="paper"] .sec-head { padding: 0; background: linear-gradient(var(--line), var(--line)) left bottom / 100% 1px no-repeat; }
-[data-style="paper"] .palette { padding: 2px 0 8px; margin-left: -10px; }
-/* Rows reach 12px into the margins, so a press, a highlight or a dragged slip has room
-   around its text; the ruled lines still run from the text to the right edge. */
-[data-style="paper"] :is(.item, .add, .sugopt) { margin-inline: -12px; padding-inline: 12px; background-color: transparent; background-origin: content-box; }
-[data-style="paper"] .item { grid-template-columns: 38px minmax(0, 1fr); }
-[data-style="paper"] .item.editing { grid-template-columns: 38px minmax(0, 1fr) 48px; }
-[data-style="paper"] :is(.item + .item, .items:not(:empty) ~ .add, .sug:not([hidden]) + .add) { background-size: calc(100% - 38px) 1px; }
-[data-style="paper"] .boxcell { place-items: center start; margin-left: -12px; padding-left: 12px; } /* the margin ticks too */
-[data-style="paper"] .text { padding-right: 0; }
-[data-style="paper"] :is(.add, .add.typing) { padding-right: 12px; }
-[data-style="paper"] .add-plus { width: 38px; place-items: center start; padding-left: 1.5px; box-sizing: border-box; }
-[data-style="paper"] .sug-pick > svg { width: 21px; margin-right: 17px; }
-/* You write on a line: a new item or section, like editing an item */
-[data-style="paper"] .add:focus-within { background-color: transparent; }
-[data-style="paper"] .add-input:focus { box-shadow: inset 0 -2px 0 var(--sec); }
-[data-style="paper"] .add-sec { padding-right: 0; border-radius: 0; }
-[data-style="paper"] .add-sec:focus-within { background: none; box-shadow: none; }
-[data-style="paper"] #add-sec:focus { box-shadow: inset 0 -2px 0 var(--ink); }
-/* Lifted: a slip of paper above the page */
-[data-style="paper"] :is(.item.lifted, .item.hint) { background-color: var(--surface); border-radius: 12px; }
-[data-style="paper"] :is(.ghost, .flying) { margin: 0; box-sizing: border-box; background-color: var(--surface); } /* placed exactly over the row, room included */
-[data-style="paper"] :is(.sec.lifted, .sec.ghost) { background: var(--surface); border-radius: 4px; box-shadow: 0 0 0 12px var(--surface), var(--float); }
-[data-style="paper"] .item.placeholder { background-color: color-mix(in oklab, var(--sec) 8%, var(--bg)); border-radius: 12px; }
-[data-style="paper"] .item.placeholder.away { background-color: transparent; }
-[data-style="paper"] .sec.placeholder { background-color: color-mix(in oklab, var(--sec) 8%, var(--bg)); border-radius: 4px; box-shadow: 0 0 0 12px color-mix(in oklab, var(--sec) 8%, var(--bg)); }
-[data-style="paper"] .item.flash { animation-name: flash-paper; }
-@keyframes flash-paper { 0%, 35% { background-color: color-mix(in oklab, var(--sec) 16%, var(--bg)); } 100% { background-color: transparent; } }
-/* What's ticked: the stub below a tear line, quieter */
-[data-style="paper"] .basket { margin-top: 12px; padding-top: 16px; background: repeating-linear-gradient(90deg, var(--tear) 0 6px, transparent 6px 12px) left top / 100% 2px no-repeat; }
-[data-style="paper"] #basket-toggle { grid-template-columns: 38px auto auto; }
-[data-style="paper"] #basket-toggle .tickmark { justify-self: start; }
-[data-style="paper"] #basket-list .text { font-size: 0.875rem; padding-block: 12px; }
-[data-style="paper"] #basket-list .box { width: 18px; height: 18px; margin-left: 1.5px; border-radius: 4px; }
-[data-style="paper"] #basket-list .box::after { width: 11px; height: 11px; }
-[data-style="paper"] .drop { padding-left: 0; border-width: 2px 0; border-radius: 0; }
-/* Settings and the welcome page, the same way */
-[data-style="paper"] .page-in { gap: 0; }
-[data-style="paper"] .page-head { margin-bottom: 8px; }
-[data-style="paper"] .set { padding: 18px 0; background: none; box-shadow: none; border-radius: 0; border-top: 1px solid var(--line); }
-[data-style="paper"] .setup input { background: var(--press); box-shadow: none; }
-[data-style="paper"][data-layout="compact"] #list { gap: 20px; }
-[data-style="paper"][data-layout="compact"] .basket { margin-top: 8px; padding-top: 12px; }
+[data-layout="compact"] .basket { gap: 6px; margin-top: 8px; padding-top: 12px; }

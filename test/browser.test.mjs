@@ -5,8 +5,8 @@
 //
 // STORE, optional, is the server's data directory; the tests then check that no item
 // name was ever written to it. BROWSER picks Playwright's chromium (the default) or
-// firefox. STYLE=paper and LAYOUT=compact run every test in that look, as chosen in
-// Settings; the test of Settings itself then stands aside.
+// firefox. LAYOUT=compact runs every test in the compact layout, as chosen in Settings;
+// the test of Settings itself then stands aside.
 
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -38,14 +38,10 @@ async function eventually(fn, ms = 6000) {
   }
 }
 
-const LOOK = [process.env.STYLE || "", process.env.LAYOUT || ""];
+const LAYOUT = process.env.LAYOUT || "";
 async function phone(errors, options = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, ...options });
-  if (LOOK.join("")) {
-    await ctx.addInitScript(([style, layout]) => {
-      try { if (style) localStorage.setItem("panier-style", style); if (layout) localStorage.setItem("panier-layout", layout); } catch (_) {}
-    }, LOOK);
-  }
+  if (LAYOUT) await ctx.addInitScript(l => { try { localStorage.setItem("panier-layout", l); } catch (_) {} }, LAYOUT);
   const page = await ctx.newPage();
   watch(page, errors);
   return { ctx, page };
@@ -385,7 +381,7 @@ test("the list has a name, at the top, renamed with a tap", async () => {
   const box = await a.locator("#list-name").boundingBox();
   assert.ok(box.height >= 44, "big enough to tap");
   const font = await a.locator("#list-name").evaluate(el => getComputedStyle(el).fontSize);
-  assert.equal(font, LOOK[1] === "compact" ? "20px" : "26px", "the size of a page title");
+  assert.equal(font, LAYOUT === "compact" ? "20px" : "26px", "the size of a page title");
 
   await renameList(a, "Courses");
   assert.equal(await a.locator("#list-name").innerText(), "Courses");
@@ -405,6 +401,40 @@ test("the list has a name, at the top, renamed with a tap", async () => {
 
   await a.click("#undo");
   assert.ok(await eventually(async () => (await b.locator("#list-name").innerText()) === "Shopping list"), "undo brings the first name back");
+  await t.close();
+});
+
+test("the list's colour, chosen under its name, tints the paper on both phones", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await add(a, "ess", "Milk");
+  await blur(a);
+  const page = pg => pg.evaluate(() => [document.documentElement.dataset.list || "white", getComputedStyle(document.body).backgroundColor]);
+  assert.deepEqual(await page(a), ["white", "rgb(255, 255, 255)"], "white to start with");
+  await a.click("#list-name");
+  const swatches = a.locator(".list-head + .palette .swatch");
+  assert.deepEqual(await swatches.evaluateAll(s => s.map(x => x.getAttribute("aria-label"))), ["White", "Green", "Teal", "Blue", "Indigo", "Plum", "Rose", "Amber", "Olive"], "white, then the section colours but ink");
+  assert.equal(await swatches.first().getAttribute("aria-pressed"), "true");
+  await swatches.nth(2).click();
+  const [list, bg] = await page(a);
+  assert.equal(list, "teal");
+  assert.notEqual(bg, "rgb(255, 255, 255)", "the paper takes a tint of it at once");
+  assert.equal(await a.locator(".list-name.editing").count(), 1, "while the name stays in editing");
+  const bar = await a.getAttribute('meta[name="theme-color"]', "content");
+  assert.equal(bar, await a.evaluate(() => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = getComputedStyle(document.body).backgroundColor; c.fillRect(0, 0, 1, 1); const d = c.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]},${d[1]},${d[2]})`; }), "the browser's bars take the paper's colour");
+  await a.keyboard.press("Enter");
+  assert.ok(await eventually(async () => (await page(b))[0] === "teal"), "the other phone's paper too");
+  assert.equal(await a.getAttribute("#undo", "aria-label"), "Undo changing the colour of “Shopping list”");
+  await a.click("#undo");
+  assert.ok(await eventually(async () => (await page(b))[0] === "white"), "undo brings white back, on both phones");
+  await a.click("#redo");
+  assert.ok(await eventually(async () => (await page(b))[0] === "teal"));
+
+  // Opening the app again, the paper is tinted before anything is drawn.
+  await t.A.addInitScript(() => document.addEventListener("DOMContentLoaded", () => { window.firstList = document.documentElement.dataset.list; }));
+  await a.reload();
+  await a.locator("#app").waitFor();
+  assert.equal(await a.evaluate(() => window.firstList), "teal");
   await t.close();
 });
 
@@ -487,14 +517,14 @@ test("unticking an item from a deleted section puts it in the first section", as
   await t.close();
 });
 
-test("items hold 120 characters, four lines on a phone", async () => {
+test("items hold 120 characters, three lines on a phone", async () => {
   const t = await pair();
   const long = "Organic free-range eggs from the market stall near the church, the brown ones in the cardboard box of twelve, not the six-pack";
   await add(t.a, "ess", long + " and more");
   const text = item(t.a, long.slice(0, 120).trim()).locator(".text");
   assert.equal((await text.innerText()).length, 120);
   const lines = await text.evaluate(el => { const c = getComputedStyle(el); return Math.round((el.getBoundingClientRect().height - parseFloat(c.paddingTop) - parseFloat(c.paddingBottom)) / parseFloat(c.lineHeight)); });
-  assert.equal(lines, LOOK[0] === "paper" ? 3 : 4, "four lines at most, three on paper's wider rows");
+  assert.equal(lines, 3, "three lines at most");
   await t.close();
 });
 
@@ -970,28 +1000,23 @@ test("a ticked item travels at the same pace however long the list, and only as 
   await t.close();
 });
 
-test("an item on the move stays in line with the list, in both styles", async () => {
+test("an item on the move stays in line with the list", async () => {
   const t = await pair();
   const { a } = t;
-  for (const x of ["Milk", "Bread", "Eggs", "Tea"]) await add(a, "ess", x);
+  for (const x of ["Milk", "Bread"]) await add(a, "ess", x);
   await blur(a);
+  await still(a);
   const left = sel => a.evaluate(s => document.querySelector(s).getBoundingClientRect().left, sel);
   const near = (x, y, msg) => assert.ok(Math.abs(x - y) < 3, `${msg}: ${x.toFixed(1)} and ${y.toFixed(1)}`); // a 12 px shift was the trouble
-  for (const [style, x, drag] of [["", "Milk", "Bread"], ["paper", "Eggs", "Tea"]]) {
-    await a.evaluate(s => { if (s) localStorage.setItem("panier-style", s); else localStorage.removeItem("panier-style"); }, style);
-    await a.reload();
-    await a.locator("#app").waitFor();
-    await still(a);
-    const at = await item(a, x).locator(".text").evaluate(e => e.getBoundingClientRect().left);
-    await item(a, x).locator(".boxcell").click();
-    await a.waitForSelector(".flying");
-    near(await left(".flying .text"), at, (style || "cards") + ": a ticked item flies in line");
-    await still(a);
-    await dragTo(a, item(a, drag), async () => (await a.locator("#list .item").first().boundingBox()).y, { hold: true });
-    near(await left(".ghost .text"), at, (style || "cards") + ": so does a dragged one");
-    await a.mouse.up();
-    await still(a);
-  }
+  const at = await item(a, "Milk").locator(".text").evaluate(e => e.getBoundingClientRect().left);
+  await item(a, "Milk").locator(".boxcell").click();
+  await a.waitForSelector(".flying");
+  near(await left(".flying .text"), at, "a ticked item flies in line");
+  await still(a);
+  await dragTo(a, item(a, "Bread"), async () => (await a.locator("#list .item").first().boundingBox()).y, { hold: true });
+  near(await left(".ghost .text"), at, "so does a dragged one");
+  await a.mouse.up();
+  await still(a);
   await t.close();
 });
 
@@ -1151,7 +1176,7 @@ test("a section let go stays where it was dropped, and unfolds from there", asyn
   await t.close();
 });
 
-test("settings: appearance, keeping the list, its size, export, and about", { skip: !!LOOK.join("") }, async () => {
+test("settings: appearance, keeping the list, its size, export, and about", { skip: !!LAYOUT }, async () => {
   const t = await pair();
   const { a } = t;
   await add(a, "ess", "Milk");
@@ -1164,11 +1189,11 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   assert.ok(await a.locator("#settings").isVisible());
 
   const bg = () => a.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  assert.equal(await bg(), "rgb(244, 245, 243)", "light, like this phone");
+  assert.equal(await bg(), "rgb(255, 255, 255)", "white paper, like this phone's light theme");
   await a.locator('#settings .choices label', { hasText: "Dark" }).click();
   assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), "dark");
   assert.equal(await bg(), "rgb(17, 21, 19)", "dark colours when Dark is chosen");
-  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "#111513", "the browser's bars follow");
+  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "rgb(17,21,19)", "the browser's bars follow");
   await a.reload();
   await a.locator("#app").waitFor();
   assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), "dark", "the choice is kept on this phone");
@@ -1187,18 +1212,8 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   await a.locator("#settings .switch").click();
   assert.equal(await row(), 52, "and back");
 
-  const look = () => a.evaluate(() => [document.documentElement.dataset.style || "cards", getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector("#list .sec")).boxShadow]);
   await a.locator('#settings .choices label', { hasText: "Light" }).click();
-  await a.locator('#settings .choices label', { hasText: "Paper" }).click();
-  assert.deepEqual(await look(), ["paper", "rgb(255, 255, 255)", "none"], "Paper: the list on a white page, without cards");
-  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "#ffffff", "the browser's bars follow");
-  await a.reload();
-  await a.locator("#app").waitFor();
-  assert.equal((await look())[0], "paper", "kept on this phone");
-  await a.click("#settings-open");
-  assert.ok(await a.locator('input[name="style"][value="paper"]').isChecked());
-  await a.locator('#settings .choices label', { hasText: "Cards" }).click();
-  assert.equal((await look())[0], "cards", "and back to cards");
+  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "rgb(255,255,255)", "and back");
 
   assert.match(await a.locator("#size-text").innerText(), /2 items to get, 1 bought before/);
   assert.ok(await eventually(async () => /browser/.test(await a.locator("#keep-text").innerText())));

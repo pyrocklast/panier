@@ -12,6 +12,10 @@ const DEFAULTS = [
 const COLORS = [["ess", "Ink"], ["green", "Green"], ["teal", "Teal"], ["blue", "Blue"], ["long", "Indigo"], ["plum", "Plum"], ["rose", "Rose"], ["look", "Amber"], ["olive", "Olive"]];
 const PALETTE = ["teal", "rose", "green", "blue", "olive", "plum", "look", "long", "ess"]; // new sections take the first unused
 const colorOk = (c, fallback) => (COLORS.some(([id]) => id === c) ? c : fallback);
+// The list's own colour tints the paper: white, the paper as it is, then the section
+// colours but ink.
+const LIST_COLORS = [["", "White"], ...COLORS.filter(([id]) => id !== "ess")];
+const listColor = () => { const c = store.listColor(); return LIST_COLORS.some(([id]) => id === c) ? c : ""; };
 const MAX_ITEM = 120; // four lines on a phone
 const MAX_SECTION = 40; // and the list's name
 const LIST = "@list"; // where the list's own name is kept, among items and sections
@@ -608,29 +612,40 @@ function joinItem(id, text) {
 
 // While a section's name is being edited, its colours show under it: a tap recolours
 // the section at once, and the name stays in editing.
-function editSection(span, id, x, y) {
-  const orig = nameOf(id);
+// Colours to choose from while a name is edited: a tap recolours at once, and the name
+// stays in editing.
+function palette(name, colors, current, pick) {
   const keep = e => e.preventDefault();
-  const palette = h("div", { class: "palette", role: "group", "aria-label": t("Colour of {x}", { x: orig }) },
-    COLORS.map(([c, label]) => h("button", {
-      type: "button", class: "swatch", style: "--c:var(--" + c + ")", "aria-label": t(label),
-      "aria-pressed": String(colorOf(id) === c), onpointerdown: keep, onmousedown: keep,
+  const el = h("div", { class: "palette", role: "group", "aria-label": t("Colour of {x}", { x: name }) },
+    colors.map(([c, label]) => h("button", {
+      type: "button", class: "swatch" + (c ? "" : " plain"), style: c ? "--c:var(--" + c + ")" : null, "aria-label": t(label),
+      "aria-pressed": String(current === c), onpointerdown: keep, onmousedown: keep,
       onclick: e => {
-        for (const b of palette.children) b.setAttribute("aria-pressed", String(b === e.currentTarget));
-        recolour(id, c, label);
+        for (const b of el.children) b.setAttribute("aria-pressed", String(b === e.currentTarget));
+        pick(c, label);
       },
     })));
+  return el;
+}
+function editSection(span, id, x, y) {
+  const orig = nameOf(id);
   editInPlace(span, {
-    key: "#" + id, row: span.closest(".sec-head"), orig, max: MAX_SECTION, x, y, below: palette,
+    key: "#" + id, row: span.closest(".sec-head"), orig, max: MAX_SECTION, x, y,
+    below: palette(orig, COLORS, colorOf(id), (c, label) => recolour(id, c, label)),
     onDelete: canDelete(id) ? () => deleteSection(id) : null, deleteLabel: t("Delete section {x}", { x: orig }),
     onSave: name => renameSection(id, name),
   });
 }
-// The list's name, at the top, is renamed the same way as a section's.
+// The list's name, at the top, is renamed the same way as a section's, its colour chosen
+// under it.
 function editListName(span, x, y) {
   const orig = listName();
   editInPlace(span, {
     key: LIST, row: span.parentNode, orig, max: MAX_SECTION, x, y,
+    below: palette(orig, LIST_COLORS, listColor(), (c, label) => {
+      announce(t("{x} is now {y}", { x: listName(), y: t(label).toLowerCase() }));
+      act(t("changing the colour of {x}", { x: q(listName()) }), [[LIST, "color", c, ""]], { animate: false });
+    }),
     onSave: name => {
       announce(t("Renamed the list to {x}", { x: name }));
       act(t("renaming the list {x}", { x: q(orig) }), [[LIST, "name", name, t("Shopping list")]], { leaving: true });
@@ -723,7 +738,7 @@ function forget(id, sec, keyboard = false) {
   }
 }
 
-/* ---------- Section cards, kept between renders so a focused field keeps its keyboard ---------- */
+/* ---------- Sections, kept between renders so a focused field keeps its keyboard ---------- */
 
 const shells = {};
 function buildShell(id) {
@@ -1077,7 +1092,7 @@ function endSectionDrag() {
   const { id, el, ghost } = drag;
   const order = [...$("#list").children].map(c => c.dataset.sec);
   const dropped = ghost.getBoundingClientRect().top;
-  const snap = letGo(); // folded: the cards unfold from here
+  const snap = letGo(); // folded: the sections unfold from here
   el.classList.remove("placeholder");
   if (store.change(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order))) announce(t("Section moved: {x}", { x: nameOf(id) }));
   sync();
@@ -1086,7 +1101,7 @@ function endSectionDrag() {
   window.scrollBy(0, head.getBoundingClientRect().top - dropped);
   if (snap) {
     for (const p of snap.parts.keys()) if (p.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) snap.parts.delete(p);
-    // The page keeps its full length while the cards below unfold, so it can stay scrolled.
+    // The page keeps its full length while the sections below unfold, so it can stay scrolled.
     page.style.minHeight = page.scrollHeight + "px";
     setTimeout(() => { page.style.minHeight = ""; }, MOTION.duration + 100);
     const to = head.getBoundingClientRect(); // where it ends up, measured before anything glides
@@ -1106,7 +1121,7 @@ function moveSection(id, dir) {
 
 /* ---------- Motion ---------- */
 
-// After a change, things glide to their new places. Section cards and the ticked list
+// After a change, things glide to their new places. Sections and the ticked list
 // grow or shrink to their new height, and what follows moves along with them; inside
 // each, items and the Add item row slide to their new spot; an item that changes place,
 // such as one being ticked, lifts, flies across and lands, taking longer the further it
@@ -1142,7 +1157,7 @@ function glide(snap) {
   const parts = rectsOf(PARTS), adds = rectsOf(ADDS);
   const now = [...document.querySelectorAll(ITEMS)].map(li => ({ li, rect: li.getBoundingClientRect(), part: li.closest(PARTS) }));
   const head = $(".basket-head").getBoundingClientRect();
-  // How far something moved within its card, leaving out the card's own movement.
+  // How far something moved within its section, leaving out the section's own movement.
   const inside = (wasRect, nowRect, part) => (wasRect.top - snap.parts.get(part).top) - (nowRect.top - parts.get(part).top);
   const run = (el, frames, opts = MOTION) => {
     const a = el.animate(frames, { ...opts, id: "glide" });
@@ -1276,6 +1291,7 @@ function render() {
   if (editingId !== LIST && title.textContent !== name) title.textContent = name;
   title.setAttribute("aria-label", t("{x}, rename", { x: name }));
   document.title = name;
+  if (window.panierList) window.panierList(listColor());
   computeSections();
   syncShells();
   // What the other phone changed is tinted where it is, without scrolling to it.
@@ -1388,7 +1404,7 @@ $("#copy-link").addEventListener("click", async e => {
 
 /* ---------- Settings ---------- */
 
-const THEME_KEY = "panier-theme", STYLE_KEY = "panier-style", LAYOUT_KEY = "panier-layout";
+const THEME_KEY = "panier-theme", LAYOUT_KEY = "panier-layout";
 // Asks the browser to keep the list even when the phone runs low on space. Firefox asks
 // you once; Chrome decides for itself. Returns whether it's kept, or null if unknown.
 async function keepList() {
@@ -1403,8 +1419,6 @@ const size = n => (n < 1024 ? t("{n} bytes", { n }) : n < 1048576 ? t("{n} KB", 
 async function paintSettings() {
   const theme = (() => { try { return localStorage.getItem(THEME_KEY) || ""; } catch (_) { return ""; } })();
   for (const r of document.querySelectorAll('input[name="theme"]')) r.checked = r.value === theme;
-  const style = document.documentElement.dataset.style || "";
-  for (const r of document.querySelectorAll('input[name="style"]')) r.checked = r.value === style;
   $("#compact-layout").checked = document.documentElement.dataset.layout === "compact";
   let bytes = 0;
   try { bytes = new Blob([localStorage.getItem("panier") || ""]).size; } catch (_) {}
@@ -1443,13 +1457,6 @@ function exportList() {
 }
 $("#settings-open").addEventListener("click", () => { paintSettings(); openSheet($("#settings")); });
 $("#settings-close").addEventListener("click", () => $("#settings").close());
-// Cards, or Paper: the list written straight on the page. On this phone only, like the rest.
-for (const r of document.querySelectorAll('input[name="style"]')) {
-  r.addEventListener("change", () => {
-    try { if (r.value) localStorage.setItem(STYLE_KEY, r.value); else localStorage.removeItem(STYLE_KEY); } catch (_) {}
-    if (window.panierStyle) window.panierStyle(r.value);
-  });
-}
 // Compact: every row 44 px, with smaller gaps and titles, on this phone only.
 $("#compact-layout").addEventListener("change", e => {
   const l = e.target.checked ? "compact" : "";

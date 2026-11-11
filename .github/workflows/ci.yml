@@ -46,7 +46,7 @@ jobs:
           PANIER_OLD="$RUNNER_TEMP/panier-old" PANIER_NEW="$RUNNER_TEMP/panier-new" node --test test/update.test.mjs
 
   # The API and the app in a browser, side by side: each server in Chromium, and Firefox
-  # in the other style and layout, so both browsers and both looks are covered.
+  # in the compact layout, so both browsers and both layouts are covered.
   browser:
     name: Browser tests (${{ matrix.name }})
     runs-on: ubuntu-latest
@@ -56,7 +56,7 @@ jobs:
         include:
           - { name: "Go server, Chromium", server: go, browser: chromium }
           - { name: "Cloudflare Worker, Chromium", server: worker, browser: chromium }
-          - { name: "Go server, Firefox, Paper and compact", server: go, browser: firefox, style: paper, layout: compact }
+          - { name: "Go server, Firefox, compact layout", server: go, browser: firefox, layout: compact }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -90,7 +90,6 @@ jobs:
       - name: Browser tests
         env:
           BROWSER: ${{ matrix.browser }}
-          STYLE: ${{ matrix.style }}
           LAYOUT: ${{ matrix.layout }}
         run: node --test test/browser.test.mjs
       - name: Server log

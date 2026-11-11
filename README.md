@@ -9,11 +9,12 @@ A private, collaborative shopping list. Minimal, end-to-end encrypted, on Cloudf
 ### The list's name
 
 - The list's name is the title at the top, *Shopping list* to start with (*Liste de courses* in French). Tap it to rename it; both phones see the new name. It also names the exported file.
+- While you rename it, the list's colours show under the name: white, then the section colours but ink. The paper takes a light tint of the colour, its ruled lines and quieter text a deeper one, and the title its deep shade; the browser's bars follow. Both phones see it, undo puts the old colour back, and the app opens in it without a flash of white. White is the paper as it is.
 - Like everything else on the list, it's encrypted: the server can't read it.
 
 ### Sections
 
-Each section is a card with its name at the top. A list starts with three:
+The list is written on the page itself, like paper: no cards, everything on one left edge, ruled lines between items and under section names, and an underline where you type. Only what's lifted above the page has a shadow: an item or section being dragged, undo, the sheets. Each section has its name at the top, and a list starts with three:
 
 | Section | Colour | For |
 | --- | --- | --- |
@@ -23,13 +24,13 @@ Each section is a card with its name at the top. A list starts with three:
 
 - Tap a section's name to rename it. Both phones see the new name.
 - While you rename a section, its colours show under the name: ink and eight hues, the same in light and dark themes. A tap recolours the section at once, and undo puts the old colour back.
-- *Add a section*, below the cards, adds one at the end with its own colour. Its name is typed like a section name; Enter or the `+` adds it, a cross clears it, and the cursor then moves to its *Add item* field.
+- *Add a section*, below the sections, adds one at the end with its own colour. Its name is typed like a section name; Enter or the `+` adds it, a cross clears it, and the cursor then moves to its *Add item* field.
 - While you rename a section that has nothing left to get, a cross appears to delete it. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 - Tick boxes take their section's colour.
 
 ### Adding
 
-- Every card ends with an *Add item* row. Tapping the row or its `+` opens the field. Items hold up to 120 characters, about four lines.
+- Every section ends with an *Add item* row. Tapping the row or its `+` opens the field. Items hold up to 120 characters, about three lines.
 - As soon as you type, a cross appears at the end of the row, where it is when editing an item: tapping it throws away what you typed, and the cursor stays in the field. The `+` stays as it is, since nothing is on the list until it's added. Escape does the same from a keyboard, once any suggestions are closed.
 - Enter, or the `+`, adds the new item and keeps the field open for the next one. Leaving the field adds it too, at once, so nothing typed is lost; what you tapped to leave it stays where it is on screen. A notification or switching apps doesn't cut it short, and text left in the field when the app closes is added the next time it opens.
 - Typing something already on the list highlights it instead of adding a copy.
@@ -48,7 +49,7 @@ Each section is a card with its name at the top. A list starts with three:
 
 - Tap the square to tick. A short vibration confirms it in browsers that let web pages vibrate, such as Chrome and Samsung Internet on Android. Firefox turned this off in version 129, and Safari never had it.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row move together and the list does not shift under your thumb.
-- They then slide to the ticked group below the lists, always at the same pace, however long the list. When the group is below the screen, they slide out of view at its bottom edge, without slowing down, rather than racing all the way down. Its heading reads *3 ticked*, with an arrow to fold it away.
+- They then slide to the ticked group below the lists, always at the same pace, however long the list. When the group is below the screen, they slide out of view at its bottom edge, without slowing down, rather than racing all the way down. They sit below a dashed tear line, in smaller, quieter text. Its heading reads *3 ticked*, with an arrow to fold it away.
 - The group shows what was ticked in the last five days, the latest first, so you can check what was bought lately. Older items are hidden but still suggested.
 - Dragging an item down onto the drop zone that appears under the ticked group's heading ticks it straight away; the item shows as ticked while it's over the group. The heading shows during the drag even when nothing is ticked yet.
 - Tapping a ticked square puts the item back at the end of its section, or of the first section if its own was deleted. Dragging a ticked item into a section puts it back right where you drop it.
@@ -86,9 +87,7 @@ Each section is a card with its name at the top. A list starts with three:
 
 *Settings*, at the bottom of the list, opens a page of its own; the phone's back gesture closes it.
 
-- **Appearance:** the same as the phone, light or dark; a style; and a *Compact layout* switch: rows of 44 px instead of 52, with smaller gaps and titles, so more of the list fits on screen. All three are chosen on each phone.
-  - *Cards* puts each section on a card of its own.
-  - *Paper* writes the list straight on the page: no cards, everything on one left edge, ruled lines between items and under section names, and an underline where you type. Only what's lifted above the page has a shadow: an item or section being dragged, undo, the sheets. Ticked items sit on a stub below a dashed tear line, in smaller grey text.
+- **Appearance:** the same as the phone, light or dark, and a *Compact layout* switch: rows of 44 px instead of 52, with smaller gaps and titles, so more of the list fits on screen. Both are chosen on each phone.
 - **Data:** whether the browser keeps the list even when the phone runs low on space. Panier asks for this when you start or join a list; Firefox asks you once, Chrome decides for itself. If it isn't kept, a button asks again, with a reminder that the pairing link brings the list back. Then *Export the list*, which saves it as a text checklist named after the list: each section's items to get, then everything bought before, by name.
 - **About:** the version, the server, how much space the list takes on this phone, and what the server can and can't see.
 
@@ -108,7 +107,7 @@ Panier is in English and French, following the phone's language. The default sec
 - **Font:** Atkinson Hyperlegible Next, designed to keep letters such as I, l and 1 apart, under the SIL Open Font License ([`web/fonts/OFL.txt`](web/fonts/OFL.txt)).
 - **One secret per list.** The first phone creates a random 256-bit key. From it, each phone derives (HKDF-SHA-256) the list's id, an access token and an AES-GCM encryption key. The pairing link carries the key after `#`, so it never reaches the server.
 - **End-to-end encryption.** Every change is encrypted on the phone before it is sent, padded to a multiple of 256 bytes so its size doesn't give away a name's length. Changes say only what they change, so adding an item or putting one back fits in one block. The server stores the encrypted changes and a SHA-256 hash of the access token; it never sees item names.
-- **Merging.** Each field of each item (name, section, position, ticked) and of each section (name, position, colour) keeps the most recent write, so two phones can edit offline and end up identical. Undo only reverses fields that still hold what you set; if the other phone changed one since, its change stands. Deleted items are remembered for about six months, so a late change from a phone that was offline can't bring them back, then forgotten.
+- **Merging.** Each field of each item (name, section, position, ticked) of each section (name, position, colour) and of the list (name, colour) keeps the most recent write, so two phones can edit offline and end up identical. Undo only reverses fields that still hold what you set; if the other phone changed one since, its change stands. Deleted items are remembered for about six months, so a late change from a phone that was offline can't bring them back, then forgotten.
 - **Server:** two interchangeable servers implement the same small API, and the app works with either. Both store the encrypted changes for each list in arrival order and announce new ones over a WebSocket. New lists need a setup code.
   - **Cloudflare Workers** ([`worker/index.js`](worker/index.js)): one Durable Object, with its own SQLite database, per list. It sleeps between changes.
   - **Go** ([`main.go`](main.go), [`api.go`](api.go), [`store.go`](store.go), [`live.go`](live.go), [`static.go`](static.go)): one program using only the standard library, with one log file per list, for running on your own machine. It sends the app's text files gzipped, about a third of their size.

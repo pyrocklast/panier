@@ -133,6 +133,7 @@ export function sections() {
   return out;
 }
 export const listName = () => valueOf("@list", "name");
+export const listColor = () => valueOf("@list", "color");
 
 /* ---------- Local changes and undo ---------- */
 
