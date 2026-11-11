@@ -886,6 +886,35 @@ test("opening the app, or coming back to it, with nothing new writes nothing", a
   await t.close();
 });
 
+test("out of sight, the app stops listening; back on screen, it catches up and listens again", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await add(b, "ess", "Milk");
+  await blur(b);
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk"), "live while on screen");
+  const sockets = [];
+  a.on("websocket", ws => sockets.push(ws));
+  const show = visible => a.evaluate(v => {
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => !v });
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (v ? "visible" : "hidden") });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }, visible);
+  await show(false); // another app, or the screen locked
+  await add(b, "ess", "Bread");
+  await blur(b);
+  await sleep(2500);
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk"], "nothing comes in while it's put away");
+  assert.equal(sockets.length, 0, "nor does it reconnect");
+  await show(true);
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Bread", 3000), "back, it catches up");
+  assert.ok(await eventually(async () => sockets.length === 1), "and listens again");
+  await add(b, "ess", "Eggs");
+  await blur(b);
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Bread,Eggs"), "live again");
+  assert.equal(await a.locator("#status").isHidden(), true, "never said to be offline");
+  await t.close();
+});
+
 test("a ticked item travels at the same pace however long the list, and only as far as the screen", async () => {
   const t = await pair();
   const { a } = t;

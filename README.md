@@ -79,7 +79,7 @@ Each section is a card with its name at the top. A list starts with three:
 ### Pairing and sync
 
 - The first phone starts the list with the server's setup code. *Add someone to this list*, at the bottom of the list, shows a QR code and a link for the second phone.
-- Changes appear on the other phone within a second. What the other phone adds, renames, moves to another section, ticks or unticks is tinted briefly where it is, without anything moving. A phone opening a list for the first time sees nothing tinted. Without signal, the app keeps working and shows *Offline* with the number of changes waiting; they are sent when the connection returns.
+- Changes appear on the other phone within a second. While Panier is out of sight, it listens for nothing, so it uses no network or battery in the background; coming back, it catches up in a fraction of a second. What the other phone adds, renames, moves to another section, ticks or unticks is tinted briefly where it is, without anything moving. A phone opening a list for the first time sees nothing tinted. Without signal, the app keeps working and shows *Offline* with the number of changes waiting; they are sent when the connection returns.
 - Opening the link to a different list, on a phone that already has one, asks first: until there can be several lists, the phone would leave the one it has. It also says if changes made on it haven't been sent yet.
 
 ### Settings

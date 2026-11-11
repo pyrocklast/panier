@@ -393,18 +393,22 @@ function connect(current, onOpen) {
   });
 }
 
-// listen keeps a live connection open and pulls whenever the server reports news.
+// listen keeps a live connection open and pulls whenever the server reports news, but
+// only while the app is on screen: out of sight, nothing runs, and coming back reconnects
+// and catches up (see resume).
 async function listen() {
   let delay = 1000;
   while (session) {
     const current = session;
+    while (document.hidden && session === current) await new Promise(r => { wake = r; });
+    if (session !== current) return;
     await connect(current, () => {
       delay = 1000;
       setState("online");
       flush();
     });
     if (session !== current) return;
-    if (reconnectNow) { reconnectNow = false; continue; } // resumed on purpose
+    if (reconnectNow) { reconnectNow = false; continue; } // closed on purpose: put away, or back
     if (state !== "full") setState("offline");
     await nap(delay);
     delay = Math.min(delay * 2, 30000);
@@ -424,8 +428,8 @@ function stop() {
   if (socket) socket.close();
 }
 
-// Phones drop connections in the background, sometimes without noticing; reconnect
-// and catch up as soon as the app is back.
+// Back on screen, or back online: reconnect and catch up. A connection still open is
+// replaced too, as phones sometimes drop one without noticing.
 function resume() {
   if (!session) return;
   if (socket && socket.readyState === WebSocket.OPEN) { reconnectNow = true; socket.close(); }
@@ -433,7 +437,11 @@ function resume() {
   pull();
   flush();
 }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) resume(); });
+// Put away, the app stops listening, so it uses no network or battery in the background.
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) resume();
+  else if (socket) { reconnectNow = true; socket.close(); }
+});
 addEventListener("online", resume);
 // Another tab saved the list: take its copy, rather than later writing this one over it.
 addEventListener("storage", e => {
