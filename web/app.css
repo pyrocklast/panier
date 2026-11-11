@@ -41,13 +41,15 @@
    before the page draws): the paper, its lines and its quiet text take a tint of it, the
    title its deep shade. Without one, the paper is white. */
 :root[data-list] {
-  --bg: light-dark(color-mix(in oklab, var(--list) 11%, #ffffff), color-mix(in oklab, var(--list) 9%, #111513));
-  --surface: light-dark(color-mix(in oklab, var(--list) 5%, #ffffff), color-mix(in oklab, var(--list) 11%, #1b201e));
-  --press: light-dark(color-mix(in oklab, var(--list) 20%, #ffffff), color-mix(in oklab, var(--list) 17%, #111513));
-  --line: light-dark(color-mix(in oklab, var(--list) 24%, #ffffff), color-mix(in oklab, var(--list) 20%, #111513));
-  --tear: light-dark(color-mix(in oklab, var(--list) 42%, #ffffff), color-mix(in oklab, var(--list) 34%, #111513));
+  --tint: 20%; --tint-dark: 14%; /* how much of the colour the paper takes, in light and dark */
+  --bg: light-dark(color-mix(in oklab, var(--list) var(--tint), #ffffff), color-mix(in oklab, var(--list) var(--tint-dark), #111513));
+  --surface: light-dark(color-mix(in oklab, var(--list) calc(var(--tint) / 2), #ffffff), color-mix(in oklab, var(--list) calc(var(--tint-dark) + 2%), #1b201e));
+  --press: light-dark(color-mix(in oklab, var(--list) calc(var(--tint) + 9%), #ffffff), color-mix(in oklab, var(--list) calc(var(--tint-dark) + 8%), #111513));
+  --line: light-dark(color-mix(in oklab, var(--list) calc(var(--tint) + 13%), #ffffff), color-mix(in oklab, var(--list) calc(var(--tint-dark) + 11%), #111513));
+  --tear: light-dark(color-mix(in oklab, var(--list) calc(var(--tint) + 31%), #ffffff), color-mix(in oklab, var(--list) calc(var(--tint-dark) + 25%), #111513));
   --muted: light-dark(color-mix(in oklab, var(--list) 55%, #1d2421), color-mix(in oklab, var(--list) 45%, #e6ebe8));
   --title: light-dark(color-mix(in oklab, var(--list) 62%, #000000), var(--list));
+  --look: light-dark(#a9680f, #e9ae58); /* amber, a shade deeper so its boxes stand out on tinted paper */
 }
 :root[data-list="green"] { --list: var(--green); }
 :root[data-list="teal"] { --list: var(--teal); }
@@ -168,7 +170,11 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   flex: 1; min-width: 0; height: 52px; padding: 0; margin-right: 4px; border: 0; outline: none; background: none;
   color: var(--ink); font: inherit;
 }
-.add-input::placeholder { color: var(--muted); }
+.add-input::placeholder { color: var(--hint, var(--muted)); }
+/* A section's Add item reads in a deep shade of its colour; ink's stays grey, so it
+   doesn't pass for an item */
+.sec { --hint: color-mix(in oklab, var(--sec) 75%, var(--ink)); }
+.sec[data-color="ess"] { --hint: var(--muted); }
 .add-input:focus { box-shadow: inset 0 -2px 0 var(--sec); }
 /* Once you type, a cross at the end of the row throws the text away, in the same place
    as when editing an item. The plus stays: nothing is on the list until it's added. */

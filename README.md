@@ -9,7 +9,7 @@ A private, collaborative shopping list. Minimal, end-to-end encrypted, on Cloudf
 ### The list's name
 
 - The list's name is the title at the top, *Shopping list* to start with (*Liste de courses* in French). Tap it to rename it; both phones see the new name. It also names the exported file.
-- While you rename it, the list's colours show under the name: white, then the section colours but ink. The paper takes a light tint of the colour, its ruled lines and quieter text a deeper one, and the title its deep shade; the browser's bars follow. Both phones see it, undo puts the old colour back, and the app opens in it without a flash of white. White is the paper as it is.
+- While you rename it, the list's colours show under the name: white, then the section colours but ink. The paper takes a tint of the colour, its ruled lines and quieter text a deeper one, and the title its deep shade; the browser's bars follow. Both phones see it, undo puts the old colour back, and the app opens in it without a flash of white. White is the paper as it is.
 - Like everything else on the list, it's encrypted: the server can't read it.
 
 ### Sections
@@ -30,7 +30,7 @@ The list is written on the page itself, like paper: no cards, everything on one 
 
 ### Adding
 
-- Every section ends with an *Add item* row. Tapping the row or its `+` opens the field. Items hold up to 120 characters, about three lines.
+- Every section ends with an *Add item* row, in a deep shade of the section's colour (grey for ink, so it doesn't pass for an item). Tapping the row or its `+` opens the field. Items hold up to 120 characters, about three lines.
 - As soon as you type, a cross appears at the end of the row, where it is when editing an item: tapping it throws away what you typed, and the cursor stays in the field. The `+` stays as it is, since nothing is on the list until it's added. Escape does the same from a keyboard, once any suggestions are closed.
 - Enter, or the `+`, adds the new item and keeps the field open for the next one. Leaving the field adds it too, at once, so nothing typed is lost; what you tapped to leave it stays where it is on screen. A notification or switching apps doesn't cut it short, and text left in the field when the app closes is added the next time it opens.
 - Typing something already on the list highlights it instead of adding a copy.

@@ -807,6 +807,7 @@ function syncShells() {
   sections.forEach((s, i) => {
     const sh = shells[s.id] || (shells[s.id] = buildShell(s.id));
     sh.el.style.setProperty("--sec", "var(--" + s.color + ")");
+    if (sh.el.dataset.color !== s.color) sh.el.dataset.color = s.color;
     if (editingId !== "#" + s.id && sh.name.textContent !== s.name) sh.name.textContent = s.name;
     sh.name.setAttribute("aria-label", t("{x}, rename", { x: s.name }));
     sh.input.setAttribute("aria-label", t("Add item to {x}", { x: s.name }));
