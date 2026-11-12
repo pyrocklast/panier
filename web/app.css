@@ -403,6 +403,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .qr svg { display: block; width: 100%; height: auto; }
 .actions { display: flex; gap: 8px; margin-top: 16px; }
 .actions .btn { flex: 1; }
+#confirm .actions .btn { flex: 1 1 auto; } /* each as wide as its words: the second says more */
 .close { position: absolute; top: 14px; right: 14px; }
 /* Who's on a list, and the two ways to take it away from them */
 .people { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
@@ -413,7 +414,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* Settings: a page of its own over the list, its parts between ruled lines */
 .sheet.page {
   width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border-radius: 0;
-  background: var(--bg); box-shadow: none;
+  background: light-dark(#ffffff, #111513); box-shadow: none; /* a page of its own, over the lists page's grey */
 }
 .page-in {
   max-width: 34rem; margin-inline: auto; box-sizing: border-box; display: flex; flex-direction: column;
