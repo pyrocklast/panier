@@ -14,11 +14,11 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 
 A phone holds any number of lists, each shared with its own people. The app opens on the list last used.
 
-- **The lists page** is reached with the sheets at the top right of a list, or the phone's back gesture. Each list lies there as a sheet in its own tint: its name, what's left to get, and the first two of those, as this phone last saw them. Lists not on screen catch up as the page shows.
+- **The lists page** is reached with the sheets at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet in its own tint: its name, who else has it, the first three things to get, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
 - **Open** a list with a tap.
-- **New list:** type a name on the blank sheet below the others. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
-- **Move** a list: hold it, then drag. From a keyboard, Alt+↑ and Alt+↓.
-- **Take a list off this phone:** drag it onto the zone that appears at the foot, or tap the cross by its name while renaming it. It stays on the server for the others, and its link brings it back. Undo, at the bottom right, puts it back where it was.
+- **New list:** type a name on the blank sheet after the others. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
+- **Move** a list: hold it, then drag it to its new place. From a keyboard, Alt and an arrow move it one place earlier or later.
+- **Delete** a list: drag it onto the zone that appears at the foot, or press Delete on it from a keyboard. Lists are deleted only here, and only once asked. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
 - **Settings** is at the top right of the lists page.
 
 ## The page
@@ -112,10 +112,9 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 ## People
 
 - **Your name** shows to the people you share lists with. It's optional, and the server never sees it. *Add someone to this list* asks for it until you've given one; Settings changes it.
-- **Who's on a list** shows in *Add someone to this list*: you, the names people gave, and how many phones gave none. On the lists page, a few quiet words after a list's name say who else has it.
-- **Remove someone**, in the same place once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *List closed*, keep what they had, and offer to take it off the phone. Share the new link with those who should keep the list.
+- **Who's on a list** shows in *Add someone to this list*: you, the names people gave, and how many phones gave none. On the lists page, a few quiet words under a list's name say who else has it.
+- **Remove someone**, in the same place once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *List closed* and keep what they had, until they delete it from the lists page. Share the new link with those who should keep the list.
 - **A closed list is only read**: nothing can be added, edited, moved or ticked, since none of it could be sent, and its boxes show faint. *Export the list* still saves a copy. So does a list changed with a newer Panier, until this one updates.
-- **Delete for everyone** closes the list on the server and takes it off this phone. Other phones say *List closed*. It can't be undone.
 - **Set up another phone**, in Settings, shows one QR code that brings every list on this phone to another.
 
 ## Sync and offline

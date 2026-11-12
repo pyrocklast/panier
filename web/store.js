@@ -224,7 +224,7 @@ class List {
     return out.sort((a, b) => b.me - a.me || a.since - b.since);
   }
   // What the lists page shows of this list: its name and colour, how much is left to get,
-  // and the first two of those, in the order the list shows them.
+  // and the first three of those, in the order the list shows them.
   summarize() {
     const e = entryOf(this.lid);
     if (!e || this.gone) return;
@@ -234,7 +234,7 @@ class List {
     const others = this.members().filter(m => !m.me);
     const next = {
       name: this.valueOf("@list", "name") || null, color: this.valueOf("@list", "color") || "",
-      toGet: toGet.length, first: toGet.slice(0, 2).map(i => i.text),
+      toGet: toGet.length, first: toGet.slice(0, 3).map(i => i.text),
       with: { names: others.filter(m => m.name).map(m => m.name), nameless: others.filter(m => !m.name).length },
       closed: !!this.s.closed, newer: this.newerFormat(),
     };

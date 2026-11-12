@@ -56,7 +56,7 @@ Then, on the phones:
 - **Move:** hold an item, or a section's name, for half a second, then drag.
 - **Sections:** tap a section's name to rename it or change its colour. *Add a section* is below the last one.
 - **The list:** tap its name to rename it or tint the paper.
-- **Lists:** the sheets at the top right of a list, or the back gesture, lead to the lists page: tap a list to open it, *New list* to start one, hold one to move it, or drop it at the foot to take it off this phone.
+- **Lists:** the sheets at the top right of a list, or the back gesture, lead to the lists page: tap a list to open it, *New list* to start one, hold one to move it, or drop it at the foot to delete it, which asks first.
 - **Import:** *From a file* on the lists page brings in a Markdown or text list; several lines pasted into *Add item* become several items.
 - **Undo and redo:** the buttons at the bottom right.
 - **Settings**, on the lists page: your name, light or dark, a compact layout, exporting every list, and setting up another phone.

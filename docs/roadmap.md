@@ -25,7 +25,7 @@ From now on, stored data only gains new kinds of record, under `@`, which older 
 
 ### Several lists
 
-The lists page is the surface the lists lie on, each list a small sheet in its own paper tint, with its name, how many things are left to get, and the first two of them. It is reached from the *Lists* control at the right of a list's header, or the back gesture, and it holds Settings. The app opens on the last list used.
+The lists page is the surface the lists lie on, side by side, each list a small sheet in its own paper tint, with its name, who else has it, the first three things left to get, and how many there are. Lists are deleted only there, and only once asked. It is reached from the *Lists* control at the right of a list's header, or the back gesture, and it holds Settings. The app opens on the last list used.
 
 Only the list on screen keeps a live connection. The others catch up when the lists page shows, and send what they have waiting when the connection returns.
 
