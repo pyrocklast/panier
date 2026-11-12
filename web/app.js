@@ -24,7 +24,6 @@ const listName = () => store.listName() || t("Shopping list");
 const SETTLE_MS = 1500;
 const RECENT_MS = 5 * 24 * 3600 * 1000; // ticked items show in the ticked group for five days
 const LONG_PRESS_MS = 450;
-const HINT_KEY = "panier-dragged-once";
 const draftsKey = () => "panier2-drafts:" + store.current(); // text typed into a list's "Add item" fields, kept until added
 const $ = s => document.querySelector(s);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
@@ -1006,7 +1005,7 @@ document.addEventListener("touchmove", e => { if (lifted || drag) e.preventDefau
 // A floating copy over the page, at rect: a drag's ghost, or an item flying to its new
 // place. It has no ids, so nothing is found twice.
 function float(el, rect, cls, top = rect.top) {
-  el.classList.remove("placeholder", "away", "lifted", "pressing", "flash", "hint");
+  el.classList.remove("placeholder", "away", "lifted", "pressing", "flash");
   el.classList.add(cls);
   el.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
   el.setAttribute("aria-hidden", "true");
@@ -1024,7 +1023,6 @@ function letGo() {
   document.documentElement.classList.remove("dragging", "drag-ticked", "sorting");
   $("#tick-drop").classList.remove("over");
   drag = null;
-  try { localStorage.setItem(HINT_KEY, "1"); } catch (_) {}
   return snap;
 }
 
@@ -1402,17 +1400,6 @@ function render() {
       }
     }
   }
-}
-
-/* Until someone has dragged once, the first item lifts briefly to show it can move */
-function dragHint() {
-  try { if (localStorage.getItem(HINT_KEY)) return; } catch (_) {}
-  setTimeout(() => {
-    const li = document.querySelector("#list .items .item");
-    if (!li || drag || editingId) return;
-    li.classList.add("hint");
-    setTimeout(() => li.classList.remove("hint"), 1800);
-  }, 800);
 }
 
 /* ---------- Sharing ---------- */
@@ -1833,6 +1820,8 @@ function removeList(lid) {
   noteUndo(name);
   announce(t("Removed {x} from this phone", { x: name }));
   renderLists();
+  // The sheet that had the cursor is gone: it goes to undo, which would bring it back.
+  if (!document.activeElement || document.activeElement === document.body) $("#undo").focus({ preventScroll: true });
 }
 function undoRemove() {
   const u = removed.pop();
@@ -1958,6 +1947,7 @@ function resetView() {
   noteUndo(null);
 }
 function showList(lid, { push = true } = {}) {
+  const from = document.activeElement;
   if (!store.open(lid)) {
     history.replaceState({}, "");
     return showLists();
@@ -1983,9 +1973,12 @@ function showList(lid, { push = true } = {}) {
     submitAdd(target, true);
   }
   try { localStorage.removeItem(draftsKey()); } catch (_) {}
-  dragHint();
+  // Opened from the keyboard, the cursor moves to the list's name rather than stay on a
+  // sheet now hidden; a tap shows no ring for it.
+  if (from && $("#lists").contains(from)) $("#list-name").focus({ preventScroll: true });
 }
 function showLists() {
+  const from = document.activeElement;
   if (view === "list") { closeSug(); store.leave(); }
   view = "lists";
   $("#app").hidden = true;
@@ -1996,6 +1989,9 @@ function showLists() {
   renderLists();
   paintStatus();
   window.scrollTo(0, 0);
+  // Back from a list, the cursor returns to its sheet.
+  const card = cards.get(shownLid);
+  if (from && $("#app").contains(from) && card) card.btn.focus({ preventScroll: true });
 }
 // Back to the lists page, as the back gesture does; then runs fn.
 function leaveList(fn) {

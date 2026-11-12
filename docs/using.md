@@ -83,7 +83,6 @@ A list starts with three sections:
 - **Hold an item** for about half a second: it lifts and its tick box turns into a grip. Drag it anywhere, including into another section; the grip takes the colour of the section it's over. Letting go without moving does nothing. With a mouse, dragging starts as soon as you move.
 - **Hold a section's name** to move the section. While it moves, every section folds down to its name, so long ones are easy to reorder; they unfold when you let go, and the one you moved stays where you dropped it.
 - What you let go of glides into its place, and anything else that moves after a change glides too, without getting in the way of a tap.
-- Until someone has dragged once, the first item lifts briefly when the app opens, to show that items can move.
 
 ## Undo and redo
 

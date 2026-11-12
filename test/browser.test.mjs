@@ -1729,3 +1729,29 @@ test("a list changed with a newer Panier is left alone", async () => {
   assert.deepEqual(await counts(a), ["Update Panier to open it"]);
   await t.close();
 });
+
+test("opening a list leaves it still, and from the keyboard the cursor follows between the lists page and the list", async () => {
+  const p = await alone();
+  const a = p.page;
+  for (const x of ["Milk", "Bread"]) await add(a, "ess", x);
+  await blur(a);
+  await toLists(a);
+  const lid = (await index(a)).open;
+  await a.locator(".sheet-open").focus();
+  await a.keyboard.press("Enter");
+  await a.locator("#app").waitFor();
+  assert.equal(await a.evaluate(() => document.activeElement.id), "list-name", "the cursor moves to the list's name");
+  await sleep(1500);
+  assert.equal(await a.evaluate(() => [...document.querySelectorAll("#list .item")].filter(el => /lifted|pressing/.test(el.className) || el.getAnimations().length).length), 0, "nothing lifts or moves by itself");
+  await a.focus("#lists-open");
+  await a.keyboard.press("Enter");
+  await a.locator("#lists").waitFor();
+  assert.equal(await a.evaluate(() => document.activeElement.dataset.fk), "sheet-" + lid, "back on the lists page, it returns to that list's sheet");
+  await a.keyboard.press("Enter");
+  await a.locator("#app").waitFor();
+  await a.click("#list-name");
+  await a.click(".list-top .bin");
+  await a.locator("#lists").waitFor();
+  assert.ok(await eventually(() => a.evaluate(() => document.activeElement.id === "undo")), "a list taken off the phone leaves the cursor on undo");
+  await p.close();
+});
