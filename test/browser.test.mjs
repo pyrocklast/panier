@@ -188,6 +188,23 @@ test("what the other phone changes is tinted where it is", async () => {
   await t.close();
 });
 
+test("a link opened in a tab where the app is already open is followed", async () => {
+  const errors = [];
+  const { ctx, page: a } = await phone(errors);
+  await a.goto(BASE + "/");
+  await a.locator("#welcome").waitFor();
+  await a.evaluate(c => { location.hash = "setup=" + c.toLowerCase(); }, SETUP); // pasted into the address bar
+  await a.locator("#pair").waitFor();
+  assert.ok(await a.locator("#app").isVisible(), "a setup link starts the list");
+  await a.click("#pair-close");
+  await a.evaluate(() => { location.hash = "k=" + "B".repeat(43); });
+  await a.locator("#switch").waitFor();
+  assert.ok(await a.locator("#switch").isVisible(), "a link to another list asks first");
+  await a.click("#switch-cancel");
+  await ctx.close();
+  assert.deepEqual(errors, []);
+});
+
 test("a link to another list asks before this phone leaves its own", async () => {
   const t = await pair();
   const { a, A } = t;

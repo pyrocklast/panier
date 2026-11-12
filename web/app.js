@@ -1593,6 +1593,9 @@ async function init() {
 }
 translatePage();
 init();
+// A pairing or setup link opened in this tab, with the app already open: it starts afresh
+// from the link, as when opened anew.
+addEventListener("hashchange", () => { if (/^#(k|setup)=/.test(location.hash)) location.reload(); });
 
 /* ---------- Updates ---------- */
 
