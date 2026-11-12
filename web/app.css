@@ -309,6 +309,13 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .item.flash { animation: flash 1.4s ease-out; }
 @keyframes flash { 0%, 35% { background-color: color-mix(in oklab, var(--sec) 16%, var(--bg)); } 100% { background-color: transparent; } }
 
+/* A closed list, or one from a newer Panier, is only read: nothing to add, edit, move or
+   tick, and its boxes say so, faint */
+#app.readonly :is(.add, .add-sec) { display: none; }
+#app.readonly :is(.text, .sec-name, .list-name, .boxcell) { cursor: default; }
+#app.readonly .box { border-color: color-mix(in oklab, var(--sec) 30%, var(--bg)); }
+#app.readonly .chk:checked + .box { opacity: 0.5; }
+
 /* Motion: items glide from app.js; this only turns the rest off when asked */
 @media (prefers-reduced-motion: reduce) {
   .item.flash, .item.hint { animation: none; }
@@ -328,6 +335,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sheet-card { list-style: none; border-radius: 12px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .sheet-first { display: contents; }
 .sheet-card.gone .sheet-name { color: var(--quiet); } /* closed, or from a newer Panier: there, but not in use */
+.sheet-with { font-weight: 400; font-size: 0.875rem; color: var(--quiet); } /* who else has it, after its name */
 .sheet-open {
   --paper: light-dark(#ffffff, #151a17); --rule: light-dark(#e4e7e4, #2a312e); --deep: var(--ink); --quiet: var(--muted);
   display: flex; flex-direction: column; width: 100%; box-sizing: border-box; padding: 12px 16px 4px; border: 0; border-radius: 12px;
@@ -413,6 +421,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* Who's on a list, and the two ways to take it away from them */
 .people { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 .people p { margin: 0 0 4px; }
+.people .field { margin-bottom: 12px; }
 .more { display: flex; flex-wrap: wrap; gap: 0 4px; margin-left: -8px; }
 #delete-open { color: var(--danger); }
 

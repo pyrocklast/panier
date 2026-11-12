@@ -1405,7 +1405,7 @@ async function alone(options) {
   await P.page.click("#pair-close");
   return { ...P, errors, async close() { await P.ctx.close(); assert.deepEqual(errors, [], "no errors in the page"); } };
 }
-const sheets = pg => pg.locator(".sheet-name").allInnerTexts();
+const sheets = pg => pg.locator(".sheet-name").evaluateAll(els => els.map(e => (e.firstChild ? e.firstChild.textContent : ""))); // the name, without who else has it
 const counts = pg => pg.locator(".sheet-count").allInnerTexts();
 async function toLists(pg) {
   await pg.click("#lists-open");
@@ -1439,7 +1439,8 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   assert.deepEqual(await sheets(a), ["Shopping list"]);
   assert.deepEqual(await counts(a), ["3 to get"]);
   assert.deepEqual(await a.locator(".sheet-item").allInnerTexts(), ["2 milk", "Bread"], "and the first two of them");
-  assert.equal(await a.locator(".sheet-open").getAttribute("aria-label"), "Shopping list, 3 to get");
+  assert.equal(await a.locator(".sheet-open").getAttribute("aria-label"), "Shopping list, with 1 other phone, 3 to get");
+  assert.equal(await a.locator(".sheet-with").innerText(), "with 1 other phone", "who else has it, quietly");
 
   await newList(a, "Hardware store");
   assert.equal(await a.locator("#list-name").innerText(), "Hardware store", "a new list opens, named");
@@ -1573,7 +1574,14 @@ test("the people on a list: names on the share sheet, undo says who; three phone
   await b.locator(".sheet-open").click();
   await a.click("#pair-open");
   assert.ok(await eventually(async () => (await a.locator("#members").innerText()) === "On this list: you and Alex."));
+  assert.ok(await a.locator("#pair-name").isVisible(), "a phone without a name is asked for one where names matter");
+  await a.fill("#pair-name-input", "Sam");
+  await a.press("#pair-name-input", "Enter");
   await a.click("#pair-close");
+  await b.click("#pair-open");
+  assert.equal(await b.locator("#pair-name").isVisible(), false, "and not once it has one");
+  assert.ok(await eventually(async () => (await b.locator("#members").innerText()) === "On this list: you and Sam."), "the others see it");
+  await b.click("#pair-close");
 
   const C = await phone(t.errors), c = C.page;
   await c.goto(BASE + "/#k=" + t.key);
@@ -1581,6 +1589,11 @@ test("the people on a list: names on the share sheet, undo says who; three phone
   await a.click("#pair-open");
   assert.ok(await eventually(async () => (await a.locator("#members").innerText()) === "On this list: you, Alex, and 1 phone without a name."));
   await a.click("#pair-close");
+  await toLists(a);
+  assert.equal(await a.locator(".sheet-with").innerText(), "with Alex and 1 other", "the lists page says who else has a list, quietly");
+  assert.match(await a.locator(".sheet-open").getAttribute("aria-label"), /^Shopping list, with Alex and 1 other, /);
+  await a.locator(".sheet-open").click();
+  await a.locator("#app").waitFor();
 
   await add(a, "ess", "Bread");
   await blur(a);
@@ -1636,6 +1649,11 @@ test("changing a list's key leaves everyone else with it closed, until they open
   await blur(a);
   await sleep(800);
   assert.deepEqual(await texts(b, "Essentials"), ["Milk"], "and gets nothing more, though it keeps what it had");
+  assert.equal(await b.locator("#add-ess").isVisible(), false, "a closed list is only read: nothing to add");
+  assert.ok(await item(b, "Milk").locator(".chk").isDisabled(), "nor to tick");
+  await item(b, "Milk").locator(".text").click();
+  assert.equal(await b.locator(".text.editing").count(), 0, "nor to edit");
+  assert.equal(await b.locator("#dock").isVisible(), false, "nor to undo");
 
   await b.goto("about:blank");
   await b.goto(BASE + "/#k=" + fresh);
@@ -1705,10 +1723,8 @@ test("a list changed with a newer Panier is left alone", async () => {
     await fetch("/api/lists/" + id + "/changes", { method: "POST", headers: { Authorization: "Bearer " + auth, "Content-Type": "application/json" }, body: JSON.stringify({ changes: [btoa(bytes(out))] }) });
   }, t.key);
   assert.ok(await eventually(async () => (await a.locator("#status").isVisible()) && (await a.locator("#status-text").innerText()) === "Update Panier", 8000));
-  await add(a, "ess", "Milk");
-  await blur(a);
-  await sleep(800);
-  assert.equal((await stored(a)).outbox.length, 1, "nothing is sent from here");
+  assert.ok(await eventually(async () => !(await a.locator("#add-ess").isVisible())), "it is only read: nothing to add");
+  assert.equal((await stored(a)).outbox.length, 0, "and nothing to send");
   await toLists(a);
   assert.deepEqual(await counts(a), ["Update Panier to open it"]);
   await t.close();

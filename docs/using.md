@@ -112,9 +112,10 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 
 ## People
 
-- **Your name**, in Settings, shows to the people you share lists with. It's optional, and the server never sees it.
-- **Who's on a list** shows in *Add someone to this list*: you, the names people gave, and how many phones gave none.
+- **Your name** shows to the people you share lists with. It's optional, and the server never sees it. *Add someone to this list* asks for it until you've given one; Settings changes it.
+- **Who's on a list** shows in *Add someone to this list*: you, the names people gave, and how many phones gave none. On the lists page, a few quiet words after a list's name say who else has it.
 - **Remove someone**, in the same place once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *List closed*, keep what they had, and offer to take it off the phone. Share the new link with those who should keep the list.
+- **A closed list is only read**: nothing can be added, edited, moved or ticked, since none of it could be sent, and its boxes show faint. *Export the list* still saves a copy. So does a list changed with a newer Panier, until this one updates.
 - **Delete for everyone** closes the list on the server and takes it off this phone. Other phones say *List closed*. It can't be undone.
 - **Set up another phone**, in Settings, shows one QR code that brings every list on this phone to another.
 

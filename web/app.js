@@ -88,6 +88,7 @@ let settleTimer = null, flashId = null, drag = null, editingId = null, renderPen
 let suppressClick = false, lifted = false;
 const ui = { sugSec: null, sug: [], sugIndex: -1, sugCol: 0, basketOpen: true };
 let view = null, shownLid = null; // "list", the list shownLid, or "lists", the lists page
+let wasReadOnly = false; // as the list on screen was last drawn
 
 /* ---------- DOM helpers ---------- */
 
@@ -134,6 +135,9 @@ function addRow(form, input, { add, clear, escape = clear }) {
 }
 
 const find = id => items.find(i => i.id === id);
+// A closed list, or one from a newer Panier, is only read: what's done here could never be
+// sent, so nothing can be added, edited, moved or ticked.
+const readOnly = () => view === "list" && (store.status().closed || store.newerFormat());
 const nameOf = id => (sectionInfo.get(id) || { name: t("this section") }).name;
 const colorOf = id => (sectionInfo.has(id) ? sectionInfo.get(id).color : "muted");
 const isShown = id => sections.some(s => s.id === id);
@@ -276,6 +280,7 @@ function scheduleSettle() {
 }
 
 function toggle(id, checked) {
+  if (readOnly()) return;
   const it = find(id);
   const fromList = !it.checked;
   const wasSettling = settling.has(id);
@@ -377,12 +382,14 @@ function addMany(sec, pasted) {
   act(plural(added, "adding {n} item", "adding {n} items"), ops);
 }
 function del(id, opts) {
+  if (readOnly()) return;
   const it = find(id);
   settling.delete(id);
   announce(t("Deleted {x}", { x: it.text }));
   act(t("deleting {x}", { x: q(it.text) }), [[id, "deleted", true]], { ...opts, note: it.text });
 }
 function nudge(id, dir) {
+  if (readOnly()) return;
   const it = find(id);
   const list = shown(it.section);
   const other = list[list.indexOf(it) + dir];
@@ -570,6 +577,7 @@ function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSave, onD
 }
 
 function editItem(span, id, x, y, caret) {
+  if (readOnly()) return;
   const orig = find(id).text;
   const row = span.closest(".item");
   editInPlace(span, {
@@ -666,6 +674,7 @@ function palette(name, colors, current, pick) {
   return el;
 }
 function editSection(span, id, x, y) {
+  if (readOnly()) return;
   const orig = nameOf(id);
   editInPlace(span, {
     key: "#" + id, row: span.closest(".sec-head"), orig, max: MAX_SECTION, x, y,
@@ -677,6 +686,7 @@ function editSection(span, id, x, y) {
 // The list's name, at the top, is renamed the same way as a section's, its colour chosen
 // under it.
 function editListName(span, x, y) {
+  if (readOnly()) return;
   const orig = listName();
   editInPlace(span, {
     key: LIST, row: span.closest(".list-top"), orig, max: MAX_SECTION, x, y,
@@ -812,7 +822,7 @@ function buildShell(id) {
   });
   const head = h("h2", { class: "sec-head" }, name);
   const el = h("section", { class: "sec", "data-sec": id, "aria-labelledby": "h-" + id }, head, ul, sug, form);
-  bindPress(head, { look: el, can: () => sections.length > 1, start: (offY, y) => startSectionDrag(id, y) });
+  bindPress(head, { look: el, can: () => !readOnly() && sections.length > 1, start: (offY, y) => startSectionDrag(id, y) });
   input.addEventListener("input", () => {
     saveDraft(id, input.value.trim() ? input.value : "");
     updateSug(id);
@@ -857,7 +867,7 @@ function syncShells() {
     sh.el.style.setProperty("--sec", "var(--" + s.color + ")");
     if (sh.el.dataset.color !== s.color) sh.el.dataset.color = s.color;
     if (editingId !== "#" + s.id && sh.name.textContent !== s.name) sh.name.textContent = s.name;
-    sh.name.setAttribute("aria-label", t("{x}, rename", { x: s.name }));
+    sh.name.setAttribute("aria-label", readOnly() ? s.name : t("{x}, rename", { x: s.name }));
     sh.input.setAttribute("aria-label", t("Add item to {x}", { x: s.name }));
     if (list.children[i] !== sh.el) list.insertBefore(sh.el, list.children[i] || null);
   });
@@ -878,11 +888,14 @@ function rowOf(it, tint) {
   if (r.li.className !== cls) r.li.className = cls; // also clears what a drag or a press left
   if (r.li.style.length !== 1 || r.li.style.getPropertyValue("--sec") !== sec) r.li.style.cssText = "--sec:" + sec;
   if (r.chk.checked !== it.checked) r.chk.checked = it.checked;
-  if (r.shown !== it.text) {
+  const ro = readOnly();
+  if (r.chk.disabled !== ro) r.chk.disabled = ro;
+  if (r.shown !== it.text || r.ro !== ro) {
     r.shown = it.text;
+    r.ro = ro;
     fillText(r.text, it.text);
     r.chk.setAttribute("aria-label", it.text);
-    r.text.setAttribute("aria-label", t("Edit {x}", { x: it.text }));
+    r.text.setAttribute("aria-label", ro ? it.text : t("Edit {x}", { x: it.text }));
   }
   return r.li;
 }
@@ -921,7 +934,7 @@ function itemEl(id) {
     else if (e.key === "Delete") { e.preventDefault(); del(id); }
   });
   li.append(cell, text);
-  bindPress(li, { can: () => !!li.closest("#list .items, #basket-list"), start: (offY, y) => startDrag(li, id, offY, y) });
+  bindPress(li, { can: () => !readOnly() && !!li.closest("#list .items, #basket-list"), start: (offY, y) => startDrag(li, id, offY, y) });
   return { li, chk, text, shown: null };
 }
 
@@ -1161,6 +1174,7 @@ function endSectionDrag() {
 }
 // With a keyboard: Alt+↑ or Alt+↓ on a section's name.
 function moveSection(id, dir) {
+  if (readOnly()) return;
   const order = sections.map(s => s.id), i = order.indexOf(id), j = i + dir;
   if (j < 0 || j >= order.length) return;
   [order[i], order[j]] = [order[j], order[i]];
@@ -1278,7 +1292,7 @@ function noteUndo(name) {
 function paintDock() {
   const onList = view === "list";
   const u = onList ? store.undoLabel() : top(removed), r = onList ? store.redoLabel() : null;
-  $("#dock").hidden = !u && !r;
+  $("#dock").hidden = (!u && !r) || readOnly(); // undo would make a change, which a read-only list can't take
   setHist($("#undo"), u, "Undo");
   setHist($("#redo"), r, "Redo");
   $("#redo").hidden = !r;
@@ -1352,8 +1366,10 @@ function render() {
   if (view !== "list" || !store.current()) return; // the lists page shows; the list draws when it's back
   const name = listName(), title = $("#list-name");
   if (editingId !== LIST && title.textContent !== name) title.textContent = name;
-  title.setAttribute("aria-label", t("{x}, rename", { x: name }));
+  title.setAttribute("aria-label", readOnly() ? name : t("{x}, rename", { x: name }));
   document.title = name;
+  wasReadOnly = readOnly();
+  $("#app").classList.toggle("readonly", wasReadOnly);
   if (window.panierList) window.panierList(listColor());
   computeSections();
   syncShells();
@@ -1469,7 +1485,11 @@ function openPair(all = false) {
   $("#pair-note").textContent = all ? t("This link holds the keys to all your lists: anyone who has it can open them. Keep it to yourself.")
     : t("This link is the key to your list: anyone who has it can open it. Keep a copy in your password manager to recover the list if you lose your phones.");
   $("#people").hidden = all;
-  if (!all) paintPeople();
+  if (!all) {
+    $("#pair-name").hidden = !!store.myName(); // names start to matter here: asked for once, where they do
+    $("#pair-name-input").value = "";
+    paintPeople();
+  }
   $("#qr").replaceChildren();
   $("#share-link").hidden = !navigator.share;
   openSheet($("#pair"));
@@ -1486,6 +1506,8 @@ function paintPeople() {
   $("#rekey-open").hidden = !others.length; // removing someone needs someone to remove
 }
 $("#pair-open").addEventListener("click", () => openPair());
+$("#pair-name-input").addEventListener("change", e => store.setMyName(clean(e.target.value, MAX_SECTION)));
+$("#pair-name-input").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
 $("#pair-close").addEventListener("click", () => $("#pair").close());
 $("#share-link").addEventListener("click", () => {
   navigator.share({ title: $("#people").hidden ? "Panier" : listName(), url: shared }).catch(() => {});
@@ -1686,6 +1708,14 @@ $("#phone-open").addEventListener("click", () => closeThen($("#settings"), () =>
 // the first two of those, as this phone last saw them. Tap to open it; hold to drag it
 // up or down, or onto the zone at the foot that takes it off this phone.
 const listColorOk = c => (c && LIST_COLORS.some(([id]) => id === c) ? c : null);
+// Who else has a list, in a few quiet words after its name: two names at most, then a count.
+function withOf(e) {
+  const w = e.with;
+  if (!w || (!w.names.length && !w.nameless)) return "";
+  const names = w.names.slice(0, 2), more = w.names.length - names.length + w.nameless;
+  const who = names.length ? [...names, ...(more ? [plural(more, "{n} other", "{n} others")] : [])] : [plural(more, "{n} other phone", "{n} other phones")];
+  return t("with {x}", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(who) });
+}
 const countOf = e => (e.closed ? t("Closed") : e.newer ? t("Update Panier to open it") : e.toGet ? plural(e.toGet, "{n} to get", "{n} to get") : t("Nothing to get"));
 // Each sheet keeps its element from one drawing to the next, and only what changed is
 // written, so a sheet held or focused stays as it is while the lists catch up.
@@ -1704,13 +1734,14 @@ function cardOf(e) {
     cards.set(e.lid, (c = { li, btn, name, count, first, shown: "" }));
   }
   const nm = e.name || t("Shopping list"), cnt = countOf(e), gone = !!(e.closed || e.newer), first = gone ? [] : e.first || [];
-  const shown = JSON.stringify([nm, cnt, first, e.color, gone]);
+  const w = gone ? "" : withOf(e);
+  const shown = JSON.stringify([nm, cnt, first, e.color, gone, w]);
   if (c.shown !== shown) {
     c.shown = shown;
-    c.name.textContent = nm;
+    c.name.replaceChildren(nm, ...(w ? [" ", h("span", { class: "sheet-with" }, w)] : []));
     c.count.textContent = cnt;
     c.first.replaceChildren(...first.map(x => { const sp = h("span"); fillText(sp, x); return h("span", { class: "sheet-item" }, sp); }));
-    c.btn.setAttribute("aria-label", nm + ", " + cnt);
+    c.btn.setAttribute("aria-label", [nm, w, cnt].filter(Boolean).join(", "));
     const col = listColorOk(e.color);
     if (col) c.li.dataset.color = col; else delete c.li.dataset.color;
     c.li.classList.toggle("gone", gone);
@@ -1905,7 +1936,10 @@ store.subscribe(kind => {
     refreshFromStore();
     if ($("#pair").open && !$("#people").hidden) paintPeople(); // someone joined, or named themselves
   }
-  else if (kind === "status" || kind === "local") paintStatus();
+  else if (kind === "status" || kind === "local") {
+    paintStatus();
+    if (readOnly() !== wasReadOnly) refreshFromStore(); // closed while on screen: it now reads only
+  }
 });
 
 // A list is on screen from the lists page, a step on in history, so back returns there.
@@ -1943,7 +1977,7 @@ function showList(lid, { push = true } = {}) {
   render();
   if (switched) window.scrollTo(0, 0);
   // Text left in an "Add item" field when the app was closed becomes an item now.
-  for (const [sec, text] of Object.entries(loadDrafts())) {
+  if (!readOnly()) for (const [sec, text] of Object.entries(loadDrafts())) {
     const target = shells[sec] ? sec : sections[0].id;
     shells[target].input.value = text;
     submitAdd(target, true);

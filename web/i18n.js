@@ -73,6 +73,9 @@ const FR = {
   "Deleted {x} for everyone": "{x} supprimée pour tout le monde",
   "This server can't make another list from this one.": "Ce serveur ne peut pas créer d’autre liste à partir de celle-ci.",
   "someone else": "quelqu’un d’autre",
+  "with {x}": "avec {x}",
+  "{n} others": ["{n} autre", "{n} autres"],
+  "{n} other phones": ["{n} autre téléphone", "{n} autres téléphones"],
 
   // The lists page
   "New list": "Nouvelle liste",

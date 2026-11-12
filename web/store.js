@@ -231,9 +231,11 @@ class List {
     const at = i => { const f = this.s.items["#" + i.section]; return f && f.pos ? f.pos[0] : DEFAULT_POS[i.section] ?? 100; }; // as app.js orders sections
     const toGet = this.items().filter(i => !i.checked);
     toGet.sort((a, b) => at(a) - at(b) || (a.section < b.section ? -1 : a.section > b.section ? 1 : 0) || a.pos - b.pos || (a.id < b.id ? -1 : 1));
+    const others = this.members().filter(m => !m.me);
     const next = {
       name: this.valueOf("@list", "name") || null, color: this.valueOf("@list", "color") || "",
       toGet: toGet.length, first: toGet.slice(0, 2).map(i => i.text),
+      with: { names: others.filter(m => m.name).map(m => m.name), nameless: others.filter(m => !m.name).length },
       closed: !!this.s.closed, newer: this.newerFormat(),
     };
     if (Object.keys(next).every(k => same(next[k], e[k]))) return;
