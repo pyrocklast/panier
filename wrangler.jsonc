@@ -15,5 +15,15 @@
   // Served on your workers.dev address; a custom domain can be added at deploy time.
   "workers_dev": true,
   "preview_urls": false,
-  "observability": { "enabled": false }
+  "observability": { "enabled": false },
+  "env": {
+    // The test copy, deployed from the next branch as its own Worker, panier-next, with
+    // lists of its own: Durable Objects belong to the Worker that declares them.
+    "next": {
+      "durable_objects": {
+        "bindings": [{ "name": "LISTS", "class_name": "List" }]
+      },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["List"] }]
+    }
+  }
 }
