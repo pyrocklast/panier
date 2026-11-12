@@ -70,6 +70,8 @@ async function pair(options) {
   const key = await openKey(A.page);
   await B.page.goto(BASE + "/#k=" + key);
   await B.page.locator("#app").waitFor();
+  // Each phone writes itself onto the list as it joins: sent before a test begins.
+  for (const pg of [A.page, B.page]) assert.ok(await eventually(() => pg.evaluate(async () => (await import("/store.js")).status().waiting === 0)), "joined");
   return {
     A: A.ctx, B: B.ctx, a: A.page, b: B.page, key, errors,
     async close() {
