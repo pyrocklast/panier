@@ -1,11 +1,12 @@
 import * as store from "./store.js";
 import { t, plural, q, lang, translatePage } from "./i18n.js";
+import { toMarkdown, fromMarkdown, pastedItems } from "./md.js";
 
 // The three sections every list starts with. They can be renamed, recoloured or deleted like any other.
 const DEFAULTS = [
-  { id: "ess", name: t("Essentials"), color: "ess", pos: 1 },
-  { id: "look", name: t("Look out for"), color: "look", pos: 2 },
-  { id: "long", name: t("Long term"), color: "long", pos: 3 },
+  { id: "ess", name: t("Essentials"), en: "Essentials", color: "ess", pos: 1 },
+  { id: "look", name: t("Look out for"), en: "Look out for", color: "look", pos: 2 },
+  { id: "long", name: t("Long term"), en: "Long term", color: "long", pos: 3 },
 ];
 // Section colours, in palette order; each is a colour in app.css, light and dark. Ink,
 // the colour of Essentials and of the app's buttons, comes first; then eight hues.
@@ -24,7 +25,7 @@ const SETTLE_MS = 1500;
 const RECENT_MS = 5 * 24 * 3600 * 1000; // ticked items show in the ticked group for five days
 const LONG_PRESS_MS = 450;
 const HINT_KEY = "panier-dragged-once";
-const DRAFTS_KEY = "panier-drafts"; // text typed into "Add item" fields, kept until added
+const draftsKey = () => "panier2-drafts:" + store.current(); // text typed into a list's "Add item" fields, kept until added
 const $ = s => document.querySelector(s);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const PLAIN = (() => { try { const d = document.createElement("div"); d.contentEditable = "plaintext-only"; return d.contentEditable === "plaintext-only"; } catch (_) { return false; } })();
@@ -86,7 +87,7 @@ const settling = new Set();
 let settleTimer = null, flashId = null, drag = null, editingId = null, renderPending = false;
 let suppressClick = false, lifted = false;
 const ui = { sugSec: null, sug: [], sugIndex: -1, sugCol: 0, basketOpen: true };
-try { ui.basketOpen = localStorage.getItem("panier-basket-open") !== "0"; } catch (_) {}
+let view = null, shownLid = null; // "list", the list shownLid, or "lists", the lists page
 
 /* ---------- DOM helpers ---------- */
 
@@ -154,9 +155,10 @@ function announce(msg) {
 const activeFk = () => { const a = document.activeElement; return a && a.dataset ? a.dataset.fk : null; };
 
 // Works out which sections to show. A section stays on screen while it has items to
-// get, or text being typed into it, even if the other phone deleted it meanwhile.
-function computeSections() {
-  const stored = new Map(store.sections().map(s => [s.id, s]));
+// get, or text being typed into it, even if someone deleted it meanwhile. layout does
+// the same for any list, as Export all lists needs.
+function layout(storedSections, its, typing = []) {
+  const stored = new Map(storedSections.map(s => [s.id, s]));
   const all = new Map();
   for (const d of DEFAULTS) {
     const st = stored.get(d.id) || {};
@@ -165,11 +167,16 @@ function computeSections() {
   for (const st of stored.values()) {
     if (!all.has(st.id)) all.set(st.id, { id: st.id, name: st.name || t("Untitled"), color: colorOk(st.color, PALETTE[0]), pos: st.pos ?? 100, deleted: st.deleted });
   }
-  const used = new Set(items.filter(inList).map(i => i.section));
-  for (const [id, sh] of Object.entries(shells)) if (sh.input.value.trim()) used.add(id);
+  const used = new Set(its.filter(inList).map(i => i.section));
+  for (const id of typing) used.add(id);
   for (const id of used) if (!all.has(id)) all.set(id, { id, name: t("Untitled"), color: PALETTE[0], pos: 100, deleted: false });
-  sectionInfo = all;
-  sections = [...all.values()].filter(s => !s.deleted || used.has(s.id)).sort((a, b) => a.pos - b.pos || (a.id < b.id ? -1 : 1));
+  return { all, shown: [...all.values()].filter(s => !s.deleted || used.has(s.id)).sort((a, b) => a.pos - b.pos || (a.id < b.id ? -1 : 1)) };
+}
+function computeSections() {
+  const typing = Object.entries(shells).filter(([, sh]) => sh.input.value.trim()).map(([id]) => id);
+  const l = layout(store.sections(), items, typing);
+  sectionInfo = l.all;
+  sections = l.shown;
 }
 
 /* ---------- Changes ---------- */
@@ -239,20 +246,23 @@ function sync() {
 // Changes from the other phone wait while you are editing or dragging, and appear
 // without motion, so nothing slides away just as you reach for it.
 function refreshFromStore() {
+  if (view !== "list") return;
   if (editingId || drag) { renderPending = true; return; }
   sync();
   paint(activeFk(), false);
 }
+// Undo reverses only what is still as you left it: if someone has changed it since, it
+// says who, by the name they gave, if any.
 function step(fn, done, nothing) {
   const r = fn();
   if (!r) return;
   noteUndo(null);
-  announce(r.done ? t(done, { x: r.label }) : t(nothing));
+  announce(r.done ? t(done, { x: r.label }) : t(nothing, { x: (r.by && store.memberName(r.by)) || t("someone else") }));
   refreshFromStore();
   scheduleSettle();
 }
-const undo = () => step(store.undo, "Undid {x}", "Nothing to undo: the other phone already changed it");
-const redo = () => step(store.redo, "Redid {x}", "Nothing to redo: the other phone already changed it");
+const undo = () => (view === "lists" ? undoRemove() : step(store.undo, "Undid {x}", "Nothing to undo: {x} already changed it"));
+const redo = () => { if (view === "list") step(store.redo, "Redid {x}", "Nothing to redo: {x} already changed it"); };
 
 // Ticked items stay put briefly, then all move to the ticked group together.
 function scheduleSettle() {
@@ -287,12 +297,12 @@ function toggle(id, checked) {
   scheduleSettle();
 }
 function loadDrafts() {
-  try { return JSON.parse(localStorage.getItem(DRAFTS_KEY)) || {}; } catch (_) { return {}; }
+  try { return JSON.parse(localStorage.getItem(draftsKey())) || {}; } catch (_) { return {}; }
 }
 function saveDraft(sec, text) {
   const d = loadDrafts();
   if (text) d[sec] = text; else delete d[sec];
-  try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(d)); } catch (_) {}
+  try { if (Object.keys(d).length) localStorage.setItem(draftsKey(), JSON.stringify(d)); else localStorage.removeItem(draftsKey()); } catch (_) {}
 }
 function clearAdd(sec) {
   shells[sec].input.value = "";
@@ -341,6 +351,30 @@ function submitAdd(sec, leaving = false) {
   announce(t("Added {x}", { x: text }));
   // A new item is unticked without saying so; "deleted: false" is what lets undo remove it.
   act(t("adding {x}", { x: q(text) }), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "deleted", false]], opts);
+}
+// Several lines pasted into an Add item field: one item each, in that section, in one
+// step to undo. Names already on the list stay as they are; those bought before come back.
+// Lines ticked in Markdown ("- [x]") are kept as bought before, to be suggested.
+function addMany(sec, pasted) {
+  clearAdd(sec);
+  const ops = [], seen = new Set(), old = Date.now() - RECENT_MS - 864e5;
+  let added = 0, had = 0, pos = maxPos(sec);
+  for (const p of pasted) {
+    const text = clean(p.text), k = nameKey(text);
+    if (!text || seen.has(k)) continue;
+    seen.add(k);
+    const same = items.filter(i => nameKey(i.text) === k);
+    const ex = same.find(inList) || same[0];
+    if (ex && (inList(ex) || p.checked)) { had++; continue; }
+    const id = ex ? ex.id : store.newId();
+    ops.push([id, "text", text], [id, "section", sec], [id, "pos", ++pos], ex ? [id, "checked", false] : [id, "deleted", false]);
+    if (p.checked) ops.push([id, "checked", true], [id, "checkedAt", old]);
+    added++;
+  }
+  const already = had ? plural(had, "{n} already on the list", "{n} already on the list") : "";
+  if (!added) { announce(already); paint(null, false); return; }
+  announce(plural(added, "Added {n} item", "Added {n} items") + (already ? ", " + already : ""));
+  act(plural(added, "adding {n} item", "adding {n} items"), ops);
 }
 function del(id, opts) {
   const it = find(id);
@@ -645,11 +679,14 @@ function editSection(span, id, x, y) {
 function editListName(span, x, y) {
   const orig = listName();
   editInPlace(span, {
-    key: LIST, row: span.parentNode, orig, max: MAX_SECTION, x, y,
+    key: LIST, row: span.closest(".list-top"), orig, max: MAX_SECTION, x, y,
     below: palette(orig, LIST_COLORS, listColor(), (c, label) => {
       announce(t("{x} is now {y}", { x: listName(), y: t(label).toLowerCase() }));
       act(t("changing the colour of {x}", { x: q(listName()) }), [[LIST, "color", c, ""]], { animate: false });
     }),
+    // The cross takes the list off this phone, for the lists page to undo.
+    onDelete: () => { const lid = store.current(); leaveList(() => removeList(lid)); },
+    deleteLabel: t("Remove {x} from this phone", { x: orig }),
     onSave: name => {
       announce(t("Renamed the list to {x}", { x: name }));
       act(t("renaming the list {x}", { x: q(orig) }), [[LIST, "name", name, t("Shopping list")]], { leaving: true });
@@ -781,6 +818,13 @@ function buildShell(id) {
     updateSug(id);
   });
   input.addEventListener("focus", () => updateSug(id));
+  input.addEventListener("paste", e => {
+    const pasted = pastedItems(e.clipboardData ? e.clipboardData.getData("text/plain") : "");
+    if (!pasted || !pasted.length) return;
+    e.preventDefault();
+    addMany(id, pasted);
+    input.focus();
+  });
   input.addEventListener("blur", () => {
     if (ui.sugSec === id) closeSug();
     // Leaving the field adds the item, but not when the whole app loses focus (a
@@ -1222,15 +1266,18 @@ function fly(o, to, target) {
 
 /* ---------- Render ---------- */
 
-// Undo floats at the bottom right; redo joins it once something has been undone.
+// Undo floats at the bottom right; redo joins it once something has been undone. On the
+// lists page, it brings back a list taken off this phone.
 let undoNote = null, noteTimer = 0;
+const top = a => (a.length ? a[a.length - 1].label : null);
 function noteUndo(name) {
   clearTimeout(noteTimer);
   undoNote = name || null;
   if (undoNote) noteTimer = setTimeout(() => { undoNote = null; paintDock(); }, 5000);
 }
 function paintDock() {
-  const u = store.undoLabel(), r = store.redoLabel();
+  const onList = view === "list";
+  const u = onList ? store.undoLabel() : top(removed), r = onList ? store.redoLabel() : null;
   $("#dock").hidden = !u && !r;
   setHist($("#undo"), u, "Undo");
   setHist($("#redo"), r, "Redo");
@@ -1249,7 +1296,9 @@ function setHist(btn, label, verb) {
 // reconnect doesn't flash it. Tapping it says what happens next.
 let statusTimer = 0, statusShown = "";
 function statusInfo() {
-  const { online, full, waiting } = store.status();
+  const { online, full, closed, waiting } = store.status();
+  if (closed) return { text: t("List closed"), detail: t("Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone.") };
+  if (store.newerFormat()) return { text: t("Update Panier"), detail: t("This list was changed with a newer Panier, which updates itself: close the app and open it again. Nothing is sent from here meanwhile.") };
   if (online && !full) return null;
   const kept = waiting
     ? plural(waiting, "{n} change is saved on this phone", "{n} changes are saved on this phone")
@@ -1259,7 +1308,7 @@ function statusInfo() {
   return { text: t("Can't reach the server"), detail: t("The server isn't answering. {kept}, to be sent as soon as it answers.", { kept }) };
 }
 function paintStatus() {
-  const info = $("#app").hidden ? null : statusInfo();
+  const info = view !== "list" ? null : statusInfo();
   const el = $("#status");
   if (!info) {
     clearTimeout(statusTimer); statusTimer = 0;
@@ -1292,6 +1341,7 @@ addEventListener("online", paintStatus);
 addEventListener("offline", paintStatus);
 
 function render() {
+  if (view !== "list" || !store.current()) return; // the lists page shows; the list draws when it's back
   const name = listName(), title = $("#list-name");
   if (editingId !== LIST && title.textContent !== name) title.textContent = name;
   title.setAttribute("aria-label", t("{x}, rename", { x: name }));
@@ -1341,7 +1391,7 @@ function dragHint() {
   }, 800);
 }
 
-/* ---------- Pairing ---------- */
+/* ---------- Sharing ---------- */
 
 function qrSvg(textToEncode) {
   const qr = window.qrcode(0, "M");
@@ -1362,9 +1412,10 @@ function qrSvg(textToEncode) {
   t.innerHTML = '<svg viewBox="0 0 ' + (n + 2 * pad) + " " + (n + 2 * pad) + '" shape-rendering="crispEdges" aria-hidden="true"><rect width="100%" height="100%" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>';
   return t.content.firstChild;
 }
-// Sheets (pairing, Settings) open as a step in the browser's history, so the phone's
-// back gesture closes them like a page.
-// Each opening is its own step, so one left over from before a reload doesn't count.
+// Sheets (sharing, Settings) open as a step in the browser's history, so the phone's
+// back gesture closes them like a page. So does a list opened from the lists page: back
+// returns to it. Each opening is its own step, so one left over from before a reload
+// doesn't count.
 const sheetOf = () => (history.state && history.state.sheet) || null;
 function openSheet(dlg) {
   dlg.showModal();
@@ -1377,29 +1428,63 @@ for (const dlg of document.querySelectorAll("dialog")) {
 }
 addEventListener("popstate", () => {
   for (const dlg of document.querySelectorAll("dialog[open]")) if (sheetOf() !== dlg.dataset.step) dlg.close();
+  if (sheetOf()) return;
+  const want = history.state && history.state.list;
+  if (want) { if (view !== "list" || shownLid !== want) showList(want, { push: false }); }
+  else if (view !== "lists") showLists();
 });
+// fn runs once the step back in history has landed; closeThen closes a sheet first.
+function afterBack(fn) {
+  let done = false;
+  const go = () => { if (done) return; done = true; removeEventListener("popstate", go); setTimeout(fn, 0); };
+  addEventListener("popstate", go);
+  setTimeout(go, 500);
+}
+function closeThen(dlg, fn) {
+  if (!dlg.open) return fn();
+  afterBack(fn);
+  dlg.close();
+}
 
 // The QR code library is only needed here, so it loads the first time the sheet opens.
-let qrLib = null;
+let qrLib = null, shared = "";
 const loadQr = () => (qrLib ||= new Promise((resolve, reject) => {
   document.head.append(h("script", { src: "vendor/qrcode.js", onload: resolve, onerror: () => { qrLib = null; reject(); } }));
 }));
-function openPair() {
-  const link = store.pairingLink();
+// The sheet shares one list, with who's on it; or, all of this phone's lists at once,
+// to set up another phone.
+function openPair(all = false) {
+  shared = all ? store.allLink() : store.pairingLink();
+  $("#pair-title").textContent = all ? t("Set up another phone") : t("Add someone to this list");
+  $("#pair-text").textContent = all ? t("Scan this code with the other phone, and it has every list this one has.")
+    : t("They scan this code with their phone, or open the link you send them.");
+  $("#pair-note").textContent = all ? t("This link holds the keys to all your lists: anyone who has it can open them. Keep it to yourself.")
+    : t("This link is the key to your list: anyone who has it can open it. Keep a copy in your password manager to recover the list if you lose your phones.");
+  $("#people").hidden = all;
+  if (!all) paintPeople();
   $("#qr").replaceChildren();
   $("#share-link").hidden = !navigator.share;
   openSheet($("#pair"));
-  loadQr().then(() => $("#qr").replaceChildren(qrSvg(link)), () => {});
+  loadQr().then(() => $("#qr").replaceChildren(qrSvg(shared)), () => {});
 }
-$("#pair-open").addEventListener("click", openPair);
+// Who has the list: each phone writes itself onto it, with the name its owner gave in
+// Settings, if any. The server sees none of it.
+function paintPeople() {
+  const others = store.members().filter(m => !m.me);
+  const named = others.filter(m => m.name).map(m => m.name), nameless = others.length - named.length;
+  const who = [t("you"), ...named];
+  if (nameless) who.push(plural(nameless, "{n} phone without a name", "{n} phones without a name"));
+  $("#members").textContent = others.length ? t("On this list: {x}.", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(who) }) : t("Only you, so far.");
+}
+$("#pair-open").addEventListener("click", () => openPair());
 $("#pair-close").addEventListener("click", () => $("#pair").close());
 $("#share-link").addEventListener("click", () => {
-  navigator.share({ title: listName(), url: store.pairingLink() }).catch(() => {});
+  navigator.share({ title: $("#people").hidden ? "Panier" : listName(), url: shared }).catch(() => {});
 });
 $("#copy-link").addEventListener("click", async e => {
   const b = e.currentTarget;
   try {
-    await navigator.clipboard.writeText(store.pairingLink());
+    await navigator.clipboard.writeText(shared);
     b.textContent = t("Copied");
   } catch (_) {
     b.textContent = t("Couldn't copy");
@@ -1407,11 +1492,140 @@ $("#copy-link").addEventListener("click", async e => {
   setTimeout(() => { b.textContent = t("Copy link"); }, 2000);
 });
 
+// Changing a list's key and deleting it for everyone are the only things that ask first:
+// neither can be undone.
+function confirmSheet({ title, text, ok, run }) {
+  $("#confirm-title").textContent = title;
+  $("#confirm-text").textContent = text;
+  $("#confirm-ok").textContent = ok;
+  $("#confirm-error").hidden = true;
+  const btn = $("#confirm-ok");
+  btn.disabled = false;
+  btn.onclick = async () => {
+    btn.disabled = true;
+    try {
+      await run();
+    } catch (err) {
+      $("#confirm-error").textContent = err.message === "full" ? t("This server can't make another list from this one.") : t("Couldn't reach the server. Check your connection and try again.");
+      $("#confirm-error").hidden = false;
+      btn.disabled = false;
+    }
+  };
+  openSheet($("#confirm"));
+}
+$("#confirm-cancel").addEventListener("click", () => $("#confirm").close());
+// Someone shouldn't have the list any more: it moves to a new key, and the old one is
+// closed, for everyone. The people who should keep it get the new link.
+$("#rekey-open").addEventListener("click", () => closeThen($("#pair"), () => confirmSheet({
+  title: t("Change the key of {x}?", { x: q(listName()) }),
+  text: t("Everyone who has this list loses it, on every phone but this one, though they keep what they had. Then send the new link to those who should have it."),
+  ok: t("Change the key"),
+  run: async () => {
+    await store.changeKey();
+    announce(t("{x} has a new key", { x: listName() }));
+    closeThen($("#confirm"), () => openPair());
+  },
+})));
+$("#delete-open").addEventListener("click", () => closeThen($("#pair"), () => confirmSheet({
+  title: t("Delete {x} for everyone?", { x: q(listName()) }),
+  text: t("It goes from the server, and from every phone that has it as soon as they open it. This can't be undone."),
+  ok: t("Delete"),
+  run: async () => {
+    const lid = store.current(), name = listName();
+    await store.deleteForEveryone(lid);
+    closeThen($("#confirm"), () => leaveList(() => announce(t("Deleted {x} for everyone", { x: name }))));
+  },
+})));
+
+/* ---------- Markdown, out and in ---------- */
+
+// A list as Export writes it: its sections as on screen, each with its items to get,
+// then those bought before, latest first.
+function sheetOfList({ name, color, sections: stored, items: its }) {
+  const { shown } = layout(stored, its);
+  const at = new Map(shown.map((s, k) => [s.id, k]));
+  const secs = shown.map(s => ({ name: s.name, color: s.color, items: [] }));
+  for (const i of its.filter(i => !i.checked).sort((a, b) => a.pos - b.pos)) secs[at.get(i.section) ?? 0].items.push({ text: i.text, checked: false });
+  for (const i of its.filter(i => i.checked).sort((a, b) => b.checkedAt - a.checkedAt)) secs[at.get(i.section) ?? 0].items.push({ text: i.text, checked: true });
+  return { name: name || t("Shopping list"), color: color || "", sections: secs };
+}
+function download(name, text) {
+  const now = new Date();
+  const day = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map(n => String(n).padStart(2, "0")).join("-");
+  const file = keyOf(name).replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "panier";
+  const url = URL.createObjectURL(new Blob([text], { type: "text/markdown;charset=utf-8" }));
+  const a = h("a", { href: url, download: file + "-" + day + ".md", hidden: true });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+function exportList() {
+  download(listName(), toMarkdown([sheetOfList({ name: listName(), color: listColor(), sections: store.sections(), items })]));
+}
+function exportAll() {
+  download("Panier", toMarkdown(store.lists().map(e => sheetOfList(store.peek(e.lid)))));
+}
+$("#export-btn").addEventListener("click", exportList);
+$("#export-all").addEventListener("click", exportAll);
+
+// The changes that make a list as read from Markdown: its sections in order, the three
+// a list starts with kept when a section has one of their names, the others deleted;
+// each name once; what was bought before kept out of the ticked group, to be suggested.
+function importOps(l) {
+  const ops = [], used = new Set(), colours = new Set(), seen = new Set();
+  const old = Date.now() - RECENT_MS - 864e5;
+  let n = 0, k = 0;
+  if (l.name) ops.push([LIST, "name", clean(l.name, MAX_SECTION)]);
+  if (l.color && LIST_COLORS.some(([c]) => c === l.color)) ops.push([LIST, "color", l.color]);
+  l.sections.forEach((sec, i) => {
+    const name = sec.name ? clean(sec.name, MAX_SECTION) : "";
+    const d = DEFAULTS.find(d => !used.has(d.id) && (name ? [d.name, d.en].some(x => keyOf(x) === keyOf(name)) : true));
+    const id = d ? d.id : store.newId(), key = "#" + id;
+    const color = colorOk(sec.color, d ? d.color : PALETTE.find(c => !colours.has(c)) || PALETTE[0]);
+    used.add(id);
+    colours.add(color);
+    ops.push([key, "name", name || d.name], [key, "pos", i + 1], [key, "color", color], [key, "deleted", false]);
+    sec.items.forEach((it, j) => {
+      const text = clean(it.text), nk = text && nameKey(text);
+      if (!text || seen.has(nk)) return;
+      seen.add(nk);
+      const iid = store.newId();
+      ops.push([iid, "text", text], [iid, "section", id], [iid, "pos", j + 1], [iid, "deleted", false]);
+      if (it.checked) ops.push([iid, "checked", true], [iid, "checkedAt", old - k++]);
+      n++;
+    });
+  });
+  if (l.sections.length) for (const d of DEFAULTS) if (!used.has(d.id)) ops.push(["#" + d.id, "deleted", true]);
+  return { ops, n };
+}
+$("#import-open").addEventListener("click", () => $("#import-file").click());
+$("#import-file").addEventListener("change", async e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  let text = "";
+  try { text = await f.text(); } catch (_) {}
+  const { lists } = fromMarkdown(text);
+  if (!lists.length) return say(t("There's no list to bring in from {x}.", { x: f.name }));
+  const made = lists.map(importOps);
+  create(async code => {
+    const lids = [];
+    for (const m of made) { lids.push(await store.createFrom(m.ops, { code })); code = null; }
+    return lids;
+  }, lids => {
+    const n = made.reduce((a, m) => a + m.n, 0);
+    announce(lids.length > 1 ? t("Brought in {x}", { x: plural(lids.length, "{n} list", "{n} lists") }) : t("Brought in {x}", { x: plural(n, "{n} item", "{n} items") }));
+    if (lids.length === 1) showList(lids[0]);
+    else renderLists();
+  });
+});
+
 /* ---------- Settings ---------- */
 
 const THEME_KEY = "panier-theme", LAYOUT_KEY = "panier-layout";
-// Asks the browser to keep the list even when the phone runs low on space. Firefox asks
-// you once; Chrome decides for itself. Returns whether it's kept, or null if unknown.
+// Asks the browser to keep the lists even when the phone runs low on space. Firefox
+// asks you once; Chrome decides for itself. Returns whether they're kept, or null if unknown.
 async function keepList() {
   try { return await navigator.storage.persist(); } catch (_) { return null; }
 }
@@ -1425,40 +1639,18 @@ async function paintSettings() {
   const theme = (() => { try { return localStorage.getItem(THEME_KEY) || ""; } catch (_) { return ""; } })();
   for (const r of document.querySelectorAll('input[name="theme"]')) r.checked = r.value === theme;
   $("#compact-layout").checked = document.documentElement.dataset.layout === "compact";
-  let bytes = 0;
-  try { bytes = new Blob([localStorage.getItem("panier") || ""]).size; } catch (_) {}
-  const toGet = items.filter(i => !i.checked).length;
-  $("#size-text").textContent = t("{size}: {toGet} to get, {done}", {
-    size: size(bytes), toGet: plural(toGet, "{n} item", "{n} items"), done: plural(items.length - toGet, "{n} bought before", "{n} bought before"),
-  });
+  $("#my-name").value = store.myName();
+  const all = store.lists();
+  $("#sizes").replaceChildren(...all.map(e => h("li", {}, h("span", {}, e.name || t("Shopping list")), h("span", {}, size(store.storedSize(e.lid))))));
+  $("#export-all").hidden = $("#phone-open").hidden = !all.length;
   $("#about-server").textContent = location.host;
   const [kept, keys] = await Promise.all([isKept(), caches.keys().catch(() => [])]);
   $("#keep-text").textContent = kept
-    ? t("Kept on this phone: the browser won't clear the list to free up space.")
-    : t("If this phone runs low on space, the browser may clear the list; the link from {link} brings it back.", { link: q(t("Add someone to this list")) });
+    ? t("Kept on this phone: the browser won't clear your lists to free up space.")
+    : t("If this phone runs low on space, the browser may clear your lists; their links bring them back.");
   $("#keep-btn").hidden = kept !== false;
   const k = keys.find(k => k.startsWith("panier-") && !k.startsWith("panier-static-"));
   $("#about-version").textContent = k ? k.slice(7) : "dev";
-}
-// The list as a plain-text checklist, named after it: each section's items to get, then
-// everything bought before, by name, as suggested.
-function exportList() {
-  const now = new Date(), name = listName();
-  const lines = [name + ", " + now.toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })];
-  for (const s of sections) {
-    const list = items.filter(i => i.section === s.id && !i.checked).sort((a, b) => a.pos - b.pos);
-    if (list.length) lines.push("", s.name, ...list.map(i => "- [ ] " + i.text));
-  }
-  const done = items.filter(i => i.checked).sort((a, b) => b.checkedAt - a.checkedAt);
-  if (done.length) lines.push("", t("Bought before"), ...done.map(i => "- [x] " + bare(i.text)));
-  const url = URL.createObjectURL(new Blob([lines.join("\n") + "\n"], { type: "text/plain;charset=utf-8" }));
-  const day = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map(n => String(n).padStart(2, "0")).join("-");
-  const file = keyOf(name).replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "panier";
-  const a = h("a", { href: url, download: file + "-" + day + ".txt", hidden: true });
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 $("#settings-open").addEventListener("click", () => { paintSettings(); openSheet($("#settings")); });
 $("#settings-close").addEventListener("click", () => $("#settings").close());
@@ -1474,8 +1666,171 @@ for (const r of document.querySelectorAll('input[name="theme"]')) {
     if (window.panierTheme) window.panierTheme(r.value);
   });
 }
+$("#my-name").addEventListener("change", e => store.setMyName(clean(e.target.value, MAX_SECTION)));
+$("#my-name").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
 $("#keep-btn").addEventListener("click", async () => { await keepList(); paintSettings(); });
-$("#export-btn").addEventListener("click", exportList);
+$("#phone-open").addEventListener("click", () => closeThen($("#settings"), () => openPair(true)));
+
+/* ---------- The lists page ---------- */
+
+// Each list lies on the page as a sheet in its own tint: its name, what's left to get and
+// the first two of those, as this phone last saw them. Tap to open it; hold to drag it
+// up or down, or onto the zone at the foot that takes it off this phone.
+const listColorOk = c => (c && LIST_COLORS.some(([id]) => id === c) ? c : null);
+const countOf = e => (e.closed ? t("Closed") : e.newer ? t("Update Panier to open it") : e.toGet ? plural(e.toGet, "{n} to get", "{n} to get") : t("Nothing to get"));
+function sheetEl(e) {
+  const name = e.name || t("Shopping list"), count = countOf(e);
+  const btn = h("button", { type: "button", class: "sheet-open", "aria-label": name + ", " + count, dataset: { fk: "sheet-" + e.lid } },
+    h("span", { class: "sheet-head", "aria-hidden": "true" }, h("span", { class: "sheet-name" }, name), h("span", { class: "sheet-count" }, count)),
+    ...(e.closed || e.newer ? [] : e.first || []).map(x => { const sp = h("span"); fillText(sp, x); return h("span", { class: "sheet-item", "aria-hidden": "true" }, sp); }));
+  const li = h("li", { class: "sheet-card", "data-lid": e.lid, "data-color": listColorOk(e.color) }, btn);
+  btn.addEventListener("click", () => { if (suppressClick) { suppressClick = false; return; } showList(e.lid); });
+  btn.addEventListener("keydown", ev => {
+    if (ev.altKey && (ev.key === "ArrowUp" || ev.key === "ArrowDown")) { ev.preventDefault(); moveSheet(e.lid, ev.key === "ArrowUp" ? -1 : 1); }
+  });
+  bindPress(li, { can: () => true, start: (offY, y) => startSheetDrag(li, e.lid, offY, y) });
+  return li;
+}
+// The page asks for the setup code for the first list, or when the server won't make one
+// otherwise; notice says what went wrong last, until the next thing tried.
+let needCode = false, notice = "";
+function renderLists() {
+  if (view !== "lists" || drag) return;
+  const fk = activeFk(), all = store.lists(), first = !all.length;
+  $("#sheets").replaceChildren(...all.map(sheetEl));
+  $("#new-list-form").hidden = first;
+  $("#setup-form").hidden = !first && !needCode;
+  const msg = notice || (needCode ? t("This server wants its setup code for this.")
+    : first ? t("Open the link from a phone that already has a list, or start one with your server's setup code.") : "");
+  $("#lists-msg").textContent = msg;
+  $("#lists-msg").hidden = !msg;
+  $("#setup-label").textContent = first ? t("Your server's setup code, to start the first list") : t("Your server's setup code");
+  if (fk) { const el = document.querySelector('[data-fk="' + fk + '"]'); if (el && el !== document.activeElement) el.focus({ preventScroll: true }); }
+  paintDock();
+}
+const say = msg => { notice = msg; renderLists(); announce(msg); };
+
+function startSheetDrag(li, lid, offY, y) {
+  const ghost = float(li.cloneNode(true), li.getBoundingClientRect(), "ghost", y - offY);
+  li.classList.add("placeholder");
+  document.documentElement.classList.add("dragging-sheet");
+  beginDrag({ lid, li, ghost, offY, y, toRemove: false, place: placeSheet, end: endSheetDrag });
+}
+function placeSheet(y) {
+  const zone = $("#remove-drop"), over = y > zone.getBoundingClientRect().top - 8;
+  if (over !== drag.toRemove) {
+    drag.toRemove = over;
+    zone.classList.toggle("over", over);
+    drag.li.classList.toggle("away", over);
+    if (over) buzz(8);
+  }
+  if (over) return;
+  const ul = $("#sheets");
+  let before = null;
+  for (const c of ul.children) {
+    if (c === drag.li) continue;
+    const r = c.getBoundingClientRect();
+    if (y < r.top + r.height / 2) { before = c; break; }
+  }
+  if (drag.li.nextElementSibling !== before) ul.insertBefore(drag.li, before);
+}
+function endSheetDrag() {
+  const { lid, toRemove, ghost } = drag;
+  const order = [...$("#sheets").children].map(c => c.dataset.lid);
+  ghost.remove();
+  $("#remove-drop").classList.remove("over");
+  document.documentElement.classList.remove("dragging-sheet");
+  drag = null;
+  if (toRemove) return removeList(lid);
+  store.reorder(order);
+  renderLists();
+}
+function moveSheet(lid, dir) {
+  const order = store.lists().map(e => e.lid), i = order.indexOf(lid), j = i + dir;
+  if (j < 0 || j >= order.length) return;
+  [order[i], order[j]] = [order[j], order[i]];
+  store.reorder(order);
+  const e = store.lists().find(x => x.lid === lid);
+  announce(t(dir < 0 ? "{x} moved up" : "{x} moved down", { x: e.name || t("Shopping list") }));
+  renderLists();
+  const el = document.querySelector('[data-fk="sheet-' + lid + '"]');
+  if (el) el.focus();
+}
+
+// Taking a list off this phone can be undone, until the app closes; the list stays on
+// the server for the others, and its link brings it back.
+const removed = [];
+function removeList(lid) {
+  const e = store.lists().find(x => x.lid === lid);
+  if (!e) return;
+  const name = e.name || t("Shopping list"), dk = "panier2-drafts:" + lid;
+  let drafts = null;
+  try { drafts = localStorage.getItem(dk); localStorage.removeItem(dk); } catch (_) {}
+  removed.push({ label: t("removing {x}", { x: q(name) }), r: store.remove(lid), drafts, dk });
+  noteUndo(name);
+  announce(t("Removed {x} from this phone", { x: name }));
+  renderLists();
+}
+function undoRemove() {
+  const u = removed.pop();
+  if (!u) return;
+  store.restore(u.r);
+  try { if (u.drafts) localStorage.setItem(u.dk, u.drafts); } catch (_) {}
+  noteUndo(null);
+  announce(t("Undid {x}", { x: u.label }));
+  renderLists();
+}
+
+// A new list starts from a name, typed on the blank sheet. The server makes it on the
+// strength of a list this phone already has there; the first needs the setup code, and
+// so does any other the server won't make that way. create keeps what was asked for
+// while the code is typed.
+let pending = null;
+async function create(make, done) {
+  notice = "";
+  try {
+    const r = await make(null);
+    pending = null;
+    done(r);
+  } catch (err) {
+    if (err.message !== "code") return say(MESSAGES.server);
+    pending = { make, done };
+    needCode = store.lists().length > 0;
+    renderLists();
+    $("#setup-code").focus();
+  }
+}
+addRow($("#new-list-form"), $("#new-list"), {
+  add: () => {
+    const name = clean($("#new-list").value, MAX_SECTION);
+    if (!name) return;
+    $("#new-list").value = "";
+    $("#new-list-form").classList.remove("typing");
+    create(code => store.createList({ code, name }), lid => { announce(t("Added {x}", { x: name })); showList(lid); });
+  },
+  clear: () => { $("#new-list").value = ""; $("#new-list-form").classList.remove("typing"); },
+});
+const MESSAGES = {
+  code: t("That setup code didn't work. Check it on the server and try again."),
+  link: t("That link is incomplete. Ask for the link again from the phone that has the list."),
+  server: t("Couldn't reach the server. Check your connection and try again."),
+};
+$("#setup-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const code = $("#setup-code").value;
+  if (!code.trim()) return;
+  const p = pending || { make: c => store.createList({ code: c }), done: lid => { showList(lid); openPair(); keepList(); } };
+  try {
+    const r = await p.make(code);
+    pending = null;
+    needCode = false;
+    notice = "";
+    $("#setup-code").value = "";
+    p.done(r);
+  } catch (err) {
+    say(MESSAGES[err.message] || MESSAGES.server);
+  }
+});
 
 /* ---------- Wiring and start ---------- */
 
@@ -1489,6 +1844,7 @@ $("#list-name").addEventListener("keydown", e => {
   if (editingId === LIST) return;
   if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editListName(e.currentTarget); }
 });
+$("#lists-open").addEventListener("click", () => leaveList());
 $("#undo").addEventListener("click", undo);
 $("#redo").addEventListener("click", redo);
 document.addEventListener("keydown", e => {
@@ -1500,96 +1856,127 @@ document.addEventListener("keydown", e => {
 });
 $("#basket-toggle").addEventListener("click", () => {
   ui.basketOpen = !ui.basketOpen;
-  try { localStorage.setItem("panier-basket-open", ui.basketOpen ? "1" : "0"); } catch (_) {}
+  store.setFolded(shownLid, !ui.basketOpen);
   paint(null, false);
 });
+// Back on screen, or back online, the lists page catches up too.
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && !editingId && !drag) paint(activeFk(), false);
+  if (document.hidden) return;
+  if (view === "lists") store.refreshAll();
+  else if (view === "list" && !editingId && !drag) paint(activeFk(), false);
 });
+addEventListener("online", () => { if (view === "lists") store.refreshAll(); });
 store.subscribe(kind => {
-  if (kind === "remote") refreshFromStore();
+  if (kind === "lists") renderLists();
+  else if (view !== "list") return;
+  else if (kind === "remote") {
+    refreshFromStore();
+    if ($("#pair").open && !$("#people").hidden) paintPeople(); // someone joined, or named themselves
+  }
   else if (kind === "status" || kind === "local") paintStatus();
 });
 
-function showList() {
-  $("#welcome").hidden = true;
+// A list is on screen from the lists page, a step on in history, so back returns there.
+function resetView() {
+  closeSug();
+  landAll();
+  clearTimeout(settleTimer);
+  for (const id of Object.keys(shells)) { shells[id].el.remove(); delete shells[id]; }
+  rows.clear();
+  settling.clear();
+  items = [];
+  sections = [];
+  sectionInfo = new Map();
+  flashId = null;
+  lastSplit = null;
+  noteUndo(null);
+}
+function showList(lid, { push = true } = {}) {
+  if (!store.open(lid)) {
+    history.replaceState({}, "");
+    return showLists();
+  }
+  const switched = shownLid !== lid;
+  if (switched) resetView();
+  notice = "";
+  shownLid = lid;
+  view = "list";
+  if (push) history.pushState({ list: lid }, "");
+  $("#lists").hidden = true;
   $("#app").hidden = false;
+  if (window.panierView) window.panierView("");
+  const e = store.lists().find(x => x.lid === lid);
+  ui.basketOpen = !(e && e.folded);
   items = store.items();
   render();
+  if (switched) window.scrollTo(0, 0);
   // Text left in an "Add item" field when the app was closed becomes an item now.
   for (const [sec, text] of Object.entries(loadDrafts())) {
     const target = shells[sec] ? sec : sections[0].id;
     shells[target].input.value = text;
     submitAdd(target, true);
   }
-  try { localStorage.removeItem(DRAFTS_KEY); } catch (_) {}
+  try { localStorage.removeItem(draftsKey()); } catch (_) {}
   dragHint();
 }
-function showWelcome(message) {
+function showLists() {
+  if (view === "list") { closeSug(); store.leave(); }
+  view = "lists";
   $("#app").hidden = true;
-  $("#dock").hidden = true;
-  $("#welcome").hidden = false;
-  if (message) $("#welcome-msg").textContent = message;
+  $("#lists").hidden = false;
+  if (window.panierView) window.panierView("lists");
+  document.title = "Panier";
+  store.refreshAll();
+  renderLists();
+  paintStatus();
+  window.scrollTo(0, 0);
 }
-const MESSAGES = {
-  code: t("That setup code didn't work. Check it on the server and try again."),
-  link: t("That link is incomplete. Ask for the link again from the phone that has the list."),
-  server: t("Couldn't reach the server. Check your connection and try again."),
-};
-$("#setup-form").addEventListener("submit", async e => {
-  e.preventDefault();
-  const code = $("#setup-code").value;
-  if (!code.trim()) return;
-  try {
-    await store.createList(code);
-    showList();
-    openPair();
-    keepList();
-  } catch (err) {
-    showWelcome(MESSAGES[err.message] || MESSAGES.server);
+// Back to the lists page, as the back gesture does; then runs fn.
+function leaveList(fn) {
+  if (history.state && history.state.list) {
+    afterBack(() => { if (view !== "lists") showLists(); if (fn) fn(); });
+    history.back();
+  } else {
+    history.replaceState({}, "");
+    showLists();
+    if (fn) fn();
   }
-});
-
-// A link to another list, on a phone that already has one, asks first: until there can
-// be several lists, switching means this phone leaves the one it has.
-function askSwitch(key) {
-  const waiting = store.status().waiting;
-  $("#switch-text").textContent = t("This phone will leave {x} and open the list from the link.", { x: q(listName()) });
-  $("#switch-lost").textContent = waiting ? plural(waiting, "{n} change made here hasn't been sent yet, and would be lost.", "{n} changes made here haven't been sent yet, and would be lost.") : "";
-  $("#switch-lost").hidden = !waiting;
-  $("#switch-ok").onclick = async () => {
-    await store.join(key);
-    location.reload();
-  };
-  openSheet($("#switch"));
 }
-$("#switch-cancel").addEventListener("click", () => $("#switch").close());
 
+// The app opens on the list last used, or the lists page when there's none. A link adds
+// the lists it holds: with one, that list opens.
 async function init() {
   const params = new URLSearchParams(location.hash.slice(1));
   if (location.hash) history.replaceState(null, "", location.pathname); // keep keys out of history
-  try {
-    const k = params.get("k");
-    if (k && store.linkKind(k) === "other") {
-      showList();
-      store.start();
-      askSwitch(k);
-      return;
-    }
-    if (k) { await store.join(k); keepList(); }
-    else if (params.get("setup") && !store.hasList()) {
-      await store.createList(params.get("setup"));
-      showList();
+  const keys = store.keysIn(params.get("k"));
+  if (params.has("k") && !keys.length) say(MESSAGES.link);
+  if (keys.length) {
+    const lids = store.addKeys(keys);
+    keepList();
+    return begin(lids.length === 1 ? lids[0] : null, lids.length > 1);
+  }
+  if (params.get("setup") && !store.lists().length) {
+    try {
+      const lid = await store.createList({ code: params.get("setup") });
+      begin(lid);
       openPair();
       keepList();
       return;
+    } catch (err) {
+      say(MESSAGES[err.message] || MESSAGES.server);
     }
-  } catch (err) {
-    if (!store.hasList()) return showWelcome(MESSAGES[err.message] || MESSAGES.server);
   }
-  if (!store.hasList()) return showWelcome();
-  showList();
-  store.start();
+  const st = history.state;
+  if (st && st.list && store.lists().some(e => e.lid === st.list)) { showList(st.list, { push: false }); store.refreshAll(); return; }
+  begin(null);
+}
+function begin(lid, toLists = false) {
+  history.replaceState({}, "");
+  const open = lid || (!toLists && store.openId());
+  if (open && store.lists().some(e => e.lid === open)) {
+    showList(open);
+    store.refreshAll(); // the others send what they have waiting
+  } else showLists();
 }
 translatePage();
 init();
@@ -1603,7 +1990,7 @@ addEventListener("hashchange", () => { if (/^#(k|setup)=/.test(location.hash)) l
 // waiting first for anything in progress: editing, typing, dragging or the pairing sheet.
 function busy() {
   return !!(editingId || drag || lifted || pointerIsDown || document.querySelector("dialog[open]") ||
-    $("#add-sec").value.trim() || Object.values(shells).some(sh => sh.input.value.trim()));
+    $("#add-sec").value.trim() || $("#new-list").value.trim() || $("#setup-code").value.trim() || Object.values(shells).some(sh => sh.input.value.trim()));
 }
 function reloadWhenIdle() {
   if (busy()) setTimeout(reloadWhenIdle, 1000);

@@ -2,19 +2,30 @@
 
 Everything the app does, in detail. The [README](../README.md) has the short version.
 
-## Starting a list
+## Starting
 
-- **The first phone** opens the app's address and types the server's setup code (see [docs/cloudflare.md](cloudflare.md) or [docs/raspberry-pi.md](raspberry-pi.md) for where it comes from). The list starts with three sections.
-- **The second phone** joins with *Add someone to this list*, at the bottom of the list: it shows a QR code to scan, and buttons to share or copy the link.
-- **Keep a copy of the link** in a password manager. It is the key to the list: it's the only way to get the list back if both phones are lost, and anyone who has it can open the list.
+- **The first phone** opens the app's address and types the server's setup code (see [docs/cloudflare.md](cloudflare.md) or [docs/raspberry-pi.md](raspberry-pi.md) for where it comes from). The first list starts with three sections.
+- **Another phone** joins with *Add someone to this list*, at the bottom of the list: it shows a QR code to scan, and buttons to share or copy the link.
+- **Keep a copy of each list's link** in a password manager. It is the key to the list: it's the only way to get the list back if every phone is lost, and anyone who has it can open the list.
 - **Install it** so it opens like an app, full screen and offline: in Firefox, **⋮ → Install** (or **Add to home screen**); in Chrome, **⋮ → Install app**; on an iPhone, Safari's **Share → Add to Home Screen**.
-- **Opening the link to a different list**, on a phone that already has one, asks first, since a phone holds one list for now and would leave the one it has. It also warns if changes made on this phone haven't been sent yet.
+- **Opening a list's link** on a phone that has other lists adds it beside them, and opens it.
+
+## Lists
+
+A phone holds any number of lists, each shared with its own people. The app opens on the list last used.
+
+- **The lists page** is reached with the sheets at the top right of a list, or the phone's back gesture. Each list lies there as a sheet in its own tint: its name, what's left to get, and the first two of those, as this phone last saw them. Lists not on screen catch up as the page shows.
+- **Open** a list with a tap.
+- **New list:** type a name on the blank sheet below the others. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
+- **Move** a list: hold it, then drag. From a keyboard, Alt+↑ and Alt+↓.
+- **Take a list off this phone:** drag it onto the zone that appears at the foot, or tap the cross by its name while renaming it. It stays on the server for the others, and its link brings it back. Undo, at the bottom right, puts it back where it was.
+- **Settings** is at the top right of the lists page.
 
 ## The page
 
 The list is written on the page itself, like paper: one left edge, ruled lines between items and under section names, and an underline where you type. Only what is lifted off the page has a shadow: something being dragged, the undo button, the sheets.
 
-- **The list's name** is the title at the top, *Shopping list* to start with. Tap it to rename it. It also names the exported file.
+- **The list's name** is the title at the top, *Shopping list* to start with. Tap it to rename it. It also names the exported file. At its right, the sheets lead to the lists page.
 - **The list's colour.** While you rename the list, colours show under its name: white and eight hues. The paper takes a light tint of the colour, the ruled lines and quieter text a deeper one, and the title a deep shade. The browser's bars follow, and the app opens in the colour without a flash of white.
 - Both phones see the name and colour, and undo puts the old ones back.
 
@@ -77,25 +88,54 @@ A list starts with three sections:
 ## Undo and redo
 
 - Every change can be undone. The undo button appears at the bottom right after the first change, and hides while you type. Redo joins it once something has been undone.
-- For a few seconds after deleting an item, a section or a suggestion, the undo button shows its name, so you know what a tap brings back.
-- Each person undoes only their own changes. If the other phone has changed something since, their change stands.
+- For a few seconds after deleting an item, a section or a suggestion, or taking a list off the phone, the undo button shows its name, so you know what a tap brings back.
+- Each person undoes only their own changes. If someone else has changed something since, their change stands, and undo says who, by the name they gave.
+
+## Import and export
+
+Lists go out and come in as Markdown checklists, readable in any notes app:
+
+```markdown
+# Shopping list <!-- green -->
+
+## Essentials <!-- ink -->
+- [ ] 2 milk
+- [x] Eggs
+```
+
+`#` is the list's name, `##` each section in order, `- [ ]` an item to get, `- [x]` one bought before, under its section. Colours ride in comments after the headings, which notes apps hide.
+
+- **Export the list**, at the bottom of a list, saves it as a `.md` file named after it.
+- **Export all lists**, in Settings, saves every list in one file, each under its own `#`.
+- **From a file**, on the lists page, brings in a list, or several from one file. It reads any Markdown checklist: other bullets, numbered lines, headings of any level, plain lines. It also reads the `.txt` files the earlier *Export the list* saved. Items bought before come in as suggestions, not ticked.
+- **Pasting several lines** into *Add item* adds one item per line, in that section, in one step to undo. Names already on the list are left as they are.
+
+## People
+
+- **Your name**, in Settings, shows to the people you share lists with. It's optional, and the server never sees it.
+- **Who's on a list** shows in *Add someone to this list*: you, the names people gave, and how many phones gave none.
+- **Change the key**, in the same place, is for when someone shouldn't have the list any more. The list moves to a new key and the old one is closed, for everyone: other phones say *List closed*, and keep what they had. Share the new link with those who should keep the list.
+- **Delete for everyone** closes the list on the server and takes it off this phone. Other phones say *List closed*. It can't be undone.
+- **Set up another phone**, in Settings, shows one QR code that brings every list on this phone to another.
 
 ## Sync and offline
 
-- Changes show on the other phone within a second. What the other phone adds, renames, moves, ticks or unticks is tinted briefly where it is, without anything moving.
-- While Panier is out of sight, it stops listening, so it uses no network or battery in the background. Coming back, it catches up in a fraction of a second.
+- Changes show on the other phones within a second. What others add, rename, move, tick or untick is tinted briefly where it is, without anything moving.
+- Only the list on screen listens. While Panier is out of sight, it stops listening, so it uses no network or battery in the background. Coming back, it catches up in a fraction of a second.
 - Without a connection, the app keeps working. A pill at the bottom left shows *Offline*; tap it to see how many changes are waiting. They are sent when the connection returns. *Can't reach the server* means the phone is online but the server isn't answering.
 - *List full* means the server has no room left for the list (32 MB, many years of use). Changes are kept on the phone.
 
 ## Settings
 
-*Settings*, at the bottom of the list, opens a page of its own; the phone's back gesture closes it. Settings are chosen on each phone.
+*Settings*, at the top of the lists page, opens a page of its own; the phone's back gesture closes it. Settings are chosen on each phone.
 
-- **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52) and smaller gaps and titles, so more of the list fits on screen.
+- **You:** your name, shown to the people you share lists with.
+- **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and each list on one line on the lists page.
 - **Data:**
-  - Whether the browser keeps the list even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If the list isn't kept, *Keep it on this phone* asks again.
-  - *Export the list* saves a text checklist named after the list: each section's items to get, then everything bought before.
-- **About:** the version, the server, how much space the list takes on this phone, and what the server can and can't see.
+  - Whether the browser keeps the lists even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep them on this phone* asks again.
+  - How much space each list takes on this phone.
+  - *Export all lists* and *Set up another phone*, above.
+- **About:** the version, the server, and what the server can and can't see.
 
 ## Keyboard and screen readers
 

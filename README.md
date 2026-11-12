@@ -1,24 +1,25 @@
 # Panier
 
-A shopping list shared between two phones, end-to-end encrypted, with no accounts. It runs on Cloudflare's free plan or on a Raspberry Pi at home.
+Shopping lists shared between phones, end-to-end encrypted, with no accounts. It runs on Cloudflare's free plan or on a Raspberry Pi at home.
 
 <p align="center"><img src="docs/screens.png" width="560" alt="Panier on two phones. Left, in light mode on green-tinted paper: the Essentials, Look out for and Long term sections. Right, in dark mode, the end of the same list, with three ticked items below a dashed line."></p>
 
 ## What it is
 
-- **Shared.** Two people, each on their own phone. Changes show on the other phone within a second.
-- **Private.** The list is encrypted on the phones. The server stores it without being able to read it.
-- **No accounts.** The second phone joins by scanning a QR code from the first.
+- **Shared.** Each list with whoever you choose, each on their own phone. Changes show on the other phones within a second.
+- **Several lists.** The weekly shop, the hardware store, the market: each its own sheet on the lists page, each shared with its own people.
+- **Private.** Lists are encrypted on the phones. The server stores them without being able to read them.
+- **No accounts.** Another phone joins a list by scanning a QR code from one that has it.
 - **Offline.** It works without signal and catches up when the connection returns.
 - **An app from the browser.** It installs from Firefox, Chrome or Safari, with no app store.
 - **Made for shopping.** Coloured sections, quantities such as *500 g flour*, suggestions from what you bought before, the last five days of ticked items, drag to reorder, and undo for everything.
+- **Markdown in and out.** A list exports as a Markdown checklist, and any Markdown checklist, or a few pasted lines, comes in.
 - **In English and French**, light and dark.
 
 ## What it isn't, yet
 
-- **One list, two people.** A phone holds one list. Several lists and more people are planned.
-- **No recovery.** Without accounts there is no password reset. The pairing link is the key: lose every phone and every copy of the link, and the list is gone.
-- **No backups** on the server yet. *Export the list*, in Settings, saves a text copy.
+- **No recovery.** Without accounts there is no password reset. A list's link is its key: lose every phone and every copy of the link, and the list is gone.
+- **No backups** on the server yet. *Export all lists*, in Settings, saves a Markdown copy that imports back.
 - **Not a hosted service.** You run your own server (see [Getting started](#getting-started)).
 
 ## Privacy in short
@@ -42,10 +43,10 @@ First a server, then the two phones.
 
 Then, on the phones:
 
-1. On the first phone, open the setup link from the guide. It creates the list.
-2. On the second phone, scan the QR code that *Add someone to this list* shows.
+1. On the first phone, open the setup link from the guide. It creates the first list.
+2. On another phone, scan the QR code that *Add someone to this list* shows.
 3. Install the app on each phone: in Firefox, **⋮ → Install**; in Chrome, **⋮ → Install app**; on an iPhone, Safari's **Share → Add to Home Screen**.
-4. Save the pairing link in a password manager.
+4. Save the list's link in a password manager.
 
 ## Using it
 
@@ -55,15 +56,17 @@ Then, on the phones:
 - **Move:** hold an item, or a section's name, for half a second, then drag.
 - **Sections:** tap a section's name to rename it or change its colour. *Add a section* is below the last one.
 - **The list:** tap its name to rename it or tint the paper.
+- **Lists:** the sheets at the top right of a list, or the back gesture, lead to the lists page: tap a list to open it, *New list* to start one, hold one to move it, or drop it at the foot to take it off this phone.
+- **Import:** *From a file* on the lists page brings in a Markdown or text list; several lines pasted into *Add item* become several items.
 - **Undo and redo:** the buttons at the bottom right.
-- **Settings**, at the bottom of the list: light or dark, a compact layout, and exporting the list.
+- **Settings**, on the lists page: your name, light or dark, a compact layout, exporting every list, and setting up another phone.
 
 [docs/using.md](docs/using.md) has everything else: quantities, suggestions, keyboard shortcuts, what each gesture does exactly.
 
 ## Good to know
 
 - **Browsers:** Firefox 121, Chrome 123, Safari 17.5 or later.
-- **Where the list lives:** in the browser's storage on each phone, and encrypted on the server. If a phone's browser data is cleared, the pairing link brings the list back. Panier asks the browser to keep the list even when space runs low; Settings shows whether it agreed.
+- **Where the lists live:** in the browser's storage on each phone, and encrypted on the server. If a phone's browser data is cleared, each list's link brings it back. Panier asks the browser to keep the lists even when space runs low; Settings shows whether it agreed.
 - **How long things stay:** ticked items show for five days, then are only suggested. Deleted items are forgotten after about six months.
 - **Size:** the server keeps up to 32 MB per list, about 88,000 changes: many years of weekly shopping for two. A full list says *List full* and keeps new changes on the phone.
 - **Updates** download in the background when the app opens. It then reloads into the new version, waiting until you're not typing, editing or dragging.
@@ -73,9 +76,10 @@ Then, on the phones:
 ## How it works
 
 - **The app** is plain HTML, CSS and JavaScript, with no framework and no build step. A service worker keeps it working offline. The font is Atkinson Hyperlegible Next, which keeps letters such as I, l and 1 apart.
-- **One key per list.** The first phone makes a random 256-bit key. Each phone derives from it the list's id, an access token and an AES-GCM encryption key. The pairing link carries the key after `#`, a part of the address browsers never send to servers.
+- **One key per list.** The phone that starts a list makes a random 256-bit key. Each phone derives from it the list's id, an access token and an AES-GCM encryption key. The list's link carries the key after `#`, a part of the address browsers never send to servers. A phone keeps an index of its lists' keys, and only the list on screen listens live.
 - **Changes.** Each change is encrypted on the phone, padded to 256 bytes so its size doesn't give away a name's length, and sent to the server. The server keeps them in order and pushes new ones to the other phone over a WebSocket.
-- **Merging.** Each field, such as an item's name, section, position or tick, keeps its latest write. Both phones can edit offline and end up with the same list. Undo only reverses what the other phone hasn't changed since.
+- **Merging.** Each field, such as an item's name, section, position or tick, keeps its latest write. Every phone can edit offline and they end up with the same list. Undo only reverses what nobody else has changed since.
+- **People.** Each phone writes itself onto each list it has, with the name given in Settings, inside the encrypted list. Removing someone means a new key: the list is copied under it and the old one closed on the server.
 - **Two servers**, with the same API and the same tests:
   - **Cloudflare Workers**: a Durable Object with its own SQLite database per list, asleep between changes.
   - **Go**: one program using only the standard library, with a file per list, and the app built in.
@@ -115,11 +119,9 @@ On every push to `main` and every pull request, GitHub runs the Go tests, the up
 
 ## Next
 
-Bigger features change how lists are stored and shared, so each starts with a short design note, agreed before building:
+Bigger features change how lists are stored and shared, so each starts with a short design note, agreed before building, like [docs/roadmap.md](docs/roadmap.md) for several lists and more people:
 
 - encrypted backups kept on the server;
-- more people, and several lists, each shared with different people;
-- removing a person or phone from a list, by changing its key;
 - recurring lists or sections, such as a weekly shop;
 - sub-sections, such as fruit and vegetables, or cleaning;
 - folding a section;

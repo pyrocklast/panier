@@ -39,7 +39,8 @@
 :root[data-theme="dark"] { color-scheme: dark; }
 /* The list's colour, chosen under its name while renaming it (theme.js sets data-list
    before the page draws): the paper, its lines and its quiet text take a tint of it, the
-   title its deep shade. Without one, the paper is white. */
+   title its deep shade. Without one, the paper is white. The lists page (data-view) isn't
+   paper but the surface the lists lie on, so it takes no list's colour. */
 :root[data-list] {
   --tint: 20%; --tint-dark: 14%; /* how much of the colour the paper takes, in light and dark */
   --bg: light-dark(color-mix(in oklab, var(--list) var(--tint), #ffffff), color-mix(in oklab, var(--list) var(--tint-dark), #111513));
@@ -82,7 +83,13 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* The list's name, a page title: in the same place as Settings' own, renamed with a tap */
 /* Names and rows are tapped, held and dragged rather than selected */
 :is(.list-head, .sec-head, .item) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-.list-head { margin: -4px 0 0; display: flex; font-size: 1.625rem; line-height: 1.4; color: var(--title); }
+.list-top { display: flex; align-items: flex-start; gap: 4px; margin: -4px 0 0; }
+.list-head { flex: 1; min-width: 0; margin: 0; display: flex; font-size: 1.625rem; line-height: 1.4; color: var(--title); }
+/* The way to the lists page, at the right of the list's name: two sheets, one on the other */
+.lists-btn { flex: none; margin: 0 -10px 0 0; color: var(--title); }
+/* While the name is edited, the cross that takes the list off this phone stands in its place */
+.list-top.editing .lists-btn { display: none; }
+.list-top .bin { flex: none; width: 44px; height: 44px; margin: 0 -10px 0 0; }
 .list-name { flex: 1; min-width: 0; padding: 4px 0; overflow-wrap: anywhere; cursor: text; outline: none; border-radius: 5px; }
 .list-name.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 currentColor; border-radius: 0; }
 #list { display: flex; flex-direction: column; gap: 28px; }
@@ -307,10 +314,64 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   .item, .box, #basket-toggle .chev { transition: none; }
 }
 
-/* Welcome */
-#welcome { padding-block: 22vh 48px; display: flex; flex-direction: column; gap: 12px; } /* over main's own spacing, in either layout */
-.welcome h1 { margin: 0; font-size: 1.625rem; letter-spacing: -0.01em; }
-.welcome p { margin: 0 0 20px; }
+/* The lists page: a plain surface, not paper, with each list on it as a sheet in its own
+   tint, ruled like the list: its name, what's left to get, and the first two of those.
+   The sheets lie flat; only a sheet being dragged lifts. */
+:root[data-view="lists"] { --bg: light-dark(#eef1ee, #0b0e0c); --slot: light-dark(#e3e7e4, #070908); }
+.lists-top { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin: -4px -8px 0 0; }
+.lists-top h1 { margin: 0; font-size: 1.625rem; line-height: 1.4; letter-spacing: -0.01em; }
+.lists-msg { margin: 0; }
+.sheets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.sheets:empty { display: none; }
+.sheet-card { border-radius: 12px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.sheet-open {
+  --paper: light-dark(#ffffff, #151a17); --rule: light-dark(#e4e7e4, #2a312e); --deep: var(--ink); --quiet: var(--muted);
+  display: flex; flex-direction: column; width: 100%; box-sizing: border-box; padding: 12px 16px 4px; border: 0; border-radius: 12px;
+  background: var(--paper); color: var(--ink); text-align: left; cursor: pointer; box-shadow: 0 0 0 1px light-dark(rgb(20 30 25 / 0.06), rgb(255 255 255 / 0.04));
+  transition: background-color 0.2s;
+}
+.sheet-card[data-color] .sheet-open {
+  --paper: light-dark(color-mix(in oklab, var(--list) 20%, #ffffff), color-mix(in oklab, var(--list) 14%, #111513));
+  --rule: light-dark(color-mix(in oklab, var(--list) 33%, #ffffff), color-mix(in oklab, var(--list) 25%, #111513));
+  --deep: light-dark(color-mix(in oklab, var(--list) 62%, #000000), var(--list));
+  --quiet: light-dark(color-mix(in oklab, var(--list) 55%, #1d2421), color-mix(in oklab, var(--list) 45%, #e6ebe8));
+}
+.sheet-card[data-color="green"] { --list: var(--green); }
+.sheet-card[data-color="teal"] { --list: var(--teal); }
+.sheet-card[data-color="blue"] { --list: var(--blue); }
+.sheet-card[data-color="long"] { --list: var(--long); }
+.sheet-card[data-color="plum"] { --list: var(--plum); }
+.sheet-card[data-color="rose"] { --list: var(--rose); }
+.sheet-card[data-color="look"] { --list: var(--look); }
+.sheet-card[data-color="olive"] { --list: var(--olive); }
+.sheet-open:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.sheet-head { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; }
+.sheet-name { flex: 1; min-width: 0; font-weight: 700; color: var(--deep); overflow-wrap: anywhere; }
+.sheet-count { flex: none; color: var(--quiet); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.sheet-item { display: flex; align-items: center; gap: 12px; min-height: 36px; border-top: 1px solid var(--rule); font-size: 0.875rem; overflow-wrap: anywhere; }
+.sheet-item::before { content: ""; flex: none; width: 13px; height: 13px; box-sizing: border-box; border: 1.5px solid var(--quiet); border-radius: 3px; }
+.sheet-card.pressing .sheet-open { background-color: color-mix(in oklab, var(--paper) 92%, var(--ink)); transition: background-color 0.3s 0.12s; }
+.sheet-card.lifted { position: relative; z-index: 2; transform: scale(1.02); box-shadow: var(--float); transition: transform 0.15s, box-shadow 0.15s; }
+.sheet-card.ghost { background: none !important; box-shadow: var(--float); }
+.sheet-card.placeholder { background-color: var(--slot); }
+.sheet-card.placeholder > * { visibility: hidden; }
+.sheet-card.placeholder.away { background-color: transparent; }
+/* New list: a blank sheet, its edge dashed, written on like Add a section */
+.new-list { box-sizing: border-box; min-height: 56px; padding: 0 0 0 14px; border: 1.5px dashed var(--tear); border-radius: 12px; }
+.new-list:focus-within { border-style: solid; border-color: var(--ink); }
+#new-list { font-weight: 700; }
+#new-list::placeholder { font-weight: 400; }
+.lists-foot { display: flex; margin: -8px 0 0 -8px; }
+/* While a sheet is dragged, dropping it here takes the list off this phone */
+.remove-drop {
+  display: none; position: fixed; z-index: 15; left: max(16px, (100vw - 34rem) / 2 + 16px); right: max(16px, (100vw - 34rem) / 2 + 16px);
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px)); min-height: 64px; place-items: center; box-sizing: border-box;
+  border: 2px dashed var(--danger); border-radius: 12px; background: var(--bg); color: var(--danger); font-weight: 700;
+  transition: background-color 0.15s;
+}
+:root.dragging-sheet .remove-drop { display: grid; }
+.remove-drop.over { background: color-mix(in oklab, var(--danger) 14%, var(--bg)); }
+
 .setup { display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: 0.875rem; }
 .setup-row { display: flex; gap: 8px; }
 .setup input {
@@ -318,6 +379,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   background: var(--press); color: var(--ink); font: inherit; font-size: 1.0625rem; letter-spacing: 0.04em;
 }
 .setup input:focus { outline: 2px solid var(--ess); outline-offset: 0; }
+.lists :is(.setup input) { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); } /* on the lists page's grey, a white field */
 
 /* Buttons */
 .btn {
@@ -325,6 +387,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   font-weight: 700; cursor: pointer;
 }
 .btn.primary { background: var(--ess); color: var(--surface); }
+.btn.danger { background: var(--danger); color: light-dark(#ffffff, #1b201e); }
 
 /* Pairing sheet */
 .sheet {
@@ -341,6 +404,11 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .actions { display: flex; gap: 8px; margin-top: 16px; }
 .actions .btn { flex: 1; }
 .close { position: absolute; top: 14px; right: 14px; }
+/* Who's on a list, and the two ways to take it away from them */
+.people { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.people p { margin: 0 0 4px; }
+.more { display: flex; flex-wrap: wrap; gap: 0 4px; margin-left: -8px; }
+#delete-open { color: var(--danger); }
 
 /* Settings: a page of its own over the list, its parts between ruled lines */
 .sheet.page {
@@ -373,12 +441,27 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 12px; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.sizes { list-style: none; margin: 0 0 12px; padding: 0; }
+.sizes li { display: flex; justify-content: space-between; gap: 16px; padding: 4px 0; }
+.sizes span:last-child { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+.field { display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: 0.875rem; }
+.field input {
+  height: 48px; padding: 0 14px; box-sizing: border-box; border: 0; border-radius: 12px;
+  background: var(--press); color: var(--ink); font: inherit; font-size: 1.0625rem;
+}
+.field input:focus { outline: 2px solid var(--ess); outline-offset: 0; }
 
 /* Compact layout, chosen in Settings: every row 44 px, tighter gaps, titles of 20 px.
    Everything you tap stays at least 44 px tall. */
 [data-layout="compact"] main.wrap { padding-top: 12px; gap: 12px; }
 [data-layout="compact"] #list { gap: 20px; }
-[data-layout="compact"] .list-head { margin: 0; font-size: 1.25rem; }
+[data-layout="compact"] .list-top { margin: 0; }
+[data-layout="compact"] .list-head, [data-layout="compact"] .lists-top h1 { font-size: 1.25rem; }
+[data-layout="compact"] .sheets { gap: 8px; }
+[data-layout="compact"] .sheet-open { padding-block: 10px; }
+[data-layout="compact"] .sheet-head { padding-bottom: 0; }
+[data-layout="compact"] .sheet-item { display: none; }
+[data-layout="compact"] .new-list { min-height: 48px; }
 [data-layout="compact"] .list-name { padding: 8px 0; }
 [data-layout="compact"] .page-head h2 { font-size: 1.25rem; }
 [data-layout="compact"] .sec-head { min-height: 44px; }

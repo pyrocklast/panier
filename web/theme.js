@@ -16,6 +16,13 @@
   };
   window.panierTheme = function (t) { set("data-theme", t === "light" || t === "dark" ? t : ""); bars(); };
   window.panierLayout = function (l) { set("data-layout", l === "compact" ? l : ""); };
+  // The lists page isn't paper: it takes no list's colour, and the colour stays stored
+  // for the next list opened.
+  window.panierView = function (v) {
+    set("data-view", v);
+    if (v) root.removeAttribute("data-list");
+    bars();
+  };
   window.panierList = function (c) {
     if ((root.getAttribute("data-list") || "") === c) return;
     set("data-list", c);
@@ -25,7 +32,10 @@
   try {
     window.panierTheme(localStorage.getItem("panier-theme"));
     window.panierLayout(localStorage.getItem("panier-layout"));
-    set("data-list", localStorage.getItem("panier-list-colour"));
+    // The app opens on the last list used, or on the lists page when there's none.
+    var index = JSON.parse(localStorage.getItem("panier2") || "null");
+    if (index && index.open) set("data-list", localStorage.getItem("panier-list-colour"));
+    else set("data-view", "lists");
   } catch (e) {}
   document.addEventListener("DOMContentLoaded", bars);
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", bars);

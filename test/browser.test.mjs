@@ -55,6 +55,11 @@ function watch(page, errors) {
   });
 }
 
+// What a phone stores: its index of lists, and the list on screen, or last on screen.
+const index = pg => pg.evaluate(() => JSON.parse(localStorage.getItem("panier2")));
+const stored = pg => pg.evaluate(() => JSON.parse(localStorage.getItem("panier2:" + JSON.parse(localStorage.getItem("panier2")).open)));
+const openKey = pg => pg.evaluate(() => { const ix = JSON.parse(localStorage.getItem("panier2")); return ix.lists.find(e => e.lid === ix.open).key; });
+
 // Two phones sharing a new list: A creates it, B joins with the pairing link.
 async function pair(options) {
   const errors = [];
@@ -62,7 +67,7 @@ async function pair(options) {
   await A.page.goto(BASE + "/#setup=" + SETUP.toLowerCase());
   await A.page.locator("#pair").waitFor();
   await A.page.click("#pair-close");
-  const key = await A.page.evaluate(() => JSON.parse(localStorage.getItem("panier")).key);
+  const key = await openKey(A.page);
   await B.page.goto(BASE + "/#k=" + key);
   await B.page.locator("#app").waitFor();
   return {
@@ -192,20 +197,17 @@ test("a link opened in a tab where the app is already open is followed", async (
   const errors = [];
   const { ctx, page: a } = await phone(errors);
   await a.goto(BASE + "/");
-  await a.locator("#welcome").waitFor();
+  await a.locator("#lists").waitFor();
+  assert.ok(await a.locator("#setup-form").isVisible(), "the first time, the lists page asks for the setup code");
   await a.evaluate(c => { location.hash = "setup=" + c.toLowerCase(); }, SETUP); // pasted into the address bar
   await a.locator("#pair").waitFor();
   assert.ok(await a.locator("#app").isVisible(), "a setup link starts the list");
   await a.click("#pair-close");
-  await a.evaluate(() => { location.hash = "k=" + "B".repeat(43); });
-  await a.locator("#switch").waitFor();
-  assert.ok(await a.locator("#switch").isVisible(), "a link to another list asks first");
-  await a.click("#switch-cancel");
   await ctx.close();
   assert.deepEqual(errors, []);
 });
 
-test("a link to another list asks before this phone leaves its own", async () => {
+test("a link to another list adds it beside this one, and keeps what this one hasn't sent", async () => {
   const t = await pair();
   const { a, A } = t;
   await add(a, "ess", "Milk");
@@ -215,39 +217,32 @@ test("a link to another list asks before this phone leaves its own", async () =>
   await o.locator("#pair").waitFor();
   await o.click("#pair-close");
   await add(o, "ess", "Garden hose");
-  assert.ok(await eventually(() => o.evaluate(() => { // saved, and sent, before that phone closes
-    const st = JSON.parse(localStorage.getItem("panier"));
-    return !st.outbox.length && Object.values(st.items).some(f => f.text && f.text[0] === "Garden hose");
-  })));
-  const key2 = await o.evaluate(() => JSON.parse(localStorage.getItem("panier")).key);
+  await blur(o);
+  assert.ok(await eventually(async () => { const st = await stored(o); return st && !st.outbox.length && Object.values(st.items).some(f => f.text && f.text[0] === "Garden hose"); }), "sent before that phone closes");
+  const key2 = await openKey(o);
   await other.close();
 
   await a.goto("about:blank");
   await a.goto(BASE + "/#k=" + t.key);
   await a.locator("#app").waitFor();
-  assert.equal(await a.locator("#switch").isVisible(), false, "its own link opens the list without asking");
-
-  await a.goto("about:blank"); // a link opened from another app loads the page afresh
-  await a.goto(BASE + "/#k=" + key2);
-  await a.locator("#switch").waitFor();
-  assert.equal(await a.locator("#switch-text").innerText(), "This phone will leave “Shopping list” and open the list from the link.");
-  assert.equal(await a.locator("#switch-lost").isVisible(), false);
-  await a.click("#switch-cancel");
-  assert.equal(await a.locator("#switch").isVisible(), false);
-  assert.deepEqual(await texts(a, "Essentials"), ["Milk"], "Cancel keeps the list");
-  assert.equal(await a.evaluate(() => JSON.parse(localStorage.getItem("panier")).key), t.key);
+  assert.equal((await index(a)).lists.length, 1, "its own link opens the list, and adds nothing");
 
   await offline(A, a);
   await add(a, "ess", "Bread");
   await blur(a);
   await a.goto("about:blank"); // a link opened from another app loads the page afresh
   await a.goto(BASE + "/#k=" + key2);
-  await a.locator("#switch").waitFor();
-  assert.equal(await a.locator("#switch-lost").innerText(), "1 change made here hasn't been sent yet, and would be lost.");
+  await a.locator("#app").waitFor();
   await online(A, a);
-  await a.click("#switch-ok");
-  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Garden hose", 10000), "Switch opens the other list");
-  assert.equal(await a.evaluate(() => JSON.parse(localStorage.getItem("panier")).key), key2);
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Garden hose", 10000), "the other list opens");
+  assert.equal(await openKey(a), key2);
+  assert.equal((await index(a)).lists.length, 2, "beside the first");
+  await a.click("#lists-open");
+  await a.locator("#lists").waitFor();
+  assert.ok(await eventually(async () => (await a.locator(".sheet-name").allInnerTexts()).length === 2));
+  await a.locator(".sheet-open").first().click();
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Bread", 10000), "and the first still has what it hadn't sent");
+  assert.ok(await eventually(async () => (await texts(t.b, "Essentials")).join() === "Milk,Bread", 10000), "which it now sends");
   await t.close();
 });
 
@@ -291,7 +286,7 @@ test("undo leaves the other phone's later change alone", async () => {
   await a.click("#undo");
   await sleep(300);
   assert.deepEqual(await texts(a, "Essentials"), ["Sourdough"]);
-  assert.match(await a.locator("#live").innerText(), /other phone already changed it/);
+  assert.match(await a.locator("#live").innerText(), /Nothing to undo: someone else already changed it/);
   await t.close();
 });
 
@@ -429,7 +424,7 @@ test("the list's colour, chosen under its name, tints the paper on both phones",
   const page = pg => pg.evaluate(() => [document.documentElement.dataset.list || "white", getComputedStyle(document.body).backgroundColor]);
   assert.deepEqual(await page(a), ["white", "rgb(255, 255, 255)"], "white to start with");
   await a.click("#list-name");
-  const swatches = a.locator(".list-head + .palette .swatch");
+  const swatches = a.locator(".list-top + .palette .swatch");
   assert.deepEqual(await swatches.evaluateAll(s => s.map(x => x.getAttribute("aria-label"))), ["White", "Green", "Teal", "Blue", "Indigo", "Plum", "Rose", "Amber", "Olive"], "white, then the section colours but ink");
   assert.equal(await swatches.first().getAttribute("aria-pressed"), "true");
   await swatches.nth(2).click();
@@ -644,7 +639,7 @@ test("text left in the field when the app closes is added next time", async () =
   const { A, b } = t;
   let a = t.a;
   await a.fill("#add-long", "Coffee filters");
-  assert.match(await a.evaluate(() => localStorage.getItem("panier-drafts")), /Coffee filters/);
+  assert.match(await a.evaluate(() => localStorage.getItem("panier2-drafts:" + JSON.parse(localStorage.getItem("panier2")).open)), /Coffee filters/, "kept for this list");
   await A.setOffline(true);
   const next = await A.newPage();
   watch(next, t.errors);
@@ -936,7 +931,7 @@ test("opening the app, or coming back to it, with nothing new writes nothing", a
   await t.A.addInitScript(() => {
     window.writes = 0;
     const set = Storage.prototype.setItem;
-    Storage.prototype.setItem = function (k, v) { if (k === "panier") window.writes++; return set.call(this, k, v); };
+    Storage.prototype.setItem = function (k, v) { if (k.startsWith("panier2")) window.writes++; return set.call(this, k, v); };
   });
   const caughtUp = () => a.waitForResponse(r => r.url().includes("/changes?since="));
   let pulled = caughtUp();
@@ -1202,45 +1197,57 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   await blur(a);
   await item(a, "Milk").locator(".boxcell").click();
   await sleep(1900);
+  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
+  assert.match(dl.suggestedFilename(), /^shopping-list-\d{4}-\d{2}-\d{2}\.md$/, "the list exports from its foot, named after it");
+  assert.equal(readFileSync(await dl.path(), "utf8"), [
+    "# Shopping list", "", "## Essentials <!-- ink -->", "- [ ] 2 eggs", "- [x] Milk", "", "## Look out for <!-- amber -->", "- [ ] Ripe avocados", "", "## Long term <!-- indigo -->", "",
+  ].join("\n"));
+  assert.equal(await a.locator("#settings-open").isVisible(), false, "Settings is on the lists page only");
+  await a.click("#lists-open");
   await a.click("#settings-open");
   assert.ok(await a.locator("#settings").isVisible());
 
   const bg = () => a.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  assert.equal(await bg(), "rgb(255, 255, 255)", "white paper, like this phone's light theme");
+  assert.equal(await bg(), "rgb(238, 241, 238)", "the lists page's light grey, in this phone's light theme");
   await a.locator('#settings .choices label', { hasText: "Dark" }).click();
   assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), "dark");
-  assert.equal(await bg(), "rgb(17, 21, 19)", "dark colours when Dark is chosen");
-  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "rgb(17,21,19)", "the browser's bars follow");
+  assert.equal(await bg(), "rgb(11, 14, 12)", "dark colours when Dark is chosen");
+  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "rgb(11,14,12)", "the browser's bars follow");
+  await a.click("#settings-close");
+  await a.locator(".sheet-open").first().click();
+  await a.locator("#app").waitFor();
+  assert.equal(await bg(), "rgb(17, 21, 19)", "and the list is dark paper");
   await a.reload();
   await a.locator("#app").waitFor();
   assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), "dark", "the choice is kept on this phone");
+  await a.click("#lists-open");
   await a.click("#settings-open");
   assert.ok(await a.locator('input[name="theme"][value="dark"]').isChecked());
 
-  const row = () => a.evaluate(() => Math.round(document.querySelector("#list .item").getBoundingClientRect().height));
-  assert.equal(await row(), 52, "roomy rows to start with");
+  const sheet = () => a.evaluate(() => Math.round(document.querySelector(".sheet-open").getBoundingClientRect().height));
+  const roomy = await sheet();
   await a.locator("#settings .switch").click();
-  assert.equal(await row(), 44, "the compact layout: rows of 44 px");
+  assert.ok(await sheet() < roomy - 40, "the compact layout: each list in one line");
+  await a.click("#settings-close");
+  await a.locator(".sheet-open").first().click();
+  const row = () => a.evaluate(() => Math.round(document.querySelector("#list .item").getBoundingClientRect().height));
+  assert.equal(await row(), 44, "and rows of 44 px");
   await a.reload();
   await a.locator("#app").waitFor();
   assert.equal(await row(), 44, "kept on this phone");
+  await a.click("#lists-open");
   await a.click("#settings-open");
   assert.ok(await a.locator("#compact-layout").isChecked());
   await a.locator("#settings .switch").click();
-  assert.equal(await row(), 52, "and back");
-
   await a.locator('#settings .choices label', { hasText: "Light" }).click();
-  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "rgb(255,255,255)", "and back");
+  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "rgb(238,241,238)", "and back");
 
-  assert.match(await a.locator("#size-text").innerText(), /2 items to get, 1 bought before/);
+  assert.deepEqual(await a.locator("#sizes li span:first-child").allInnerTexts(), ["Shopping list"], "the space each list takes");
+  assert.match(await a.locator("#sizes li span:last-child").innerText(), /\d+ (bytes|KB)/);
   assert.ok(await eventually(async () => /browser/.test(await a.locator("#keep-text").innerText())));
-  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
-  assert.match(dl.suggestedFilename(), /^shopping-list-\d{4}-\d{2}-\d{2}\.txt$/, "named after the list");
-  const text = readFileSync(await dl.path(), "utf8");
-  assert.match(text, /^Shopping list, /);
-  assert.match(text, /\nEssentials\n- \[ \] 2 eggs\n/);
-  assert.match(text, /\nLook out for\n- \[ \] Ripe avocados\n/);
-  assert.match(text, /\nBought before\n- \[x\] Milk\n/);
+  const [all] = await Promise.all([a.waitForEvent("download"), a.click("#export-all")]);
+  assert.match(all.suggestedFilename(), /^panier-\d{4}-\d{2}-\d{2}\.md$/, "every list in one file");
+  assert.match(readFileSync(await all.path(), "utf8"), /^# Shopping list\n/);
 
   assert.equal(await a.locator("#about-server").innerText(), new URL(BASE).host);
   assert.ok(await eventually(async () => (await a.locator("#about-version").innerText()) !== ""));
@@ -1249,7 +1256,7 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), undefined);
   await a.evaluate(() => history.back()); // the phone's back gesture
   assert.ok(await eventually(async () => !(await a.locator("#settings").isVisible())), "going back closes Settings");
-  assert.ok(await a.locator("#app").isVisible(), "and stays in the app");
+  assert.ok(await a.locator("#lists").isVisible(), "and stays on the lists page");
   await t.close();
 });
 
@@ -1266,10 +1273,13 @@ test("in French when the phone is in French", async () => {
   await blur(a);
   assert.equal(await a.getAttribute("#undo", "aria-label"), `Annuler${nb}: ajouter «${nb}2 lait${nb}»`);
 
+  await a.click("#lists-open");
+  assert.equal(await a.locator(".sheet-count").innerText(), "1 à acheter");
   await a.click("#settings-open");
   assert.equal(await a.locator("#settings-title").innerText(), "Paramètres");
-  assert.equal(await a.locator("#size-text").evaluate(el => el.textContent.split(":").pop().trim()), "1 article à acheter, 0 déjà acheté", "French counts 0 as one");
   await a.click("#settings-close");
+  await a.locator(".sheet-open").click();
+  await a.locator("#app").waitFor();
 
   assert.ok(await eventually(async () => (await texts(b, "Essentiels")).join() === "2 lait"), "sent before going offline");
   await offline(A, a);
@@ -1288,8 +1298,6 @@ test("in French when the phone is in French", async () => {
   await t.close();
 });
 
-const stored = pg => pg.evaluate(() => JSON.parse(localStorage.getItem("panier")));
-
 test("the ticked group shows the last five days, the latest first; older items are still suggested", async () => {
   const t = await pair();
   let { a } = t;
@@ -1305,9 +1313,9 @@ test("the ticked group shows the last five days, the latest first; older items a
   watch(a, t.errors);
   await a.goto(BASE + "/api/lists");
   await a.evaluate(ages => {
-    const s = JSON.parse(localStorage.getItem("panier"));
+    const k = "panier2:" + JSON.parse(localStorage.getItem("panier2")).open, s = JSON.parse(localStorage.getItem(k));
     for (const f of Object.values(s.items)) if (f.text && f.text[0] in ages) f.checkedAt[0] = Date.now() - ages[f.text[0]] * 864e5 - 1000;
-    localStorage.setItem("panier", JSON.stringify(s));
+    localStorage.setItem(k, JSON.stringify(s));
   }, ages);
   await a.goto(BASE + "/");
   await a.locator("#app").waitFor();
@@ -1327,32 +1335,29 @@ test("the stored list names each phone once and forgets items deleted over six m
   const st = await stored(a);
   const milk = Object.values(st.items).find(f => f.text && f.text[0] === "Milk");
   assert.equal(typeof milk.text[2], "number", "each field names its phone by number");
-  assert.equal(st.devs[milk.text[2]], st.dev);
+  assert.equal(st.devs[milk.text[2]], (await index(a)).dev);
 
-  // A list as an earlier version stored it, with an item deleted seven months ago and one a
-  // month ago, written while the app isn't running, as it would be after an update.
+  // An item deleted seven months ago and one a month ago, written while the app isn't running.
   await a.close();
   a = await t.A.newPage();
   watch(a, t.errors);
   await a.goto(BASE + "/api/lists"); // a plain answer from the server: the app isn't running
   await a.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem("panier"));
-    for (const f of Object.values(s.items)) for (const v of Object.values(f)) v[2] = s.devs[v[2]];
-    delete s.devs;
+    const k = "panier2:" + JSON.parse(localStorage.getItem("panier2")).open, s = JSON.parse(localStorage.getItem(k));
     const day = 864e5, gone = (text, ago) => {
       const at = Date.now() - ago;
-      return { text: [text, at, s.dev], section: ["ess", at, s.dev], pos: [9, at, s.dev], checked: [false, at, s.dev], checkedAt: [0, at, s.dev], deleted: [true, at, s.dev] };
+      return { text: [text, at, 0], section: ["ess", at, 0], pos: [9, at, 0], checked: [false, at, 0], checkedAt: [0, at, 0], deleted: [true, at, 0] };
     };
     s.items.oldGone = gone("Old", 210 * day);
     s.items.newGone = gone("Recent", 30 * day);
-    localStorage.setItem("panier", JSON.stringify(s));
+    localStorage.setItem(k, JSON.stringify(s));
   });
   await a.goto(BASE + "/");
   await a.locator("#app").waitFor();
-  assert.deepEqual(await texts(a, "Essentials"), ["Milk"], "a list stored by the earlier version opens as before");
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk"]);
   await add(a, "ess", "Bread");
   await blur(a);
-  assert.ok(await eventually(async () => Array.isArray((await stored(a)).devs)));
+  assert.ok(await eventually(async () => Object.values((await stored(a)).items).some(f => f.text && f.text[0] === "Bread")));
   const now = await stored(a);
   assert.equal(now.items.oldGone, undefined, "deleted seven months ago: forgotten");
   assert.ok(now.items.newGone, "deleted a month ago: kept");
@@ -1377,5 +1382,306 @@ test("a phone doesn't download its own changes again", async () => {
   await add(b, "long", "Bike lights");
   await blur(b);
   assert.ok(await eventually(async () => (await texts(a, "Long term")).join() === "Bike lights"), "but still gets the other phone's");
+  await t.close();
+});
+
+/* ---------- Several lists, Markdown, people, removal ---------- */
+
+// A phone alone, with a list started from the setup code.
+async function alone(options) {
+  const errors = [];
+  const P = await phone(errors, options);
+  await P.page.goto(BASE + "/#setup=" + SETUP.toLowerCase());
+  await P.page.locator("#pair").waitFor();
+  await P.page.click("#pair-close");
+  return { ...P, errors, async close() { await P.ctx.close(); assert.deepEqual(errors, [], "no errors in the page"); } };
+}
+const sheets = pg => pg.locator(".sheet-name").allInnerTexts();
+const counts = pg => pg.locator(".sheet-count").allInnerTexts();
+async function toLists(pg) {
+  await pg.click("#lists-open");
+  await pg.locator("#lists").waitFor();
+}
+async function newList(pg, name) {
+  await pg.fill("#new-list", name);
+  await pg.press("#new-list", "Enter");
+  await pg.locator("#app").waitFor();
+}
+const live = pg => pg.locator("#live").innerText();
+async function paste(pg, text) {
+  await pg.evaluate(text => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", text);
+    document.activeElement.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, text);
+}
+
+test("several lists: each a sheet on the lists page, made from a name, each syncing on its own", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await add(a, "ess", "2 milk");
+  await add(a, "ess", "Bread");
+  await add(a, "look", "Ripe avocados");
+  await blur(a);
+  await toLists(a);
+  assert.deepEqual(await sheets(a), ["Shopping list"]);
+  assert.deepEqual(await counts(a), ["3 to get"]);
+  assert.deepEqual(await a.locator(".sheet-item").allInnerTexts(), ["2 milk", "Bread"], "and the first two of them");
+  assert.equal(await a.locator(".sheet-open").getAttribute("aria-label"), "Shopping list, 3 to get");
+
+  await newList(a, "Hardware store");
+  assert.equal(await a.locator("#list-name").innerText(), "Hardware store", "a new list opens, named");
+  assert.deepEqual(await names(a), ["Essentials", "Look out for", "Long term"]);
+  await add(a, "ess", "Screws");
+  await blur(a);
+  await a.goBack(); // the phone's back gesture
+  await a.locator("#lists").waitFor();
+  assert.ok(await eventually(async () => (await sheets(a)).join() === "Shopping list,Hardware store"));
+  assert.deepEqual(await counts(a), ["3 to get", "1 to get"]);
+
+  await sleep(500);
+  assert.equal((await index(b)).lists.length, 1, "the other phone has only the list shared with it");
+  assert.deepEqual(await texts(b, "Essentials"), ["2 milk", "Bread"]);
+  await add(b, "ess", "Eggs");
+  await blur(b);
+  assert.ok(await eventually(async () => { const st = await stored(b); return !st.outbox.length && Object.values(st.items).some(f => f.text && f.text[0] === "Eggs"); }), "sent, and saved");
+  await a.locator(".sheet-open").nth(1).click();
+  await a.locator("#app").waitFor();
+  await a.goBack();
+  assert.ok(await eventually(async () => (await counts(a))[0] === "4 to get"), "a list not on screen catches up as the lists page shows");
+
+  await a.locator(".sheet-open").nth(1).click();
+  await a.reload();
+  await a.locator("#app").waitFor();
+  assert.equal(await a.locator("#list-name").innerText(), "Hardware store", "the app opens on the list last used");
+  await a.goBack();
+  await a.locator("#lists").waitFor();
+  assert.deepEqual(await sheets(a), ["Shopping list", "Hardware store"], "with the lists page under it");
+  await t.close();
+});
+
+test("lists are reordered and taken off the phone by dragging, and come back with undo", async () => {
+  const p = await alone();
+  const a = p.page;
+  await toLists(a);
+  for (const n of ["Hardware store", "Market"]) { await newList(a, n); await toLists(a); }
+  assert.deepEqual(await sheets(a), ["Shopping list", "Hardware store", "Market"]);
+
+  await a.locator(".sheet-open").nth(2).focus();
+  await a.keyboard.press("Alt+ArrowUp");
+  assert.deepEqual(await sheets(a), ["Shopping list", "Market", "Hardware store"], "Alt+↑ moves a list up");
+  assert.equal(await a.evaluate(() => document.activeElement.innerText.split("\n")[0]), "Market", "and keeps the cursor on it");
+
+  const top = (await a.locator(".sheet-card").first().boundingBox()).y;
+  await dragTo(a, a.locator(".sheet-card").nth(2), top + 5);
+  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "dragged to the top");
+  assert.deepEqual((await index(a)).lists.map(e => e.name || "Shopping list"), ["Hardware store", "Shopping list", "Market"], "and kept in that order");
+
+  await dragTo(a, a.locator(".sheet-card").nth(1), async () => (await a.locator("#remove-drop").boundingBox()).y + 20);
+  assert.deepEqual(await sheets(a), ["Hardware store", "Market"], "dropped at the foot, it's off this phone");
+  assert.equal(await a.locator("#undo-what").innerText(), "Shopping list", "undo names what it would bring back");
+  await a.click("#undo");
+  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "back where it was");
+
+  await a.locator(".sheet-open").nth(2).click();
+  await a.click("#list-name");
+  assert.equal(await a.locator(".list-top .bin").getAttribute("aria-label"), "Remove Market from this phone");
+  await a.click(".list-top .bin");
+  await a.locator("#lists").waitFor();
+  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list"], "the cross by its name takes it off too");
+  await a.click("#undo");
+  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"]);
+  await p.close();
+});
+
+test("lists come in from Markdown, from the earlier text export too, and from several pasted lines", async () => {
+  const errors = [];
+  const { ctx, page: a } = await phone(errors);
+  await a.goto(BASE + "/");
+  await a.locator("#lists").waitFor();
+  const md = "# Hardware store <!-- olive -->\n\n## Garden <!-- teal -->\n- [ ] Hose\n- [x] Seeds\n\n## Essentials\n- [ ] 2 bulbs\n";
+  await a.setInputFiles("#import-file", { name: "hardware.md", mimeType: "text/markdown", buffer: Buffer.from(md) });
+  await a.fill("#setup-code", SETUP); // the first list on a server needs its setup code
+  await a.click("#setup-form button[type=submit]");
+  await a.locator("#app").waitFor();
+  assert.equal(await a.locator("#list-name").innerText(), "Hardware store");
+  assert.equal(await a.evaluate(() => document.documentElement.dataset.list), "olive");
+  assert.deepEqual(await names(a), ["Garden", "Essentials"], "its sections, and no others");
+  assert.deepEqual(await texts(a, "Garden"), ["Hose"]);
+  assert.deepEqual(await texts(a, "Essentials"), ["2 bulbs"]);
+  assert.deepEqual(await ticked(a), [], "what was bought before isn't shown as ticked");
+  await section(a, "Garden").locator(".add-input").fill("se");
+  assert.deepEqual(await section(a, "Garden").locator(".sug .t").allInnerTexts(), ["Seeds"], "but suggested");
+  await section(a, "Garden").locator(".add-input").fill("");
+  await blur(a);
+  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
+  assert.equal(readFileSync(await dl.path(), "utf8"), md.replace("## Essentials\n", "## Essentials <!-- ink -->\n"), "and exports as it came in");
+
+  await toLists(a);
+  const txt = "Shopping list, 12 November 2026\n\nEssentials\n- [ ] 2 eggs\n\nLook out for\n- [ ] Ripe avocados\n\nBought before\n- [x] Milk\n";
+  await a.setInputFiles("#import-file", { name: "shopping-list-2026-11-12.txt", mimeType: "text/plain", buffer: Buffer.from(txt) });
+  await a.locator("#app").waitFor();
+  assert.equal(await a.locator("#list-name").innerText(), "Shopping list", "no setup code the second time");
+  assert.deepEqual(await names(a), ["Essentials", "Look out for"]);
+  assert.deepEqual(await texts(a, "Essentials"), ["2 eggs"]);
+  await a.fill("#add-ess", "mi");
+  assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Milk"]);
+
+  await a.fill("#add-ess", "");
+  await a.focus("#add-ess");
+  await paste(a, "- [ ] Butter\n- [ ] 2 eggs\nCheese\n");
+  assert.deepEqual(await texts(a, "Essentials"), ["2 eggs", "Butter", "Cheese"], "one item a line");
+  assert.ok(await eventually(async () => (await live(a)) === "Added 2 items, 1 already on the list"));
+  await blur(a);
+  await a.click("#undo");
+  assert.deepEqual(await texts(a, "Essentials"), ["2 eggs"], "in one step to undo");
+  await ctx.close();
+  assert.deepEqual(errors, []);
+});
+
+test("the people on a list: names on the share sheet, undo says who; three phones end up the same", async () => {
+  const t = await pair();
+  const { a, b, A, B } = t;
+  await toLists(b);
+  await b.click("#settings-open");
+  await b.fill("#my-name", "Alex");
+  await b.press("#my-name", "Enter");
+  await b.click("#settings-close");
+  await b.locator(".sheet-open").click();
+  await a.click("#pair-open");
+  assert.ok(await eventually(async () => (await a.locator("#members").innerText()) === "On this list: you and Alex."));
+  await a.click("#pair-close");
+
+  const C = await phone(t.errors), c = C.page;
+  await c.goto(BASE + "/#k=" + t.key);
+  await c.locator("#app").waitFor();
+  await a.click("#pair-open");
+  assert.ok(await eventually(async () => (await a.locator("#members").innerText()) === "On this list: you, Alex, and 1 phone without a name."));
+  await a.click("#pair-close");
+
+  await add(a, "ess", "Bread");
+  await blur(a);
+  await item(a, "Bread").locator(".text").click();
+  await a.keyboard.press("End");
+  await a.keyboard.type(" (sliced)");
+  await a.keyboard.press("Enter");
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).includes("Bread (sliced)")));
+  await item(b, "Bread (sliced)").locator(".text").click();
+  await b.keyboard.press("Control+A");
+  await b.keyboard.type("Sourdough");
+  await b.keyboard.press("Enter");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).includes("Sourdough")));
+  await a.click("#undo");
+  assert.ok(await eventually(async () => /Nothing to undo: Alex already changed it/.test(await live(a))), "undo says who changed it since");
+
+  const phones = [[A, a], [B, b], [C.ctx, c]];
+  for (const [ctx, pg] of phones) await offline(ctx, pg);
+  await add(a, "ess", "Apples");
+  await add(b, "ess", "Pears");
+  await add(c, "look", "Figs");
+  await item(c, "Sourdough").locator(".boxcell").click();
+  for (const [, pg] of phones) await blur(pg);
+  await sleep(1900);
+  for (const [ctx, pg] of phones) await online(ctx, pg);
+  const seen = async pg => [(await texts(pg, "Essentials")).slice().sort().join(), (await texts(pg, "Look out for")).join(), (await ticked(pg)).join()].join("|");
+  assert.ok(await eventually(async () => {
+    const all = await Promise.all(phones.map(([, pg]) => seen(pg)));
+    return all.every(x => x === "Apples,Pears|Figs|Sourdough");
+  }, 15000), "edited offline on three phones, the same list on each");
+  await C.ctx.close();
+  await t.close();
+});
+
+test("changing a list's key leaves everyone else with it closed, until they open the new link; deleting closes it for all", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await add(a, "ess", "Milk");
+  await blur(a);
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk"));
+  await a.click("#pair-open");
+  await a.click("#rekey-open");
+  await a.locator("#confirm").waitFor();
+  assert.equal(await a.locator("#confirm-title").innerText(), "Change the key of “Shopping list”?");
+  await a.click("#confirm-ok");
+  await a.locator("#pair").waitFor(); // then the new link, to share with those who keep it
+  const fresh = await openKey(a);
+  assert.notEqual(fresh, t.key);
+  await a.click("#pair-close");
+  assert.deepEqual(await texts(a, "Essentials"), ["Milk"], "this phone carries on with the list");
+  assert.ok(await eventually(async () => (await b.locator("#status").isVisible()) && (await b.locator("#status-text").innerText()) === "List closed", 8000), "the other phone is told");
+  await add(a, "ess", "Bread");
+  await blur(a);
+  await sleep(800);
+  assert.deepEqual(await texts(b, "Essentials"), ["Milk"], "and gets nothing more, though it keeps what it had");
+
+  await b.goto("about:blank");
+  await b.goto(BASE + "/#k=" + fresh);
+  await b.locator("#app").waitFor();
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk,Bread"), "the new link brings the list back");
+  await toLists(b);
+  assert.ok(await eventually(async () => (await counts(b)).join() === "Closed,2 to get"), "beside the closed one");
+
+  await b.locator(".sheet-open").nth(1).click();
+  await b.click("#pair-open");
+  await b.click("#delete-open");
+  await b.click("#confirm-ok");
+  await b.locator("#lists").waitFor();
+  assert.ok(await eventually(async () => (await counts(b)).join() === "Closed"), "deleting it takes it off this phone");
+  assert.ok(await eventually(async () => (await a.locator("#status-text").innerText()) === "List closed", 8000), "and closes it for everyone");
+  await t.close();
+});
+
+test("one link sets up another phone with every list", async () => {
+  const p = await alone();
+  const a = p.page;
+  await add(a, "ess", "Milk");
+  await toLists(a);
+  await newList(a, "Hardware store");
+  await add(a, "ess", "Screws");
+  await blur(a);
+  await toLists(a);
+  await a.click("#settings-open");
+  await a.click("#phone-open");
+  await a.locator("#pair").waitFor();
+  assert.equal(await a.locator("#pair-title").innerText(), "Set up another phone");
+  assert.equal(await a.locator("#people").isVisible(), false, "no people: it's for this phone's owner");
+  await a.click("#pair-close");
+  const keys = (await index(a)).lists.map(e => e.key);
+  const other = await phone(p.errors), o = other.page;
+  await o.goto(BASE + "/#k=" + keys.join("."));
+  await o.locator("#lists").waitFor();
+  assert.ok(await eventually(async () => (await sheets(o)).join() === "Shopping list,Hardware store" && (await counts(o)).join() === "1 to get,1 to get"));
+  await other.ctx.close();
+  await p.close();
+});
+
+test("a list changed with a newer Panier is left alone", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  // A newer Panier on a third phone asks for format 99: its change, encrypted with the list's key.
+  await b.evaluate(async key => {
+    const enc = new TextEncoder(), raw = Uint8Array.from(atob(key.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+    const base = await crypto.subtle.importKey("raw", raw, "HKDF", false, ["deriveBits", "deriveKey"]);
+    const p = info => ({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: enc.encode(info) });
+    const bytes = b => String.fromCharCode(...new Uint8Array(b));
+    const id = [...new Uint8Array(await crypto.subtle.deriveBits(p("panier list id"), base, 128))].map(x => x.toString(16).padStart(2, "0")).join("");
+    const auth = btoa(bytes(await crypto.subtle.deriveBits(p("panier auth"), base, 256))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const k = await crypto.subtle.deriveKey(p("panier encryption"), base, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+    const padded = new Uint8Array(256).fill(0x20);
+    padded.set(enc.encode(JSON.stringify({ d: "newer", o: [["@list", "format", 99, Date.now() + 1000]] })));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(id) }, k, padded));
+    const out = new Uint8Array(12 + ct.length);
+    out.set(iv);
+    out.set(ct, 12);
+    await fetch("/api/lists/" + id + "/changes", { method: "POST", headers: { Authorization: "Bearer " + auth, "Content-Type": "application/json" }, body: JSON.stringify({ changes: [btoa(bytes(out))] }) });
+  }, t.key);
+  assert.ok(await eventually(async () => (await a.locator("#status").isVisible()) && (await a.locator("#status-text").innerText()) === "Update Panier", 8000));
+  await add(a, "ess", "Milk");
+  await blur(a);
+  await sleep(800);
+  assert.equal((await stored(a)).outbox.length, 1, "nothing is sent from here");
+  await toLists(a);
+  assert.deepEqual(await counts(a), ["Update Panier to open it"]);
   await t.close();
 });
