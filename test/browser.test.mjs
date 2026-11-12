@@ -1755,3 +1755,32 @@ test("opening a list leaves it still, and from the keyboard the cursor follows b
   assert.ok(await eventually(() => a.evaluate(() => document.activeElement.id === "undo")), "a list taken off the phone leaves the cursor on undo");
   await p.close();
 });
+
+test("on a slow phone, a step back in history that lands late undoes nothing that came after it", async () => {
+  const p = await alone();
+  const a = p.page;
+  await add(a, "ess", "Milk");
+  await blur(a);
+  // Each step back lands most of a second late, as on a busy phone.
+  await a.evaluate(() => { const back = history.back.bind(history); history.back = () => setTimeout(back, 800); });
+  await a.click("#lists-open");
+  await a.locator(".sheet-open").click();
+  await sleep(1500);
+  assert.equal(await a.locator("#app").isVisible(), true, "the list opened at once stays open");
+  await a.goBack();
+  await a.locator("#lists").waitFor();
+  await a.click("#settings-open");
+  await a.click("#phone-open");
+  await sleep(1500);
+  assert.equal(await a.locator("#pair").isVisible(), true, "a sheet opened from another stays open");
+  await a.goBack();
+  assert.ok(await eventually(async () => !(await a.locator("#pair").isVisible()) && (await a.locator("#lists").isVisible())), "back closes it, onto the lists page");
+  await a.locator(".sheet-open").click();
+  await a.click("#pair-open");
+  await a.click("#pair-close");
+  await a.click("#lists-open");
+  await sleep(1500);
+  assert.equal(await a.locator("#lists").isVisible(), true, "two steps back, one after the other, land on the lists page");
+  assert.ok(await eventually(() => a.evaluate(() => JSON.stringify(history.state) === "{}")), "and history follows, one step after the other");
+  await p.close();
+});

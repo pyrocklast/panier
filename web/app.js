@@ -1423,38 +1423,50 @@ function qrSvg(textToEncode) {
   t.innerHTML = '<svg viewBox="0 0 ' + (n + 2 * pad) + " " + (n + 2 * pad) + '" shape-rendering="crispEdges" aria-hidden="true"><rect width="100%" height="100%" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>';
   return t.content.firstChild;
 }
-// Sheets (sharing, Settings) open as a step in the browser's history, so the phone's
-// back gesture closes them like a page. So does a list opened from the lists page: back
-// returns to it. Each opening is its own step, so one left over from before a reload
-// doesn't count.
-const sheetOf = () => (history.state && history.state.sheet) || null;
+// A list opened from the lists page is a step in the browser's history, and so is a sheet
+// (sharing, Settings) on top, so the phone's back gesture steps back through them like
+// pages. The app changes what it shows at once, and history follows: a step back lands a
+// moment later, so the next step waits for it, and a slow one can never land on top of
+// what came after it and undo it. Each sheet opening is its own step, so one left over
+// from before a reload doesn't count.
+let stepping = false, syncing = false;
+function follow() {
+  if (stepping || syncing) return;
+  const s = history.state || {}, dlg = document.querySelector("dialog[open]");
+  const want = [...(view === "list" ? [{ list: shownLid }] : []), ...(dlg && dlg.dataset.step ? [{ sheet: dlg.dataset.step }] : [])];
+  const top = want[want.length - 1] || {};
+  if (s.sheet ? s.sheet === top.sheet : s.list ? s.list === top.list : !want.length) return;
+  if (s.sheet || (s.list && !(want[0] && want[0].list))) { stepping = true; return history.back(); }
+  let rest = want;
+  if (s.list) { if (s.list !== want[0].list) history.replaceState(want[0], ""); rest = want.slice(1); }
+  for (const w of rest) history.pushState(w, "");
+}
 function openSheet(dlg) {
   dlg.showModal();
   dlg.focus(); // the sheet itself, not its first button, which would show a focus ring
   dlg.dataset.step = Date.now() + "-" + Math.random();
-  history.pushState({ sheet: dlg.dataset.step }, "");
+  follow();
 }
-for (const dlg of document.querySelectorAll("dialog")) {
-  dlg.addEventListener("close", () => { if (dlg.dataset.step && sheetOf() === dlg.dataset.step) history.back(); });
-}
+for (const dlg of document.querySelectorAll("dialog")) dlg.addEventListener("close", follow);
 addEventListener("popstate", () => {
-  for (const dlg of document.querySelectorAll("dialog[open]")) if (sheetOf() !== dlg.dataset.step) dlg.close();
-  if (sheetOf()) return;
-  const want = history.state && history.state.list;
-  if (want) { if (view !== "list" || shownLid !== want) showList(want, { push: false }); }
-  else if (view !== "lists") showLists();
+  if (stepping) { stepping = false; return follow(); }
+  // The back gesture, or forward: what's shown follows history.
+  const s = history.state || {};
+  syncing = true;
+  try {
+    for (const dlg of document.querySelectorAll("dialog[open]")) if (s.sheet !== dlg.dataset.step) dlg.close();
+    if (!s.sheet) {
+      if (s.list) { if (view !== "list" || shownLid !== s.list) showList(s.list); }
+      else if (view !== "lists") showLists();
+    }
+  } finally {
+    syncing = false;
+  }
+  follow();
 });
-// fn runs once the step back in history has landed; closeThen closes a sheet first.
-function afterBack(fn) {
-  let done = false;
-  const go = () => { if (done) return; done = true; removeEventListener("popstate", go); setTimeout(fn, 0); };
-  addEventListener("popstate", go);
-  setTimeout(go, 500);
-}
 function closeThen(dlg, fn) {
-  if (!dlg.open) return fn();
-  afterBack(fn);
-  dlg.close();
+  if (dlg.open) dlg.close();
+  fn();
 }
 
 // The QR code library is only needed here, so it loads the first time the sheet opens.
@@ -1946,18 +1958,15 @@ function resetView() {
   lastSplit = null;
   noteUndo(null);
 }
-function showList(lid, { push = true } = {}) {
+function showList(lid) {
   const from = document.activeElement;
-  if (!store.open(lid)) {
-    history.replaceState({}, "");
-    return showLists();
-  }
+  if (!store.open(lid)) return showLists();
   const switched = shownLid !== lid;
   if (switched) resetView();
   notice = "";
   shownLid = lid;
   view = "list";
-  if (push) history.pushState({ list: lid }, "");
+  follow();
   $("#lists").hidden = true;
   $("#app").hidden = false;
   if (window.panierView) window.panierView("");
@@ -1981,6 +1990,7 @@ function showLists() {
   const from = document.activeElement;
   if (view === "list") { closeSug(); store.leave(); }
   view = "lists";
+  follow();
   $("#app").hidden = true;
   $("#lists").hidden = false;
   if (window.panierView) window.panierView("lists");
@@ -1995,14 +2005,8 @@ function showLists() {
 }
 // Back to the lists page, as the back gesture does; then runs fn.
 function leaveList(fn) {
-  if (history.state && history.state.list) {
-    afterBack(() => { if (view !== "lists") showLists(); if (fn) fn(); });
-    history.back();
-  } else {
-    history.replaceState({}, "");
-    showLists();
-    if (fn) fn();
-  }
+  if (view !== "lists") showLists();
+  if (fn) fn();
 }
 
 // The app opens on the list last used, or the lists page when there's none. A link adds
@@ -2029,7 +2033,7 @@ async function init() {
     }
   }
   const st = history.state;
-  if (st && st.list && store.lists().some(e => e.lid === st.list)) { showList(st.list, { push: false }); store.refreshAll(); return; }
+  if (st && st.list && store.lists().some(e => e.lid === st.list)) { showList(st.list); store.refreshAll(); return; }
   begin(null);
 }
 function begin(lid, toLists = false) {
