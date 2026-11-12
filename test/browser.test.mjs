@@ -1414,7 +1414,7 @@ async function paste(pg, text) {
     dt.setData("text/plain", text);
     // Firefox leaves out the clipboard of a paste made by a script; a real paste carries it.
     const e = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
-    if (!e.clipboardData) Object.defineProperty(e, "clipboardData", { value: dt });
+    if (!e.clipboardData || !e.clipboardData.getData("text/plain")) Object.defineProperty(e, "clipboardData", { value: dt });
     document.activeElement.dispatchEvent(e);
   }, text);
 }
