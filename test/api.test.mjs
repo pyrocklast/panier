@@ -158,6 +158,47 @@ test("live updates need the token", async () => {
   await assert.rejects(openLive(l, ["panier"]).opened);
 });
 
+test("a list vouches for a new one with its token, instead of the setup code", async () => {
+  const l = await newList();
+  const vouch = (token, by = l.id) => {
+    const id = randomBytes(16).toString("hex"), auth = b64u(randomBytes(32));
+    return fetch(BASE + "/api/lists", { method: "POST", headers: { ...auth_(token), "Content-Type": "application/json" }, body: JSON.stringify({ id, auth, by }) })
+      .then(res => ({ status: res.status, list: { id, token: auth, url: BASE + "/api/lists/" + id } }));
+  };
+  const auth_ = token => (token ? auth(token) : {});
+  assert.equal((await vouch(b64u(randomBytes(32)))).status, 403, "a wrong token can't vouch");
+  assert.equal((await vouch(null)).status, 400, "nor can no token");
+  assert.equal((await vouch(l.token, randomBytes(16).toString("hex"))).status, 403, "nor a list that doesn't exist");
+  const made = await vouch(l.token);
+  assert.equal(made.status, 201);
+  assert.equal((await post(made.list, ["QUJD"])).status, 200, "the new list works");
+  const again = await vouch(made.list.token, made.list.id);
+  assert.equal(again.status, 201, "and can vouch in turn");
+});
+
+test("a closed list loses its changes and refuses everything", async () => {
+  const l = await newList();
+  await post(l, ["QUJD", "REVG"]);
+  const live = openLive(l, ["panier", l.token]);
+  await live.opened;
+  assert.equal(await live.next(), "2");
+  const close = token => fetch(l.url, { method: "DELETE", headers: auth(token) });
+  assert.equal((await close(b64u(randomBytes(32)))).status, 401, "only with its token");
+  assert.equal((await close(l.token)).status, 204);
+  assert.equal(await live.next(), "closed", "phones listening are told");
+  assert.equal((await get(l)).status, 410);
+  assert.equal((await post(l, ["R0hJ"])).status, 410);
+  assert.equal((await close(l.token)).status, 204, "closing again changes nothing");
+  await assert.rejects(openLive(l, ["panier", l.token]).opened, "no more live updates");
+  const res = await fetch(BASE + "/api/lists", {
+    method: "POST", headers: { ...auth(l.token), "Content-Type": "application/json" },
+    body: JSON.stringify({ id: randomBytes(16).toString("hex"), auth: b64u(randomBytes(32)), by: l.id }),
+  });
+  assert.equal(res.status, 403, "a closed list can't vouch");
+  const create = await fetch(BASE + "/api/lists", { method: "POST", headers: { "X-Setup-Code": SETUP }, body: JSON.stringify({ id: l.id, auth: b64u(randomBytes(32)) }) });
+  assert.equal(create.status, 409, "and its id stays taken");
+});
+
 test("a full list refuses more changes", { skip: !process.env.FULL }, async () => {
   const l = await newList();
   const big = Array(15).fill("A".repeat(16 * 1024));

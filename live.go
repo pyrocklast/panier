@@ -111,6 +111,11 @@ func (sv *server) live(w http.ResponseWriter, r *http.Request, l *list) {
 		case <-done:
 			return
 		case n := <-ch:
+			if n < 0 { // the list was closed
+				ws.send(opText, []byte("closed"))
+				ws.send(opClose, binary.BigEndian.AppendUint16(nil, 1000))
+				return
+			}
 			if ws.send(opText, []byte(strconv.Itoa(n))) != nil {
 				return
 			}

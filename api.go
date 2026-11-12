@@ -37,6 +37,7 @@ type server struct {
 func (sv *server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/lists", sv.createList)
+	mux.HandleFunc("DELETE /api/lists/{id}", sv.withList(sv.closeList, false))
 	mux.HandleFunc("GET /api/lists/{id}/changes", sv.withList(sv.getChanges, false))
 	mux.HandleFunc("POST /api/lists/{id}/changes", sv.withList(sv.postChanges, false))
 	mux.HandleFunc("GET /api/lists/{id}/live", sv.withList(sv.live, true))
@@ -77,19 +78,16 @@ func decodeToken(s string) ([]byte, bool) {
 	return b, err == nil && len(b) == 32
 }
 
-// createList registers a new list. It needs the server's setup code, so only the
-// person who installed the server can create lists; the id and token come from the
-// list key, which never leaves the phones.
+// createList registers a new list: with the server's setup code, so only the person
+// who installed the server can start the first one, or vouched for by a list already
+// here, named in "by", with its token in the Authorization header. A list made that
+// way joins the family of the list that vouched, which holds maxFamily lists at most.
+// The id and token come from the list key, which never leaves the phones.
 func (sv *server) createList(w http.ResponseWriter, r *http.Request) {
-	code := r.Header.Get("X-Setup-Code")
-	if subtle.ConstantTimeCompare([]byte(normalizeCode(code)), []byte(sv.setupCode)) != 1 {
-		time.Sleep(setupFailDelay)
-		fail(w, http.StatusForbidden, "wrong setup code")
-		return
-	}
 	var req struct {
-		ID   string `json:"id"`
-		Auth string `json:"auth"`
+		ID   string  `json:"id"`
+		Auth string  `json:"auth"`
+		By   *string `json:"by"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&req); err != nil {
 		fail(w, http.StatusBadRequest, "bad request")
@@ -100,7 +98,33 @@ func (sv *server) createList(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "bad id or token")
 		return
 	}
-	switch err := sv.store.create(req.ID, token); {
+	root := req.ID
+	if req.By != nil {
+		voucher, ok := decodeToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+		if !idPattern.MatchString(*req.By) || *req.By == req.ID || !ok {
+			fail(w, http.StatusBadRequest, "bad voucher")
+			return
+		}
+		if root, ok = sv.store.vouch(*req.By, voucher); !ok {
+			time.Sleep(setupFailDelay)
+			fail(w, http.StatusForbidden, "that list can't vouch for a new one")
+			return
+		}
+		switch room, err := sv.store.spend(root); {
+		case err != nil:
+			log.Printf("vouch: %v", err)
+			fail(w, http.StatusInternalServerError, "could not create list")
+			return
+		case !room:
+			fail(w, http.StatusForbidden, "no more lists can be made from that list")
+			return
+		}
+	} else if subtle.ConstantTimeCompare([]byte(normalizeCode(r.Header.Get("X-Setup-Code"))), []byte(sv.setupCode)) != 1 {
+		time.Sleep(setupFailDelay)
+		fail(w, http.StatusForbidden, "wrong setup code")
+		return
+	}
+	switch err := sv.store.create(req.ID, token, root); {
 	case errors.Is(err, errExists):
 		fail(w, http.StatusConflict, "list already exists")
 	case err != nil:
@@ -137,8 +161,23 @@ func (sv *server) withList(h func(http.ResponseWriter, *http.Request, *list), li
 			fail(w, http.StatusUnauthorized, "wrong token")
 			return
 		}
+		if r.Method != http.MethodDelete && l.closed() {
+			fail(w, http.StatusGone, "this list was closed")
+			return
+		}
 		h(w, r, l)
 	}
+}
+
+// closeList deletes a list's changes for good; it then refuses everything. Anyone who
+// holds the list can close it, as anyone who holds it can empty it.
+func (sv *server) closeList(w http.ResponseWriter, r *http.Request, l *list) {
+	if err := l.close(); err != nil {
+		log.Printf("close list: %v", err)
+		fail(w, http.StatusInternalServerError, "could not close the list")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (sv *server) getChanges(w http.ResponseWriter, r *http.Request, l *list) {
@@ -177,6 +216,9 @@ func (sv *server) postChanges(w http.ResponseWriter, r *http.Request, l *list) {
 	switch {
 	case errors.Is(err, errFull):
 		fail(w, http.StatusInsufficientStorage, "this list is full")
+		return
+	case errors.Is(err, errClosed):
+		fail(w, http.StatusGone, "this list was closed")
 		return
 	case errors.Is(err, errBroken):
 		fail(w, http.StatusServiceUnavailable, "the server needs a restart")

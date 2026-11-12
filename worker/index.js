@@ -5,6 +5,12 @@
 // of the list's access token and the encrypted changes in arrival order. Like the Go
 // server, it cannot read the lists it stores.
 //
+// A list is created with the setup code, or by a phone that already holds a list here,
+// which proves it with that list's token: the new list joins the first one's family,
+// which can hold MAX_FAMILY lists in all, so a leaked link can't fill the server. A
+// list can be closed by anyone who holds it: its changes are deleted, and it refuses
+// everything after.
+//
 // Live updates use WebSockets with Cloudflare's hibernation API: between changes the
 // object sleeps and connected phones cost nothing.
 
@@ -15,6 +21,7 @@ const MAX_CHANGE = 16 * 1024; // per encrypted change
 const MAX_PER_REQUEST = 200;
 const MAX_PER_PAGE = 1000;
 const MAX_LISTENERS = 16; // live connections per list
+const MAX_FAMILY = 100; // lists made from one list created with the setup code, itself not counted
 const DEFAULT_MAX_LOG_BYTES = 32 * 1024 * 1024; // several years of use for two people
 
 const ID = /^[0-9a-f]{32}$/;
@@ -89,24 +96,24 @@ export default {
     if (url.pathname === "/api/lists") {
       return req.method === "POST" ? createList(req, env) : text(405, "method not allowed");
     }
-    const m = url.pathname.match(/^\/api\/lists\/([^/]+)\/(changes|live)$/);
+    const m = url.pathname.match(/^\/api\/lists\/([^/]+)(?:\/(changes|live))?$/);
     if (!m) return text(404, "not found");
     if (!ID.test(m[1])) return text(404, "no such list");
+    if (!m[2] && req.method !== "DELETE") return text(405, "method not allowed");
     if (Number(req.headers.get("Content-Length")) > MAX_BODY) return text(400, "request too large");
-    return env.LISTS.get(env.LISTS.idFromName(m[1])).fetch(req);
+    return list(env, m[1]).fetch(req);
   },
 };
 
-// createList registers a new list. It needs the setup code (the SETUP_CODE secret),
-// so only whoever deployed the Worker can create lists.
+const list = (env, id) => env.LISTS.get(env.LISTS.idFromName(id));
+const refuse = async (status, why) => {
+  await sleep(1000); // codes and tokens are too long to guess; this keeps automated guessing slow too
+  return text(status, why);
+};
+
+// createList registers a new list: with the setup code (the SETUP_CODE secret), or
+// vouched for by a list already here, named in "by", with its token.
 async function createList(req, env) {
-  const norm = s => (s || "").trim().toUpperCase();
-  const want = norm(env.SETUP_CODE);
-  const [a, b] = await Promise.all([sha256(encoder.encode(norm(req.headers.get("X-Setup-Code")))), sha256(encoder.encode(want))]);
-  if (!want || !crypto.subtle.timingSafeEqual(a, b)) {
-    await sleep(1000); // the code is too long to guess; this keeps automated guessing slow too
-    return text(403, "wrong setup code");
-  }
   let body;
   try {
     body = JSON.parse(await readBody(req, 4096));
@@ -116,12 +123,29 @@ async function createList(req, env) {
   if (!body || typeof body.id !== "string" || !ID.test(body.id) || typeof body.auth !== "string" || !TOKEN.test(body.auth)) {
     return text(400, "bad id or token");
   }
+  let root = body.id;
+  if (body.by !== undefined) {
+    const token = tokenOf(req, false);
+    if (typeof body.by !== "string" || !ID.test(body.by) || body.by === body.id || !token) return text(400, "bad voucher");
+    root = await list(env, body.by).vouch(toHex(await sha256(fromB64url(token))));
+    if (!root) return refuse(403, "that list can't vouch for a new one");
+    if (!(await list(env, root).spend())) return text(403, "no more lists can be made from that list");
+  } else {
+    const norm = s => (s || "").trim().toUpperCase();
+    const want = norm(env.SETUP_CODE);
+    const [a, b] = await Promise.all([sha256(encoder.encode(norm(req.headers.get("X-Setup-Code")))), sha256(encoder.encode(want))]);
+    if (!want || !crypto.subtle.timingSafeEqual(a, b)) return refuse(403, "wrong setup code");
+  }
   const hash = toHex(await sha256(fromB64url(body.auth)));
-  const created = await env.LISTS.get(env.LISTS.idFromName(body.id)).create(hash);
+  const created = await list(env, body.id).create(hash, root);
   return created ? new Response(null, { status: 201, headers: HEADERS }) : text(409, "list already exists");
 }
 
-export class List extends DurableObject {
+// Lists stored by the version before ListV2. Nothing reaches them any more; the class
+// stays until a migration deletes it, with their data, once every list has been restored.
+export class List extends DurableObject {}
+
+export class ListV2 extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
@@ -141,14 +165,46 @@ export class List extends DurableObject {
     }
   }
 
-  async create(authHex) {
+  // root is the list created with the setup code that this one descends from, or its own id.
+  async create(authHex, root) {
     if (this.meta()) return false;
     this.ctx.storage.transactionSync(() => {
       this.sql.exec("CREATE TABLE meta (k TEXT PRIMARY KEY, v)");
       this.sql.exec("CREATE TABLE changes (seq INTEGER PRIMARY KEY, data TEXT NOT NULL)");
-      this.sql.exec("INSERT INTO meta (k, v) VALUES ('auth', ?), ('size', 0)", authHex);
+      this.sql.exec("INSERT INTO meta (k, v) VALUES ('auth', ?), ('size', 0), ('root', ?), ('made', 0)", authHex, root);
     });
     return true;
+  }
+
+  // vouch returns this list's family, if sumHex is its token's hash and it isn't closed.
+  vouch(sumHex) {
+    const meta = this.meta();
+    if (!meta || meta.closed || !/^[0-9a-f]{64}$/.test(sumHex)) return null;
+    return crypto.subtle.timingSafeEqual(fromHex(sumHex), fromHex(meta.auth)) ? meta.root : null;
+  }
+
+  // spend counts one more list made in this family, if there's room. A closed list still counts.
+  spend() {
+    const meta = this.meta();
+    if (!meta || Number(meta.made) >= MAX_FAMILY) return false;
+    this.sql.exec("UPDATE meta SET v = ? WHERE k = 'made'", Number(meta.made) + 1);
+    return true;
+  }
+
+  // close deletes the changes and refuses everything from now on; phones listening are told.
+  close() {
+    this.ctx.storage.transactionSync(() => {
+      this.sql.exec("DELETE FROM changes");
+      this.sql.exec("UPDATE meta SET v = 0 WHERE k = 'size'");
+      this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('closed', 1)");
+    });
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        ws.send("closed");
+        ws.close(1000, "closed");
+      } catch (_) {}
+    }
+    return new Response(null, { status: 204, headers: HEADERS });
   }
 
   latest() {
@@ -164,6 +220,8 @@ export class List extends DurableObject {
     const sum = await sha256(fromB64url(token));
     if (!crypto.subtle.timingSafeEqual(sum, fromHex(meta.auth))) return text(401, "wrong token");
 
+    if (req.method === "DELETE") return meta.closed ? new Response(null, { status: 204, headers: HEADERS }) : this.close();
+    if (meta.closed) return text(410, "this list was closed");
     if (live) return this.live(req);
     if (req.method === "GET") return this.getChanges(req);
     if (req.method === "POST") return this.postChanges(req, meta);

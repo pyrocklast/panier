@@ -503,3 +503,89 @@ func TestFilesAreGzipped(t *testing.T) {
 		t.Fatalf("an image is sent as it is: %v", res.Header)
 	}
 }
+
+func TestCreateByVouching(t *testing.T) {
+	ts := newTestServer(t, t.TempDir())
+	create(t, ts)
+	token := func(b byte) string { return base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{b}, 32)) }
+	id := func(b byte) string { return strings.Repeat(fmt.Sprintf("%02x", b), 16) }
+	vouch := func(by, byToken string, n byte) int {
+		return do(t, "POST", ts.URL+"/api/lists", byToken, "", map[string]string{"id": id(n), "auth": token(n), "by": by}).StatusCode
+	}
+	if got := vouch(testID, token(9), 0x10); got != http.StatusForbidden {
+		t.Fatalf("wrong voucher token: got %d", got)
+	}
+	if got := vouch(id(0x99), testToken, 0x10); got != http.StatusForbidden {
+		t.Fatalf("unknown voucher: got %d", got)
+	}
+	if got := vouch(testID, "", 0x10); got != http.StatusBadRequest {
+		t.Fatalf("no voucher token: got %d", got)
+	}
+	if got := vouch(testID, testToken, 0x10); got != http.StatusCreated {
+		t.Fatalf("vouched by the first list: got %d", got)
+	}
+	// A list made by vouching can vouch in turn, within the same family's budget.
+	if got := vouch(id(0x10), token(0x10), 0x11); got != http.StatusCreated {
+		t.Fatalf("vouched by a vouched list: got %d", got)
+	}
+	for n := byte(0x12); n < 0x10+byte(maxFamily); n++ {
+		if got := vouch(id(0x11), token(0x11), n); got != http.StatusCreated {
+			t.Fatalf("list %d of the family: got %d", n-0x0f, got)
+		}
+	}
+	if got := vouch(testID, testToken, 0xf0); got != http.StatusForbidden {
+		t.Fatalf("one more than the family holds: got %d", got)
+	}
+	// Another list started with the setup code has a budget of its own.
+	if res := do(t, "POST", ts.URL+"/api/lists", "", testCode, map[string]string{"id": id(0xe0), "auth": token(0xe0)}); res.StatusCode != http.StatusCreated {
+		t.Fatalf("second setup list: got %d", res.StatusCode)
+	}
+	if got := vouch(id(0xe0), token(0xe0), 0xe1); got != http.StatusCreated {
+		t.Fatalf("vouched in the second family: got %d", got)
+	}
+}
+
+func TestCloseList(t *testing.T) {
+	dir := t.TempDir()
+	ts := newTestServer(t, dir)
+	create(t, ts)
+	list := ts.URL + "/api/lists/" + testID
+	do(t, "POST", list+"/changes", testToken, "", map[string][]string{"changes": {"QUJD"}})
+
+	conn, r, _ := wsDial(t, ts, "panier, "+testToken)
+	if op, msg := serverFrame(t, conn, r); op != opText || msg != "1" {
+		t.Fatalf("first message: %d %q", op, msg)
+	}
+	if res := do(t, "DELETE", list, base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{8}, 32)), "", nil); res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("close with a wrong token: got %d", res.StatusCode)
+	}
+	if res := do(t, "DELETE", list, testToken, "", nil); res.StatusCode != http.StatusNoContent {
+		t.Fatalf("close: got %d", res.StatusCode)
+	}
+	if op, msg := serverFrame(t, conn, r); op != opText || msg != "closed" {
+		t.Fatalf("listeners are told: %d %q", op, msg)
+	}
+	if op, _ := serverFrame(t, conn, r); op != opClose {
+		t.Fatalf("then the connection closes: got opcode %d", op)
+	}
+	for _, m := range []string{"GET", "POST"} {
+		if res := do(t, m, list+"/changes", testToken, "", map[string][]string{"changes": {"REVG"}}); res.StatusCode != http.StatusGone {
+			t.Fatalf("%s after closing: got %d", m, res.StatusCode)
+		}
+	}
+	if res := do(t, "DELETE", list, testToken, "", nil); res.StatusCode != http.StatusNoContent {
+		t.Fatalf("closing again: got %d", res.StatusCode)
+	}
+	if res := do(t, "POST", ts.URL+"/api/lists", testToken, "", map[string]string{"id": strings.Repeat("cd", 16), "auth": testToken, "by": testID}); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("a closed list can't vouch: got %d", res.StatusCode)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "lists", testID, "log")); len(b) != 0 {
+		t.Fatalf("the changes are deleted, got %q", b)
+	}
+
+	// Still closed after a restart.
+	ts2 := newTestServer(t, dir)
+	if res := do(t, "GET", ts2.URL+"/api/lists/"+testID+"/changes", testToken, "", nil); res.StatusCode != http.StatusGone {
+		t.Fatalf("after a restart: got %d", res.StatusCode)
+	}
+}
