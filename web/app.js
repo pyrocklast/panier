@@ -1314,6 +1314,7 @@ function statusInfo() {
 const listsStatus = () => (!navigator.onLine && store.lists().length
   ? { text: t("Offline"), detail: t("No connection. Your lists show as this phone last saw them.") } : null);
 function paintStatus() {
+  if (view === "list") $("#pair-open").hidden = store.status().closed || store.newerFormat(); // a closed list's link opens nothing
   const now = () => (view === "lists" ? listsStatus() : view === "list" ? statusInfo() : null);
   const info = now();
   const el = $("#status");
@@ -1354,8 +1355,6 @@ function render() {
   title.setAttribute("aria-label", t("{x}, rename", { x: name }));
   document.title = name;
   if (window.panierList) window.panierList(listColor());
-  const st = store.status();
-  $("#pair-open").hidden = st.closed || store.newerFormat(); // a closed list's link opens nothing
   computeSections();
   syncShells();
   // What the other phone changed is tinted where it is, without scrolling to it.
@@ -1767,9 +1766,10 @@ function placeSheet(y) {
   if (drag.li.nextElementSibling !== before) ul.insertBefore(drag.li, before);
 }
 function endSheetDrag() {
-  const { lid, toRemove, ghost, before } = drag;
+  const { lid, li, toRemove, ghost, before } = drag;
   const order = [...$("#sheets").children].map(c => c.dataset.lid);
   ghost.remove();
+  li.classList.remove("placeholder", "away"); // the same sheet stays on the page
   $("#remove-drop").classList.remove("over");
   document.documentElement.classList.remove("dragging-sheet");
   drag = null;
