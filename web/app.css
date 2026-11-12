@@ -239,6 +239,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--surface); box-shadow: var(--float);
   font-size: 0.875rem; line-height: 1.45;
 }
+.linkbtn.inline { min-height: 24px; padding: 0; color: var(--ink); font-size: inherit; } /* a step to take, in the words saying why */
 
 /* Undo and redo */
 .dock {
@@ -294,7 +295,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 #add-sec { font-weight: 700; } /* typed like a section name */
 #add-sec::placeholder { font-weight: 400; }
 #add-sec:focus { box-shadow: inset 0 -2px 0 var(--ink); }
-:root.dragging, :root.dragging *, :root.sorting, :root.sorting * { cursor: grabbing !important; }
+:root.dragging, :root.dragging *, :root.sorting, :root.sorting *, :root.dragging-sheet, :root.dragging-sheet * { cursor: grabbing !important; }
 
 /* Reordering sections: hold a name, then move; meanwhile each section folds to its heading */
 :root.sorting #list > .sec > :not(.sec-head) { display: none; }
@@ -318,12 +319,15 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
    tint, ruled like the list: its name, what's left to get, and the first two of those.
    The sheets lie flat; only a sheet being dragged lifts. */
 :root[data-view="lists"] { --bg: light-dark(#eef1ee, #0b0e0c); --slot: light-dark(#e3e7e4, #070908); }
-.lists-top { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin: -4px -8px 0 0; }
-.lists-top h1 { margin: 0; font-size: 1.625rem; line-height: 1.4; letter-spacing: -0.01em; }
+/* The same header as a list's: the title on the left, at the right the way to what's around it */
+.lists-top { display: flex; align-items: flex-start; gap: 4px; margin: -4px 0 0; }
+.lists-top h1 { flex: 1; min-width: 0; margin: 0; padding: 4px 0; font-size: 1.625rem; line-height: 1.4; }
 .lists-msg { margin: 0; }
 .sheets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .sheets:empty { display: none; }
-.sheet-card { border-radius: 12px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.sheet-card { list-style: none; border-radius: 12px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.sheet-first { display: contents; }
+.sheet-card.gone .sheet-name { color: var(--quiet); } /* closed, or from a newer Panier: there, but not in use */
 .sheet-open {
   --paper: light-dark(#ffffff, #151a17); --rule: light-dark(#e4e7e4, #2a312e); --deep: var(--ink); --quiet: var(--muted);
   display: flex; flex-direction: column; width: 100%; box-sizing: border-box; padding: 12px 16px 4px; border: 0; border-radius: 12px;
@@ -352,7 +356,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sheet-item::before { content: ""; flex: none; width: 13px; height: 13px; box-sizing: border-box; border: 1.5px solid var(--quiet); border-radius: 3px; }
 .sheet-card.pressing .sheet-open { background-color: color-mix(in oklab, var(--paper) 92%, var(--ink)); transition: background-color 0.3s 0.12s; }
 .sheet-card.lifted { position: relative; z-index: 2; transform: scale(1.02); box-shadow: var(--float); transition: transform 0.15s, box-shadow 0.15s; }
-.sheet-card.ghost { background: none !important; box-shadow: var(--float); }
+.sheet-card.ghost { background: none !important; box-shadow: var(--float); transition: opacity 0.15s, transform 0.15s; }
+.sheet-card.ghost.leaving { opacity: 0.5; transform: scale(0.96); } /* over the zone that takes it off the phone */
 .sheet-card.placeholder { background-color: var(--slot); }
 .sheet-card.placeholder > * { visibility: hidden; }
 .sheet-card.placeholder.away { background-color: transparent; }
@@ -361,16 +366,16 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .new-list:focus-within { border-style: solid; border-color: var(--ink); }
 #new-list { font-weight: 700; }
 #new-list::placeholder { font-weight: 400; }
-.lists-foot { display: flex; margin: -8px 0 0 -8px; }
+.lists-foot { display: flex; justify-content: center; margin: -8px 0 0; } /* as a list's foot */
 /* While a sheet is dragged, dropping it here takes the list off this phone */
 .remove-drop {
-  display: none; position: fixed; z-index: 15; left: max(16px, (100vw - 34rem) / 2 + 16px); right: max(16px, (100vw - 34rem) / 2 + 16px);
+  display: none; position: fixed; z-index: 21; left: max(16px, (100vw - 34rem) / 2 + 16px); right: max(16px, (100vw - 34rem) / 2 + 16px);
   bottom: calc(16px + env(safe-area-inset-bottom, 0px)); min-height: 64px; place-items: center; box-sizing: border-box;
   border: 2px dashed var(--danger); border-radius: 12px; background: var(--bg); color: var(--danger); font-weight: 700;
   transition: background-color 0.15s;
 }
 :root.dragging-sheet .remove-drop { display: grid; }
-.remove-drop.over { background: color-mix(in oklab, var(--danger) 14%, var(--bg)); }
+.remove-drop.over { background: color-mix(in oklab, var(--danger) 14%, var(--bg)); } /* the sheet slips under it */
 
 .setup { display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: 0.875rem; }
 .setup-row { display: flex; gap: 8px; }

@@ -585,7 +585,7 @@ export function peek(lid) {
   const l = get(lid);
   return { name: l.valueOf("@list", "name"), color: l.valueOf("@list", "color"), sections: l.sections(), items: l.items() };
 }
-export const storedSize = lid => { try { return (localStorage.getItem(ENTRY + lid) || "").length; } catch (_) { return 0; } };
+export const storedSize = lid => { try { return new Blob([localStorage.getItem(ENTRY + lid) || ""]).size; } catch (_) { return 0; } };
 export function takeFresh() {
   const ids = cur.fresh;
   cur.fresh = new Set();

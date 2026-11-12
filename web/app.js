@@ -356,7 +356,7 @@ function submitAdd(sec, leaving = false) {
 // step to undo. Names already on the list stay as they are; those bought before come back.
 // Lines ticked in Markdown ("- [x]") are kept as bought before, to be suggested.
 function addMany(sec, pasted) {
-  clearAdd(sec);
+  closeSug(); // what was typed before stays in the field
   const ops = [], seen = new Set(), old = Date.now() - RECENT_MS - 864e5;
   let added = 0, had = 0, pos = maxPos(sec);
   for (const p of pasted) {
@@ -1035,7 +1035,7 @@ function onDragMove(e) {
 }
 function dragTick() {
   if (!drag) return;
-  const y = drag.y, H = innerHeight;
+  const y = drag.y, H = drag.bottom || innerHeight;
   let dy = 0;
   if (y < 64) dy = -Math.ceil((64 - y) / 6);
   else if (y > H - 64) dy = Math.ceil((y - (H - 64)) / 6);
@@ -1297,7 +1297,10 @@ function setHist(btn, label, verb) {
 let statusTimer = 0, statusShown = "";
 function statusInfo() {
   const { online, full, closed, waiting } = store.status();
-  if (closed) return { text: t("List closed"), detail: t("Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone.") };
+  if (closed) return {
+    text: t("List closed"), detail: t("Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone."),
+    act: { label: t("Remove it from this phone"), run: () => { const lid = store.current(); leaveList(() => removeList(lid)); } },
+  };
   if (store.newerFormat()) return { text: t("Update Panier"), detail: t("This list was changed with a newer Panier, which updates itself: close the app and open it again. Nothing is sent from here meanwhile.") };
   if (online && !full) return null;
   const kept = waiting
@@ -1307,8 +1310,12 @@ function statusInfo() {
   if (!navigator.onLine) return { text: t("Offline"), detail: t("No connection. {kept}, to be sent when you're back online.", { kept }) };
   return { text: t("Can't reach the server"), detail: t("The server isn't answering. {kept}, to be sent as soon as it answers.", { kept }) };
 }
+// On the lists page, only being offline is worth saying: the lists show as last seen.
+const listsStatus = () => (!navigator.onLine && store.lists().length
+  ? { text: t("Offline"), detail: t("No connection. Your lists show as this phone last saw them.") } : null);
 function paintStatus() {
-  const info = view !== "list" ? null : statusInfo();
+  const now = () => (view === "lists" ? listsStatus() : view === "list" ? statusInfo() : null);
+  const info = now();
   const el = $("#status");
   if (!info) {
     clearTimeout(statusTimer); statusTimer = 0;
@@ -1321,12 +1328,12 @@ function paintStatus() {
   }
   const show = () => {
     statusTimer = 0;
-    const now = statusInfo();
-    if (!now) return;
-    if (statusShown !== now.text) announce(now.text + ". " + now.detail);
-    statusShown = now.text;
-    $("#status-text").textContent = now.text;
-    $("#status-detail").textContent = now.detail;
+    const s = now();
+    if (!s) return;
+    if (statusShown !== s.text) announce(s.text + ". " + s.detail);
+    statusShown = s.text;
+    $("#status-text").textContent = s.text;
+    $("#status-detail").replaceChildren(s.detail, ...(s.act ? [" ", h("button", { type: "button", class: "linkbtn inline", onclick: s.act.run }, s.act.label)] : []));
     el.hidden = false;
   };
   if (statusShown) show();
@@ -1347,6 +1354,8 @@ function render() {
   title.setAttribute("aria-label", t("{x}, rename", { x: name }));
   document.title = name;
   if (window.panierList) window.panierList(listColor());
+  const st = store.status();
+  $("#pair-open").hidden = st.closed || store.newerFormat(); // a closed list's link opens nothing
   computeSections();
   syncShells();
   // What the other phone changed is tinted where it is, without scrolling to it.
@@ -1475,6 +1484,7 @@ function paintPeople() {
   const who = [t("you"), ...named];
   if (nameless) who.push(plural(nameless, "{n} phone without a name", "{n} phones without a name"));
   $("#members").textContent = others.length ? t("On this list: {x}.", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(who) }) : t("Only you, so far.");
+  $("#rekey-open").hidden = !others.length; // removing someone needs someone to remove
 }
 $("#pair-open").addEventListener("click", () => openPair());
 $("#pair-close").addEventListener("click", () => $("#pair").close());
@@ -1517,9 +1527,9 @@ $("#confirm-cancel").addEventListener("click", () => $("#confirm").close());
 // Someone shouldn't have the list any more: it moves to a new key, and the old one is
 // closed, for everyone. The people who should keep it get the new link.
 $("#rekey-open").addEventListener("click", () => closeThen($("#pair"), () => confirmSheet({
-  title: t("Change the key of {x}?", { x: q(listName()) }),
-  text: t("Everyone who has this list loses it, on every phone but this one, though they keep what they had. Then send the new link to those who should have it."),
-  ok: t("Change the key"),
+  title: t("Remove someone from {x}?", { x: q(listName()) }),
+  text: t("The list moves to a new key. Everyone who has it now loses it, on every phone but this one, though they keep what they had. Then send the new link to those who should keep it."),
+  ok: t("Give it a new key"),
   run: async () => {
     await store.changeKey();
     announce(t("{x} has a new key", { x: listName() }));
@@ -1585,7 +1595,7 @@ function importOps(l) {
     const color = colorOk(sec.color, d ? d.color : PALETTE.find(c => !colours.has(c)) || PALETTE[0]);
     used.add(id);
     colours.add(color);
-    ops.push([key, "name", name || d.name], [key, "pos", i + 1], [key, "color", color], [key, "deleted", false]);
+    ops.push([key, "name", name || (d ? d.name : t("Untitled"))], [key, "pos", i + 1], [key, "color", color], [key, "deleted", false]);
     sec.items.forEach((it, j) => {
       const text = clean(it.text), nk = text && nameKey(text);
       if (!text || seen.has(nk)) return;
@@ -1678,18 +1688,35 @@ $("#phone-open").addEventListener("click", () => closeThen($("#settings"), () =>
 // up or down, or onto the zone at the foot that takes it off this phone.
 const listColorOk = c => (c && LIST_COLORS.some(([id]) => id === c) ? c : null);
 const countOf = e => (e.closed ? t("Closed") : e.newer ? t("Update Panier to open it") : e.toGet ? plural(e.toGet, "{n} to get", "{n} to get") : t("Nothing to get"));
-function sheetEl(e) {
-  const name = e.name || t("Shopping list"), count = countOf(e);
-  const btn = h("button", { type: "button", class: "sheet-open", "aria-label": name + ", " + count, dataset: { fk: "sheet-" + e.lid } },
-    h("span", { class: "sheet-head", "aria-hidden": "true" }, h("span", { class: "sheet-name" }, name), h("span", { class: "sheet-count" }, count)),
-    ...(e.closed || e.newer ? [] : e.first || []).map(x => { const sp = h("span"); fillText(sp, x); return h("span", { class: "sheet-item", "aria-hidden": "true" }, sp); }));
-  const li = h("li", { class: "sheet-card", "data-lid": e.lid, "data-color": listColorOk(e.color) }, btn);
-  btn.addEventListener("click", () => { if (suppressClick) { suppressClick = false; return; } showList(e.lid); });
-  btn.addEventListener("keydown", ev => {
-    if (ev.altKey && (ev.key === "ArrowUp" || ev.key === "ArrowDown")) { ev.preventDefault(); moveSheet(e.lid, ev.key === "ArrowUp" ? -1 : 1); }
-  });
-  bindPress(li, { can: () => true, start: (offY, y) => startSheetDrag(li, e.lid, offY, y) });
-  return li;
+// Each sheet keeps its element from one drawing to the next, and only what changed is
+// written, so a sheet held or focused stays as it is while the lists catch up.
+const cards = new Map(); // list id → { li, btn, name, count, first, shown }
+function cardOf(e) {
+  let c = cards.get(e.lid);
+  if (!c) {
+    const name = h("span", { class: "sheet-name" }), count = h("span", { class: "sheet-count" }), first = h("span", { class: "sheet-first", "aria-hidden": "true" });
+    const btn = h("button", { type: "button", class: "sheet-open", dataset: { fk: "sheet-" + e.lid } }, h("span", { class: "sheet-head", "aria-hidden": "true" }, name, count), first);
+    const li = h("li", { class: "sheet-card", "data-lid": e.lid }, btn);
+    btn.addEventListener("click", () => { if (suppressClick) { suppressClick = false; return; } showList(e.lid); });
+    btn.addEventListener("keydown", ev => {
+      if (ev.altKey && (ev.key === "ArrowUp" || ev.key === "ArrowDown")) { ev.preventDefault(); moveSheet(e.lid, ev.key === "ArrowUp" ? -1 : 1); }
+    });
+    bindPress(li, { can: () => true, start: (offY, y) => startSheetDrag(li, e.lid, offY, y) });
+    cards.set(e.lid, (c = { li, btn, name, count, first, shown: "" }));
+  }
+  const nm = e.name || t("Shopping list"), cnt = countOf(e), gone = !!(e.closed || e.newer), first = gone ? [] : e.first || [];
+  const shown = JSON.stringify([nm, cnt, first, e.color, gone]);
+  if (c.shown !== shown) {
+    c.shown = shown;
+    c.name.textContent = nm;
+    c.count.textContent = cnt;
+    c.first.replaceChildren(...first.map(x => { const sp = h("span"); fillText(sp, x); return h("span", { class: "sheet-item" }, sp); }));
+    c.btn.setAttribute("aria-label", nm + ", " + cnt);
+    const col = listColorOk(e.color);
+    if (col) c.li.dataset.color = col; else delete c.li.dataset.color;
+    c.li.classList.toggle("gone", gone);
+  }
+  return c.li;
 }
 // The page asks for the setup code for the first list, or when the server won't make one
 // otherwise; notice says what went wrong last, until the next thing tried.
@@ -1697,7 +1724,8 @@ let needCode = false, notice = "";
 function renderLists() {
   if (view !== "lists" || drag) return;
   const fk = activeFk(), all = store.lists(), first = !all.length;
-  $("#sheets").replaceChildren(...all.map(sheetEl));
+  setRows($("#sheets"), all.map(cardOf));
+  for (const lid of cards.keys()) if (!all.some(e => e.lid === lid)) cards.delete(lid);
   $("#new-list-form").hidden = first;
   $("#setup-form").hidden = !first && !needCode;
   const msg = notice || (needCode ? t("This server wants its setup code for this.")
@@ -1714,7 +1742,10 @@ function startSheetDrag(li, lid, offY, y) {
   const ghost = float(li.cloneNode(true), li.getBoundingClientRect(), "ghost", y - offY);
   li.classList.add("placeholder");
   document.documentElement.classList.add("dragging-sheet");
-  beginDrag({ lid, li, ghost, offY, y, toRemove: false, place: placeSheet, end: endSheetDrag });
+  const before = store.lists().map(e => e.lid).join();
+  // The page scrolls before the zone at the foot, not over it, so a sheet can go last.
+  const bottom = $("#remove-drop").getBoundingClientRect().top - 8;
+  beginDrag({ lid, li, ghost, offY, y, toRemove: false, before, bottom, place: placeSheet, end: endSheetDrag });
 }
 function placeSheet(y) {
   const zone = $("#remove-drop"), over = y > zone.getBoundingClientRect().top - 8;
@@ -1722,6 +1753,7 @@ function placeSheet(y) {
     drag.toRemove = over;
     zone.classList.toggle("over", over);
     drag.li.classList.toggle("away", over);
+    drag.ghost.classList.toggle("leaving", over);
     if (over) buzz(8);
   }
   if (over) return;
@@ -1735,14 +1767,14 @@ function placeSheet(y) {
   if (drag.li.nextElementSibling !== before) ul.insertBefore(drag.li, before);
 }
 function endSheetDrag() {
-  const { lid, toRemove, ghost } = drag;
+  const { lid, toRemove, ghost, before } = drag;
   const order = [...$("#sheets").children].map(c => c.dataset.lid);
   ghost.remove();
   $("#remove-drop").classList.remove("over");
   document.documentElement.classList.remove("dragging-sheet");
   drag = null;
   if (toRemove) return removeList(lid);
-  store.reorder(order);
+  if (order.join() !== before) store.reorder(order);
   renderLists();
 }
 function moveSheet(lid, dir) {

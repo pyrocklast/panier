@@ -52,7 +52,7 @@ Each phone can give itself a name, in Settings, written inside each of its lists
 
 ### Removing someone
 
-The link is the key, so removing someone means giving the list a new one: *Change the key* copies the list to a new one, closes the old one on the server, and shows the new link for the others. A closed list refuses everything; phones still holding it say so. *Delete for everyone* closes it without a copy. A removed person keeps what their phone already had.
+The link is the key, so removing someone means giving the list a new one: *Remove someone* copies the list to a new one, closes the old one on the server, and shows the new link for the others. A closed list refuses everything; phones still holding it say so. *Delete for everyone* closes it without a copy. A removed person keeps what their phone already had.
 
 ## Phases
 

@@ -24,9 +24,9 @@
     bars();
   };
   window.panierList = function (c) {
+    try { if ((localStorage.getItem("panier-list-colour") || "") !== c) { if (c) localStorage.setItem("panier-list-colour", c); else localStorage.removeItem("panier-list-colour"); } } catch (e) {}
     if ((root.getAttribute("data-list") || "") === c) return;
     set("data-list", c);
-    try { if (c) localStorage.setItem("panier-list-colour", c); else localStorage.removeItem("panier-list-colour"); } catch (e) {}
     bars();
   };
   try {

@@ -449,6 +449,13 @@ test("the list's colour, chosen under its name, tints the paper on both phones",
   await a.reload();
   await a.locator("#app").waitFor();
   assert.equal(await a.evaluate(() => window.firstList), "teal");
+  await a.click("#lists-open");
+  await a.fill("#new-list", "Market");
+  await a.press("#new-list", "Enter");
+  await a.locator("#app").waitFor();
+  await a.reload();
+  await a.locator("#app").waitFor();
+  assert.equal(await a.evaluate(() => window.firstList), undefined, "a white list opened after a coloured one starts white");
   await t.close();
 });
 
@@ -1455,6 +1462,11 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await a.goBack();
   assert.ok(await eventually(async () => (await counts(a))[0] === "4 to get"), "a list not on screen catches up as the lists page shows");
 
+  await offline(t.A, a);
+  assert.ok(await eventually(async () => (await a.locator("#status").isVisible()) && (await a.locator("#status-text").innerText()) === "Offline", 4000), "offline, the lists page says so");
+  await online(t.A, a);
+  assert.ok(await eventually(async () => !(await a.locator("#status").isVisible())));
+
   await a.locator(".sheet-open").nth(1).click();
   await a.reload();
   await a.locator("#app").waitFor();
@@ -1489,6 +1501,10 @@ test("lists are reordered and taken off the phone by dragging, and come back wit
   assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "back where it was");
 
   await a.locator(".sheet-open").nth(2).click();
+  await a.click("#pair-open");
+  assert.equal(await a.locator("#members").innerText(), "Only you, so far.");
+  assert.equal(await a.locator("#rekey-open").isVisible(), false, "no one to remove");
+  await a.click("#pair-close");
   await a.click("#list-name");
   assert.equal(await a.locator(".list-top .bin").getAttribute("aria-label"), "Remove Market from this phone");
   await a.click(".list-top .bin");
@@ -1532,10 +1548,12 @@ test("lists come in from Markdown, from the earlier text export too, and from se
   await a.fill("#add-ess", "mi");
   assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Milk"]);
 
-  await a.fill("#add-ess", "");
+  await a.fill("#add-ess", "Jam");
   await a.focus("#add-ess");
   await paste(a, "- [ ] Butter\n- [ ] 2 eggs\nCheese\n");
   assert.deepEqual(await texts(a, "Essentials"), ["2 eggs", "Butter", "Cheese"], "one item a line");
+  assert.equal(await a.inputValue("#add-ess"), "Jam", "and what was typed stays");
+  await a.fill("#add-ess", "");
   assert.ok(await eventually(async () => (await live(a)) === "Added 2 items, 1 already on the list"));
   await blur(a);
   await a.click("#undo");
@@ -1606,7 +1624,7 @@ test("changing a list's key leaves everyone else with it closed, until they open
   await a.click("#pair-open");
   await a.click("#rekey-open");
   await a.locator("#confirm").waitFor();
-  assert.equal(await a.locator("#confirm-title").innerText(), "Change the key of “Shopping list”?");
+  assert.equal(await a.locator("#confirm-title").innerText(), "Remove someone from “Shopping list”?");
   await a.click("#confirm-ok");
   await a.locator("#pair").waitFor(); // then the new link, to share with those who keep it
   const fresh = await openKey(a);
@@ -1633,6 +1651,11 @@ test("changing a list's key leaves everyone else with it closed, until they open
   await b.locator("#lists").waitFor();
   assert.ok(await eventually(async () => (await counts(b)).join() === "Closed"), "deleting it takes it off this phone");
   assert.ok(await eventually(async () => (await a.locator("#status-text").innerText()) === "List closed", 8000), "and closes it for everyone");
+  assert.equal(await a.locator("#pair-open").isVisible(), false, "a closed list isn't offered for sharing");
+  await a.click("#status-pill");
+  await a.click("#status-detail button");
+  await a.locator("#lists").waitFor();
+  assert.ok(await eventually(async () => (await sheets(a)).length === 0), "the closed list is taken off this phone from its status");
   await t.close();
 });
 

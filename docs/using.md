@@ -114,7 +114,7 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 
 - **Your name**, in Settings, shows to the people you share lists with. It's optional, and the server never sees it.
 - **Who's on a list** shows in *Add someone to this list*: you, the names people gave, and how many phones gave none.
-- **Change the key**, in the same place, is for when someone shouldn't have the list any more. The list moves to a new key and the old one is closed, for everyone: other phones say *List closed*, and keep what they had. Share the new link with those who should keep the list.
+- **Remove someone**, in the same place once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *List closed*, keep what they had, and offer to take it off the phone. Share the new link with those who should keep the list.
 - **Delete for everyone** closes the list on the server and takes it off this phone. Other phones say *List closed*. It can't be undone.
 - **Set up another phone**, in Settings, shows one QR code that brings every list on this phone to another.
 

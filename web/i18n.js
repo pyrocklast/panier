@@ -57,11 +57,14 @@ const FR = {
   "{n} phones without a name": ["{n} téléphone sans nom", "{n} téléphones sans nom"],
   "On this list: {x}.": "Sur cette liste" + nb + ": {x}.",
   "Only you, so far.": "Personne d’autre pour l’instant.",
-  "Change the key": "Changer la clé",
+  "Remove someone": "Retirer quelqu’un",
   "Delete for everyone": "Supprimer pour tout le monde",
-  "Change the key of {x}?": "Changer la clé de {x}" + nb + "?",
-  "Everyone who has this list loses it, on every phone but this one, though they keep what they had. Then send the new link to those who should have it.":
-    "Toutes les personnes qui ont cette liste la perdent, sur tous les téléphones sauf celui-ci, mais gardent ce qu’elles avaient. Envoyez ensuite le nouveau lien à celles qui doivent l’avoir.",
+  "Remove someone from {x}?": "Retirer quelqu’un de {x}" + nb + "?",
+  "The list moves to a new key. Everyone who has it now loses it, on every phone but this one, though they keep what they had. Then send the new link to those who should keep it.":
+    "La liste passe à une nouvelle clé. Toutes les personnes qui l’ont la perdent, sur tous les téléphones sauf celui-ci, mais gardent ce qu’elles avaient. Envoyez ensuite le nouveau lien à celles qui doivent la garder.",
+  "Give it a new key": "Lui donner une nouvelle clé",
+  "Remove it from this phone": "La retirer de ce téléphone",
+  "No connection. Your lists show as this phone last saw them.": "Pas de connexion. Vos listes s’affichent telles que ce téléphone les a vues la dernière fois.",
   "{x} has a new key": "{x} a une nouvelle clé",
   "Delete {x} for everyone?": "Supprimer {x} pour tout le monde" + nb + "?",
   "It goes from the server, and from every phone that has it as soon as they open it. This can't be undone.":
