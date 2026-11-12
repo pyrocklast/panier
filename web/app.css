@@ -260,6 +260,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   --slot: light-dark(color-mix(in oklab, var(--sec) 8%, var(--bg)), color-mix(in oklab, var(--sec) 7%, color-mix(in oklab, var(--bg) 55%, #000000)));
 }
 .item.placeholder { background-color: var(--slot); }
+/* No ruled line runs along the slot, above or below it */
+.item.placeholder, .item.placeholder + .item, .items:has(> .placeholder:last-child) ~ .add { background-image: none; }
 .item.placeholder > * { visibility: hidden; }
 .item.placeholder.away { background-color: transparent; } /* heading for the ticked items: its slot empties, nothing moves */
 
