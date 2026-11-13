@@ -414,9 +414,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .remove-drop.over { background: color-mix(in oklab, var(--danger) 14%, var(--bg)); } /* the sheet slips under it */
 
 .setup { display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: 0.875rem; }
-.setup-row { display: flex; gap: 8px; }
+.setup-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .setup input {
-  flex: 1; min-width: 0; height: 48px; padding: 0 14px; box-sizing: border-box; border: 0; border-radius: 12px;
+  flex: 1 1 12.5rem; min-width: 0; height: 48px; padding: 0 14px; box-sizing: border-box; border: 0; border-radius: 12px; /* wide enough for the code: on a narrow phone, Start goes under it */
   background: var(--press); color: var(--ink); font: inherit; font-size: 1.0625rem; letter-spacing: 0.04em;
 }
 .setup input:focus { outline: 2px solid var(--ess); outline-offset: 0; }
