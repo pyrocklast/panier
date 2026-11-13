@@ -22,9 +22,9 @@ export function float(el, rect, cls, top = rect.top) {
 // taps keep working throughout, unlike with the browser's page-wide transitions.
 const EASE = "cubic-bezier(0.4, 0, 0.2, 1)"; // gentle start, gentle landing
 const LEAVE = "cubic-bezier(0.4, 0, 1, 1)"; // gentle start, then out of view at full speed
-export const MOTION = { duration: 400, easing: EASE };
-const PACE = 0.8; // px per ms: every trip at the same speed, however long the list
-const SHORTEST = 420; // ms, so a short hop still reads as a move
+export const MOTION = { duration: 320, easing: EASE };
+const PACE = 1; // px per ms: every trip at the same speed, however long the list
+const SHORTEST = 340; // ms, so a short hop still reads as a move
 const PARTS = "#list > .sec, #basket-list";
 const ITEMS = "#list .item[data-id], #basket-list .item[data-id]";
 const ADDS = "#list > .sec > .add";
