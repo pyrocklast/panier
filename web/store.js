@@ -64,7 +64,7 @@ export const openId = () => index.open;
 // them back, but only for about six months.
 const FORGET_MS = 183 * 24 * 3600 * 1000;
 const blank = key => ({ key, clock: 0, seq: 0, items: {}, devs: [], outbox: [] });
-// The three sections a list starts with, as app.js names them, in their first order.
+// The three sections a list starts with, as model.js names them, in their first order.
 const DEFAULT_POS = { ess: 1, look: 2, long: 3 };
 const isItem = id => id[0] !== "#" && id[0] !== "@";
 const MEMBER = "@m/"; // a phone on the list: "@m/" + its id, with "on" and, if given, "name"
@@ -227,7 +227,7 @@ class List {
   summarize() {
     const e = entryOf(this.lid);
     if (!e || this.gone) return;
-    const at = i => { const f = this.s.items["#" + i.section]; return f && f.pos ? f.pos[0] : DEFAULT_POS[i.section] ?? 100; }; // as app.js orders sections
+    const at = i => { const f = this.s.items["#" + i.section]; return f && f.pos ? f.pos[0] : DEFAULT_POS[i.section] ?? 100; }; // as model.js orders sections
     const toGet = this.items().filter(i => !i.checked);
     toGet.sort((a, b) => at(a) - at(b) || (a.section < b.section ? -1 : a.section > b.section ? 1 : 0) || a.pos - b.pos || (a.id < b.id ? -1 : 1));
     const others = this.members().filter(m => !m.me);

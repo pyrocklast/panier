@@ -1,6 +1,6 @@
 // Applies what Settings chose on this phone before the page draws, so it never flashes
 // another look: the theme and the compact layout, and the list's colour as last seen here
-// (app.js keeps it up to date). Settings calls these again when they change.
+// (list.js keeps it up to date). Settings calls these again when they change.
 (function () {
   var root = document.documentElement;
   var set = function (name, value) { if (value) root.setAttribute(name, value); else root.removeAttribute(name); };

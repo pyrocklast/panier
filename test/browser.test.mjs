@@ -114,7 +114,7 @@ async function renameList(pg, to) {
   await pg.keyboard.press("Enter");
 }
 
-// Waits until nothing is gliding (see Motion in app.js), so positions measured next are final.
+// Waits until nothing is gliding (see motion.js), so positions measured next are final.
 const still = pg => pg.waitForFunction(() => !document.getAnimations().some(a => (a.id === "glide" || a.id === "fly") && a.playState === "running"));
 
 // Drags an item with the mouse to a point; returns before releasing if hold is set.

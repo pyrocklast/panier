@@ -86,7 +86,7 @@ Then, on the phones:
 
 | Folder | What's in it |
 | --- | --- |
-| [`web/`](web/) | the app: `app.js` for the screen, `store.js` for storage, encryption and sync, `md.js` for Markdown, `i18n.js` for the words |
+| [`web/`](web/) | the app, in plain modules: `app.js` starts it and moves between the lists page (`lists.js`) and a list (`list.js`); `store.js` is storage, encryption and sync; `model.js` what a list is made of; `md.js` Markdown; `i18n.js` the words; the rest, one part of the screen each |
 | [`worker/`](worker/) | the Cloudflare server |
 | `*.go` | the Go server |
 | [`deploy/install.sh`](deploy/install.sh) | the Raspberry Pi installer |

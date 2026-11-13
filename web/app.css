@@ -310,7 +310,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .drop.over .box { background: var(--muted); color: var(--surface); }
 
 /* An item on its way to its new place lifts off, travels and lands; a dragged one lands
-   where it was let go. app.js sets the duration to match the trip. */
+   where it was let go. motion.js sets the duration to match the trip. */
 .flying { animation: lift ease-in-out both; }
 .ghost.landing { animation: land ease-in both; }
 @keyframes lift { 0%, 100% { box-shadow: none; } 25%, 75% { box-shadow: var(--float); } }
@@ -344,7 +344,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 #app.readonly .box { border-color: color-mix(in oklab, var(--sec) 30%, var(--bg)); }
 #app.readonly .chk:checked + .box { opacity: 0.5; }
 
-/* Motion: items glide from app.js; this only turns the rest off when asked */
+/* Motion: items glide from motion.js; this only turns the rest off when asked */
 @media (prefers-reduced-motion: reduce) {
   .item.flash { animation: none; }
   .item, .box, #basket-toggle .chev { transition: none; }

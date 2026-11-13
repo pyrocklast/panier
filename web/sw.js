@@ -13,7 +13,8 @@
 const VERSION = "dev";
 const STATIC = "panier-static-dev";
 const CACHE = "panier-" + VERSION;
-const FILES = ["./", "app.css", "app.js", "store.js", "md.js", "i18n.js", "theme.js", "manifest.webmanifest"];
+// Every script the app loads is listed here: one left out would be missing offline (test/files.test.mjs checks).
+const FILES = ["./", "app.css", "theme.js", "app.js", "list.js", "lists.js", "model.js", "state.js", "dom.js", "press.js", "motion.js", "edit.js", "bar.js", "sheets.js", "share.js", "settings.js", "store.js", "md.js", "i18n.js", "manifest.webmanifest"];
 const STATIC_FILES = ["vendor/qrcode.js", "icon.svg", "icon-192.png", "fonts/atkinson-hyperlegible-next-400.woff2", "fonts/atkinson-hyperlegible-next-700.woff2"];
 const fresh = f => new Request(f, { cache: "reload" });
 
