@@ -2,7 +2,7 @@
 
 Shopping lists shared between phones, end-to-end encrypted, with no accounts. It runs on Cloudflare's free plan or on a Raspberry Pi at home.
 
-<p align="center"><img src="docs/screens.png" width="560" alt="Panier on two phones. Left, in light mode on green-tinted paper: the Essentials, Look out for and Long term sections. Right, in dark mode, the end of the same list, with three ticked items below a dashed line."></p>
+<p align="center"><img src="docs/screens.png" width="560" alt="Panier on two phones. Left, in light mode, the lists page: six lists as sheets of paper, each tinted its own colour, Groceries shared with Alex. Right, in dark mode, the end of the Groceries list: its sections named in their colours, and three ticked items below a dashed line, each box filled with its section’s colour."></p>
 
 ## What it is
 

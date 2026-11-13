@@ -1698,6 +1698,11 @@ test("changing a list's key leaves everyone else with it closed, until they open
   await item(b, "Milk").locator(".text").click();
   assert.equal(await b.locator(".text.editing").count(), 0, "nor to edit");
   assert.equal(await b.locator("#dock").isVisible(), false, "nor to undo");
+  assert.equal(await b.evaluate(async () => (await import("/store.js")).change("adding", [["x1", "text", "Eggs"]])), null, "nor does the store take a change");
+  await blur(b);
+  await b.keyboard.press("Control+z");
+  assert.deepEqual(await texts(b, "Essentials"), ["Milk"], "and Ctrl+Z changes nothing");
+  assert.equal(await b.evaluate(async () => (await import("/store.js")).status().waiting), 0, "nothing waits to be sent");
 
   await b.goto("about:blank");
   await b.goto(BASE + "/#k=" + fresh);
