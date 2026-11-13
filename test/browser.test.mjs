@@ -580,11 +580,11 @@ test("leaving the Add item field adds the item, and the tap still works", async 
   assert.deepEqual((await texts(a, "Essentials")).filter(x => x.toLowerCase() === "bread"), ["bread"], "a name bought before brings that item back, as typed");
   assert.ok(!(await ticked(a)).includes("Bread"), "rather than adding a copy");
 
-  await a.fill("#add-look", "MILK");
+  await a.fill("#add-look", "LEMONS"); // not Milk, which was ticked a moment ago and is about to leave for the ticked group
   await blur(a);
   await sleep(400);
   const all = (await a.locator("#list .items .text").allInnerTexts()).map(x => x.toLowerCase());
-  assert.equal(all.filter(x => x === "milk").length, 1, "a duplicate adds nothing");
+  assert.equal(all.filter(x => x === "lemons").length, 1, "a duplicate adds nothing");
   assert.equal(await a.inputValue("#add-look"), "");
   await t.close();
 });
