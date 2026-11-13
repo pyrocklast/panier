@@ -8,58 +8,84 @@
    from type, space and ruled lines, all on one left edge; a row to add sections, the
    ticked items below a tear line, and undo and redo floating at the bottom within thumb
    reach. Only what's lifted above the page has a surface and a shadow: a dragged item or
-   section, undo, the sheets. The paper takes a tint of the list's colour, if it has one.
+   section, undo, the sheets. The paper is dyed with the list's colour, if it has one.
    Settings can make every row compact. */
 :root {
   /* Each colour is light-dark(light, dark): the phone's theme picks, unless Settings
      chose one, which sets data-theme on the page. */
   color-scheme: light dark;
-  --bg: light-dark(#ffffff, #111513);      /* the page */
-  --surface: light-dark(#ffffff, #1b201e); /* what's lifted above it */
-  --press: light-dark(#eef0ee, #242a27);
-  --ink: light-dark(#1d2421, #e6ebe8);
-  --title: var(--ink);                     /* the list's name */
-  --muted: light-dark(#646e69, #98a39d);
-  --line: light-dark(#e4e7e4, #2a312e);    /* ruled lines, under names and between items */
-  --tear: light-dark(#cfd5d1, #3b443f);    /* the tear line above what's ticked */
-  --ess: light-dark(#1d2421, #e6ebe8); /* ink: Essentials, and the app's buttons */
-  --green: light-dark(#468039, #86c877);
-  --look: light-dark(#b5711a, #e9ae58);
-  --long: light-dark(#676bc0, #a7abf2);
-  --teal: light-dark(#1a7f84, #6cc9cc);
-  --rose: light-dark(#b84d6e, #f08fac);
-  --blue: light-dark(#3f72b8, #8fb6f0);
-  --olive: light-dark(#747822, #c4c86a);
-  --plum: light-dark(#8a52a6, #cfa0e6);
+  /* The eight colours, each only a hue: every tone of one (its boxes, its paper, its
+     lines, its names) is that hue at a lightness and chroma set by the role, in OKLCH, so
+     the eight weigh the same and stay rich in the dark. --k is how much colour a hue's
+     paper carries: warm hues hold more before they look loud. */
+  --h-rose: 15;   --k-rose: 1;
+  --h-look: 72;   --k-look: 1.15;
+  --h-olive: 112; --k-olive: 1;
+  --h-green: 148; --k-green: 0.95;
+  --h-teal: 198;  --k-teal: 0.8;
+  --h-blue: 254;  --k-blue: 0.85;
+  --h-long: 286;  --k-long: 0.8;
+  --h-plum: 325;  --k-plum: 0.8;
+  /* A section's colour, the ink its boxes are drawn in: dark enough to stand out on any
+     list's paper, light enough in the dark */
+  --rose:  light-dark(oklch(0.56 0.150 var(--h-rose)),  oklch(0.78 0.110 var(--h-rose)));
+  --look:  light-dark(oklch(0.58 0.125 var(--h-look)),  oklch(0.81 0.110 var(--h-look)));
+  --olive: light-dark(oklch(0.56 0.100 var(--h-olive)), oklch(0.81 0.095 var(--h-olive)));
+  --green: light-dark(oklch(0.55 0.120 var(--h-green)), oklch(0.80 0.110 var(--h-green)));
+  --teal:  light-dark(oklch(0.55 0.085 var(--h-teal)),  oklch(0.80 0.080 var(--h-teal)));
+  --blue:  light-dark(oklch(0.54 0.130 var(--h-blue)),  oklch(0.79 0.095 var(--h-blue)));
+  --long:  light-dark(oklch(0.53 0.130 var(--h-long)),  oklch(0.79 0.095 var(--h-long)));
+  --plum:  light-dark(oklch(0.53 0.130 var(--h-plum)),  oklch(0.79 0.095 var(--h-plum)));
+  /* Neutrals lean warm: paper rather than screen white, ink rather than black */
+  --white: light-dark(oklch(0.99 0.006 90), oklch(0.185 0.005 150)); /* a list without a colour */
+  --bg: var(--white);                                                   /* the page */
+  --surface: light-dark(oklch(1 0 0), oklch(0.225 0.006 150));          /* what's lifted above it */
+  --press: light-dark(oklch(0.95 0.008 90), oklch(0.25 0.007 150));
+  --ink: light-dark(oklch(0.25 0.012 150), oklch(0.93 0.008 95));
+  --title: var(--ink);                                                  /* the list's name */
+  --muted: light-dark(oklch(0.47 0.015 150), oklch(0.72 0.012 150));
+  --line: light-dark(oklch(0.91 0.008 90), oklch(0.29 0.008 150));      /* ruled lines, under names and between items */
+  --tear: light-dark(oklch(0.84 0.012 90), oklch(0.36 0.010 150));      /* the tear line above what's ticked */
+  --ess: var(--ink); /* ink: Essentials, and the app's buttons */
   --danger: light-dark(#c0392b, #ff8a80);
   --float: 0 14px 34px -10px light-dark(rgb(20 30 25 / 0.28), rgb(0 0 0 / 0.6)), 0 0 0 1px light-dark(rgb(20 30 25 / 0.06), #2f3733);
   --ff: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
-/* The list's colour, chosen under its name while renaming it (theme.js sets data-list
-   before the page draws): the paper, its lines and its quiet text take a tint of it, the
-   title its deep shade. Without one, the paper is white. The lists page (data-view) isn't
-   paper but the surface the lists lie on, so it takes no list's colour. */
-:root[data-list] {
-  --tint: 20%; --tint-dark: 14%; /* how much of the colour the paper takes, in light and dark */
-  --bg: light-dark(color-mix(in oklab, var(--list) var(--tint), #ffffff), color-mix(in oklab, var(--list) var(--tint-dark), #111513));
-  --surface: light-dark(color-mix(in oklab, var(--list) calc(var(--tint) / 2), #ffffff), color-mix(in oklab, var(--list) calc(var(--tint-dark) + 2%), #1b201e));
-  --press: light-dark(color-mix(in oklab, var(--list) calc(var(--tint) + 9%), #ffffff), color-mix(in oklab, var(--list) calc(var(--tint-dark) + 8%), #111513));
-  --line: light-dark(color-mix(in oklab, var(--list) calc(var(--tint) + 13%), #ffffff), color-mix(in oklab, var(--list) calc(var(--tint-dark) + 11%), #111513));
-  --tear: light-dark(color-mix(in oklab, var(--list) calc(var(--tint) + 31%), #ffffff), color-mix(in oklab, var(--list) calc(var(--tint-dark) + 25%), #111513));
-  --muted: light-dark(color-mix(in oklab, var(--list) 55%, #1d2421), color-mix(in oklab, var(--list) 45%, #e6ebe8));
-  --title: light-dark(color-mix(in oklab, var(--list) 62%, #000000), var(--list));
-  --look: light-dark(#a9680f, #e9ae58); /* amber, a shade deeper so its boxes stand out on tinted paper */
+/* Where a colour applies: the list (theme.js sets data-list before the page draws), a
+   sheet on the lists page, a section */
+:is(:root[data-list="rose"], .sheet-card[data-color="rose"], .sec[data-color="rose"]) { --h: var(--h-rose); --k: var(--k-rose); }
+:is(:root[data-list="look"], .sheet-card[data-color="look"], .sec[data-color="look"]) { --h: var(--h-look); --k: var(--k-look); }
+:is(:root[data-list="olive"], .sheet-card[data-color="olive"], .sec[data-color="olive"]) { --h: var(--h-olive); --k: var(--k-olive); }
+:is(:root[data-list="green"], .sheet-card[data-color="green"], .sec[data-color="green"]) { --h: var(--h-green); --k: var(--k-green); }
+:is(:root[data-list="teal"], .sheet-card[data-color="teal"], .sec[data-color="teal"]) { --h: var(--h-teal); --k: var(--k-teal); }
+:is(:root[data-list="blue"], .sheet-card[data-color="blue"], .sec[data-color="blue"]) { --h: var(--h-blue); --k: var(--k-blue); }
+:is(:root[data-list="long"], .sheet-card[data-color="long"], .sec[data-color="long"]) { --h: var(--h-long); --k: var(--k-long); }
+:is(:root[data-list="plum"], .sheet-card[data-color="plum"], .sec[data-color="plum"]) { --h: var(--h-plum); --k: var(--k-plum); }
+/* A list's colour, chosen under its name while renaming it: warm paper dyed with its hue,
+   the lines a deeper dye, the name in the hue's deep tone, the ink and quiet text leaning
+   its way. Without one, the paper is plain. The lists page (data-view) isn't paper but
+   the desk the lists lie on, so it takes no list's colour; each sheet there is dyed the
+   same as its list. */
+:is(:root[data-list], .sheet-card[data-color]) {
+  --dye: oklch(0.62 calc(0.13 * var(--k)) var(--h));
+  --paper: light-dark(color-mix(in oklab, var(--dye) 24%, oklch(0.985 0.012 85)), color-mix(in oklab, var(--dye) 24%, oklch(0.19 0.006 150)));
+  --rule: light-dark(color-mix(in oklab, var(--dye) 40%, oklch(0.985 0.012 85)), color-mix(in oklab, var(--dye) 33%, oklch(0.19 0.006 150)));
+  --deep: light-dark(oklch(0.42 0.100 var(--h)), oklch(0.86 0.085 var(--h)));
+  --quiet: light-dark(oklch(0.46 0.050 var(--h)), oklch(0.76 0.045 var(--h)));
+  --hued: light-dark(oklch(0.25 0.018 var(--h)), oklch(0.93 0.012 var(--h)));
 }
-:root[data-list="green"] { --list: var(--green); }
-:root[data-list="teal"] { --list: var(--teal); }
-:root[data-list="blue"] { --list: var(--blue); }
-:root[data-list="long"] { --list: var(--long); }
-:root[data-list="plum"] { --list: var(--plum); }
-:root[data-list="rose"] { --list: var(--rose); }
-:root[data-list="look"] { --list: var(--look); }
-:root[data-list="olive"] { --list: var(--olive); }
+:root[data-list] {
+  --bg: var(--paper);
+  --surface: light-dark(color-mix(in oklab, var(--dye) 10%, oklch(0.995 0.006 85)), color-mix(in oklab, var(--dye) 30%, oklch(0.23 0.006 150)));
+  --press: light-dark(color-mix(in oklab, var(--dye) 34%, oklch(0.985 0.012 85)), color-mix(in oklab, var(--dye) 32%, oklch(0.19 0.006 150)));
+  --line: var(--rule);
+  --tear: light-dark(color-mix(in oklab, var(--dye) 60%, oklch(0.985 0.012 85)), color-mix(in oklab, var(--dye) 48%, oklch(0.19 0.006 150)));
+  --muted: var(--quiet);
+  --title: var(--deep);
+  --ink: var(--hued);
+}
 
 body {
   margin: 0; background: var(--bg); color: var(--ink); font: 400 1.0625rem/1.4 var(--ff); -webkit-tap-highlight-color: transparent;
@@ -103,6 +129,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   flex: 1; min-width: 0; padding: 12px 0; font-weight: 700; overflow-wrap: anywhere; cursor: text; outline: none; border-radius: 5px;
 }
 .sec-name.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 var(--sec); border-radius: 0; }
+/* A section's name is written in a deep tone of its colour, so its boxes belong to it */
+.sec[data-color]:not([data-color="ess"]) .sec-name { color: light-dark(oklch(0.42 0.090 var(--h)), oklch(0.85 0.075 var(--h))); }
 .sec-head .bin { width: 44px; height: 44px; margin-right: -12px; }
 /* Colours to choose from, under a section's name or the list's while it is renamed */
 .palette { display: flex; padding: 2px 0 8px; margin-left: -10px; }
@@ -112,7 +140,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .swatch:focus-visible { outline: 2px solid var(--ink); outline-offset: -3px; border-radius: 12px; }
 /* White, the list without a colour: a ring shows where it is */
 .swatch.plain { --c: var(--muted); }
-.swatch.plain::before { background: #ffffff; box-shadow: inset 0 0 0 1.5px var(--c); }
+.swatch.plain::before { background: oklch(0.99 0.006 90); box-shadow: inset 0 0 0 1.5px var(--c); }
 .swatch.plain[aria-pressed="true"]::before { box-shadow: inset 0 0 0 1.5px var(--c), 0 0 0 2px var(--bg), 0 0 0 4px var(--c); }
 
 /* Items. Rows reach 12px into the margins, so a press, a highlight or a dragged slip has
@@ -144,12 +172,16 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   width: 21px; height: 21px; box-sizing: border-box; border-radius: 5px; border: 2px solid var(--sec);
   display: grid; place-items: center; color: transparent; transition: background-color 0.15s, border-color 0.15s, opacity 0.15s;
 }
-.chk:checked + .box { background: var(--muted); border-color: var(--muted); color: var(--surface); }
+/* Ticked, the box fills with its section's colour: the ticked group fills with the
+   colours of what's been got */
+.chk:checked + .box { background: var(--sec); border-color: var(--sec); color: var(--bg); }
 .chk:focus-visible + .box { outline: 2px solid var(--ink); outline-offset: 3px; }
 .text {
   min-width: 0; padding: 14px 0; overflow-wrap: anywhere; cursor: text;
   border-radius: 5px; outline: none;
+  color: light-dark(color-mix(in oklab, var(--sec) 28%, var(--ink)), color-mix(in oklab, var(--sec) 40%, var(--ink))); /* the ink leans to its section's colour */
 }
+:is(.add-input, .text.editing) { caret-color: var(--sec); }
 /* A name reached with the keyboard: a ring with room around the text, rounded like a row */
 :is(.list-name, .sec-name, .text):focus-visible:not(.editing) { box-shadow: inset 0 0 0 2px var(--ink); border-radius: 8px; padding-inline: 8px; margin-inline: -8px; }
 .qty { margin-right: 0.15em; font-weight: 700; font-variant-numeric: tabular-nums; } /* a quantity, a little apart */
@@ -215,7 +247,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 }
 #basket-toggle .chev { margin-left: 6px; transition: transform 0.15s; }
 #basket-count { font-variant-numeric: tabular-nums; }
-.tickmark { width: 21px; height: 21px; border-radius: 5px; background: var(--muted); color: var(--bg); display: grid; place-items: center; }
+.tickmark { width: 21px; height: 21px; border-radius: 5px; background: var(--title); color: var(--bg); display: grid; place-items: center; }
 #basket-toggle[aria-expanded="false"] .chev { transform: rotate(-90deg); }
 
 .foot { margin: 8px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 12px; }
@@ -318,40 +350,28 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   .item, .box, #basket-toggle .chev { transition: none; }
 }
 
-/* The lists page: a plain surface, not paper, with each list on it as a sheet in its own
-   tint, side by side, two to a row, three where there's room, all the same size. Each is
-   ruled like the list: its name, who else has it, the first three things to get on three
-   lines, blank or not, and how many in all. The sheets lie flat; only one being dragged
-   lifts. */
-:root[data-view="lists"] { --bg: light-dark(#eef1ee, #0b0e0c); --slot: light-dark(#e3e7e4, #070908); }
+/* The lists page: a desk a shade deeper than paper, not paper itself, with each list
+   lying on it as a sheet of its own paper, side by side, two to a row, three where there's
+   room, all the same size. Each is ruled like the list: its name, who else has it, the
+   first three things to get on three lines, blank or not, and how many in all. Only a
+   sheet being dragged lifts. */
+:root[data-view="lists"] { --bg: light-dark(oklch(0.90 0.009 85), oklch(0.135 0.004 150)); --slot: light-dark(oklch(0.87 0.010 85), oklch(0.11 0.004 150)); }
 /* The same header as a list's: the title on the left, at the right the way to what's around it */
 .lists-top { display: flex; align-items: flex-start; gap: 4px; margin: -4px 0 0; }
 .lists-top h1 { flex: 1; min-width: 0; margin: 0; padding: 4px 0; font-size: 1.625rem; line-height: 1.4; }
 .lists-msg { margin: 0; }
 .sheets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
 @media (min-width: 34rem) { .sheets { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.sheet-card { display: flex; min-width: 0; border-radius: 12px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.sheet-card {
+  --paper: var(--white); --rule: var(--line); --deep: var(--ink); --quiet: var(--muted); --hued: var(--ink); /* plain, without a colour */
+  display: flex; min-width: 0; border-radius: 12px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
 .sheet-card.gone .sheet-name { color: var(--quiet); } /* closed, or from a newer Panier: there, but not in use */
 .sheet-open {
-  --paper: light-dark(#ffffff, #151a17); --rule: light-dark(#e4e7e4, #2a312e); --deep: var(--ink); --quiet: var(--muted);
   display: flex; flex: 1; min-width: 0; box-sizing: border-box; padding: 12px 14px 10px; border: 0; border-radius: 12px;
-  background: var(--paper); color: var(--ink); text-align: left; cursor: pointer; box-shadow: 0 0 0 1px light-dark(rgb(20 30 25 / 0.06), rgb(255 255 255 / 0.04));
-  transition: background-color 0.2s;
+  background: var(--paper); color: var(--hued); text-align: left; cursor: pointer; transition: background-color 0.2s;
+  box-shadow: 0 1px 1px light-dark(oklch(0.35 0.03 85 / 0.10), oklch(0 0 0 / 0.5)), 0 3px 10px -4px light-dark(oklch(0.35 0.03 85 / 0.12), oklch(0 0 0 / 0.5)); /* paper lying on the desk */
 }
-.sheet-card[data-color] .sheet-open {
-  --paper: light-dark(color-mix(in oklab, var(--list) 20%, #ffffff), color-mix(in oklab, var(--list) 14%, #111513));
-  --rule: light-dark(color-mix(in oklab, var(--list) 33%, #ffffff), color-mix(in oklab, var(--list) 25%, #111513));
-  --deep: light-dark(color-mix(in oklab, var(--list) 62%, #000000), var(--list));
-  --quiet: light-dark(color-mix(in oklab, var(--list) 55%, #1d2421), color-mix(in oklab, var(--list) 45%, #e6ebe8));
-}
-.sheet-card[data-color="green"] { --list: var(--green); }
-.sheet-card[data-color="teal"] { --list: var(--teal); }
-.sheet-card[data-color="blue"] { --list: var(--blue); }
-.sheet-card[data-color="long"] { --list: var(--long); }
-.sheet-card[data-color="plum"] { --list: var(--plum); }
-.sheet-card[data-color="rose"] { --list: var(--rose); }
-.sheet-card[data-color="look"] { --list: var(--look); }
-.sheet-card[data-color="olive"] { --list: var(--olive); }
 .sheet-open:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .sheet-in { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .sheet-name {
@@ -437,7 +457,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* Settings: a page of its own over the list, its parts between ruled lines */
 .sheet.page {
   width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border-radius: 0;
-  background: light-dark(#ffffff, #111513); box-shadow: none; /* a page of its own, over the lists page's grey */
+  background: var(--white); box-shadow: none; /* a page of its own, plain paper over the lists page's desk */
 }
 .page-in {
   max-width: 34rem; margin-inline: auto; box-sizing: border-box; display: flex; flex-direction: column;

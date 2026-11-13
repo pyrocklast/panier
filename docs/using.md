@@ -14,7 +14,7 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 
 A phone holds any number of lists, each shared with its own people. The app opens on the list last used.
 
-- **The lists page** is reached with the sheets at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet in its own tint: its name, who else has it, the first three things to get, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
+- **The lists page** is reached with the sheets at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to get, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
 - **Open** a list with a tap.
 - **New list:** type a name on the blank sheet after the others. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
 - **Move** a list: hold it, then drag it to its new place. From a keyboard, Alt and an arrow move it one place earlier or later.
@@ -26,7 +26,8 @@ A phone holds any number of lists, each shared with its own people. The app open
 The list is written on the page itself, like paper: one left edge, ruled lines between items and under section names, and an underline where you type. Only what is lifted off the page has a shadow: something being dragged, the undo button, the sheets.
 
 - **The list's name** is the title at the top, *Shopping list* to start with. Tap it to rename it. It also names the exported file. At its right, the sheets lead to the lists page.
-- **The list's colour.** While you rename the list, colours show under its name: white and eight hues. The paper takes a light tint of the colour, the ruled lines and quieter text a deeper one, and the title a deep shade. The browser's bars follow, and the app opens in the colour without a flash of white.
+- **The list's colour.** While you rename the list, colours show under its name: white and eight hues. The paper is warm paper dyed with the colour, the ruled lines a deeper dye, the title a deep shade of it, and the writing leans its way. The browser's bars follow, and the app opens in the colour without a flash of white.
+- **The eight colours weigh the same.** Each is a single hue, and every tone of it, from paper to tick box, is that hue at a lightness set by what it's for, so no colour shouts or fades beside another, in light or dark.
 - Both phones see the name and colour, and undo puts the old ones back.
 
 ## Sections
@@ -40,7 +41,7 @@ A list starts with three sections:
 | Long term | indigo | things to get eventually |
 
 - **Rename** a section by tapping its name. Both phones see the new name. Emptying the name and leaving puts the old one back.
-- **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it at once. Its tick boxes take the colour, and its *Add item* row a deep shade of it (grey for ink, so it doesn't pass for an item).
+- **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it at once. Its name is written in a deep shade of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
 - **Add a section** with *Add a section*, below the last one. It gets the first colour not used yet. Enter or `+` adds it, the cross clears what you typed, and the cursor then moves to its *Add item* row.
 - **Delete** a section once nothing is left to get in it: while you rename it, a cross appears. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 
@@ -63,9 +64,9 @@ A list starts with three sections:
 
 ## Ticking
 
-- **Tap the square** to tick an item. A short vibration confirms it in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
+- **Tap the square** to tick an item: it fills with its section's colour. A short vibration confirms it in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row leave together and the list doesn't move under your thumb.
-- They then slide into **the ticked group**, below the sections, after a dashed tear line. It shows what was ticked in the last five days, latest first, so you can check what was bought lately. Its heading, such as *3 ticked*, folds it away.
+- They then slide into **the ticked group**, below the sections, after a dashed tear line, which fills with the colours of what's been got. It shows what was ticked in the last five days, latest first, so you can check what was bought lately. Its heading, such as *3 ticked*, folds it away.
 - Older ticked items are hidden, but still suggested when you type.
 - **Untick** an item by tapping its square: it goes back to the end of its section, or of the first section if its own was deleted.
 - **Drag** an item onto the drop zone under the ticked group's heading to tick it, or drag a ticked item into a section to put it back exactly where you drop it.

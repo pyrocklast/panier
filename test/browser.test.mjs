@@ -92,6 +92,12 @@ const ticked = async pg => (await pg.locator("#basket-list .text").allTextConten
 const exactly = text => new RegExp("^\\s*" + text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*$");
 const item = (pg, text) => pg.locator("#list .item").filter({ has: pg.locator(".text", { hasText: exactly(text) }) });
 const blur = pg => pg.evaluate(() => document.activeElement.blur());
+// A colour as the screen shows it, [r, g, b], whatever notation the browser keeps it in;
+// the page's paper; and a colour as the browser's bars are given it.
+const shown = (pg, css) => pg.evaluate(css => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = css; c.fillRect(0, 0, 1, 1); return [...c.getImageData(0, 0, 1, 1).data].slice(0, 3); }, css);
+const paperOf = async pg => shown(pg, await pg.evaluate(() => getComputedStyle(document.body).backgroundColor));
+const rgbText = c => `rgb(${c.join(",")})`;
+const spread = c => Math.max(...c) - Math.min(...c); // how coloured, rather than grey
 async function offline(ctx, pg) { await ctx.setOffline(true); await pg.evaluate(() => dispatchEvent(new Event("offline"))); }
 async function online(ctx, pg) { await ctx.setOffline(false); await pg.evaluate(() => dispatchEvent(new Event("online"))); }
 async function renameSection(pg, from, to) {
@@ -423,8 +429,10 @@ test("the list's colour, chosen under its name, tints the paper on both phones",
   const { a, b } = t;
   await add(a, "ess", "Milk");
   await blur(a);
-  const page = pg => pg.evaluate(() => [document.documentElement.dataset.list || "white", getComputedStyle(document.body).backgroundColor]);
-  assert.deepEqual(await page(a), ["white", "rgb(255, 255, 255)"], "white to start with");
+  const page = async pg => [await pg.evaluate(() => document.documentElement.dataset.list || "white"), await paperOf(pg)];
+  const [first, plain] = await page(a);
+  assert.equal(first, "white", "white to start with");
+  assert.ok(Math.min(...plain) > 240 && spread(plain) < 10, "plain paper, barely warm: " + plain);
   await a.click("#list-name");
   const swatches = a.locator(".list-top + .palette .swatch");
   assert.deepEqual(await swatches.evaluateAll(s => s.map(x => x.getAttribute("aria-label"))), ["White", "Green", "Teal", "Blue", "Indigo", "Plum", "Rose", "Amber", "Olive"], "white, then the section colours but ink");
@@ -432,10 +440,9 @@ test("the list's colour, chosen under its name, tints the paper on both phones",
   await swatches.nth(2).click();
   const [list, bg] = await page(a);
   assert.equal(list, "teal");
-  assert.notEqual(bg, "rgb(255, 255, 255)", "the paper takes a tint of it at once");
+  assert.ok(spread(bg) > 10 && bg[2] > bg[0], "the paper is dyed with it at once: " + bg);
   assert.equal(await a.locator(".list-name.editing").count(), 1, "while the name stays in editing");
-  const bar = await a.getAttribute('meta[name="theme-color"]', "content");
-  assert.equal(bar, await a.evaluate(() => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = getComputedStyle(document.body).backgroundColor; c.fillRect(0, 0, 1, 1); const d = c.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]},${d[1]},${d[2]})`; }), "the browser's bars take the paper's colour");
+  assert.equal(await a.getAttribute('meta[name="theme-color"]', "content"), rgbText(bg), "the browser's bars take the paper's colour");
   await a.keyboard.press("Enter");
   assert.ok(await eventually(async () => (await page(b))[0] === "teal"), "the other phone's paper too");
   assert.equal(await a.getAttribute("#undo", "aria-label"), "Undo changing the colour of “Shopping list”");
@@ -1216,16 +1223,18 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   await a.click("#settings-open");
   assert.ok(await a.locator("#settings").isVisible());
 
-  const bg = () => a.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  assert.equal(await bg(), "rgb(238, 241, 238)", "the lists page's light grey, in this phone's light theme");
+  const desk = await paperOf(a);
+  assert.ok(Math.min(...desk) > 200 && Math.max(...desk) < 240, "the lists page's desk, a light warm grey, in this phone's light theme: " + desk);
   await a.locator('#settings .choices label', { hasText: "Dark" }).click();
   assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), "dark");
-  assert.equal(await bg(), "rgb(11, 14, 12)", "dark colours when Dark is chosen");
-  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "rgb(11,14,12)", "the browser's bars follow");
+  const night = await paperOf(a);
+  assert.ok(Math.max(...night) < 30, "dark colours when Dark is chosen: " + night);
+  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), rgbText(night), "the browser's bars follow");
   await a.click("#settings-close");
   await a.locator(".sheet-open").first().click();
   await a.locator("#app").waitFor();
-  assert.equal(await bg(), "rgb(17, 21, 19)", "and the list is dark paper");
+  const dark = await paperOf(a);
+  assert.ok(Math.max(...dark) < 45 && dark.join() !== night.join(), "and the list is dark paper, lighter than the desk: " + dark);
   await a.reload();
   await a.locator("#app").waitFor();
   assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), "dark", "the choice is kept on this phone");
@@ -1249,7 +1258,7 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   assert.ok(await a.locator("#compact-layout").isChecked());
   await a.locator("#settings .switch").click();
   await a.locator('#settings .choices label', { hasText: "Light" }).click();
-  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), "rgb(238,241,238)", "and back");
+  assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), rgbText(desk), "and back");
 
   assert.deepEqual(await a.locator("#sizes li span:first-child").allInnerTexts(), ["Shopping list"], "the space each list takes");
   assert.match(await a.locator("#sizes li span:last-child").innerText(), /\d+ (bytes|KB)/);
