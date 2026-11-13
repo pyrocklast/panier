@@ -266,8 +266,8 @@ function step(fn, done, nothing) {
   refreshFromStore();
   scheduleSettle();
 }
-const undo = () => (view === "lists" ? undoRemove() : step(store.undo, "Undid {x}", "Nothing to undo: {x} already changed it"));
-const redo = () => { if (view === "list") step(store.redo, "Redid {x}", "Nothing to redo: {x} already changed it"); };
+const undo = () => (view === "lists" ? undoRemove() : readOnly() || step(store.undo, "Undid {x}", "Nothing to undo: {x} already changed it"));
+const redo = () => { if (view === "list" && !readOnly()) step(store.redo, "Redid {x}", "Nothing to redo: {x} already changed it"); };
 
 // Ticked items stay put briefly, then all move to the ticked group together.
 function scheduleSettle() {
@@ -280,9 +280,11 @@ function scheduleSettle() {
   }, SETTLE_MS);
 }
 
+// A row can outlive its item for a moment: deleted on another phone while this one was
+// editing. Whatever is done to it then does nothing.
 function toggle(id, checked) {
-  if (readOnly()) return;
   const it = find(id);
+  if (readOnly() || !it) return;
   const fromList = !it.checked;
   const wasSettling = settling.has(id);
   if (checked) {
@@ -382,15 +384,15 @@ function addMany(sec, pasted) {
   act(plural(added, "adding {n} item", "adding {n} items"), ops);
 }
 function del(id, opts) {
-  if (readOnly()) return;
   const it = find(id);
+  if (readOnly() || !it) return;
   settling.delete(id);
   announce(t("Deleted {x}", { x: it.text }));
   act(t("deleting {x}", { x: q(it.text) }), [[id, "deleted", true]], { ...opts, note: it.text });
 }
 function nudge(id, dir) {
-  if (readOnly()) return;
   const it = find(id);
+  if (readOnly() || !it) return;
   const list = shown(it.section);
   const other = list[list.indexOf(it) + dir];
   if (other) {
@@ -576,7 +578,7 @@ function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSave, onD
 }
 
 function editItem(span, id, x, y, caret) {
-  if (readOnly()) return;
+  if (readOnly() || !find(id)) return;
   const orig = find(id).text;
   const row = span.closest(".item");
   editInPlace(span, {
@@ -1484,9 +1486,11 @@ function openPair(all = false) {
     paintPeople();
   }
   $("#qr").replaceChildren();
+  $("#qr").hidden = false;
   $("#share-link").hidden = !navigator.share;
   openSheet($("#pair"));
-  loadQr().then(() => $("#qr").replaceChildren(qrSvg(shared))).catch(() => {}); // offline, or too long for a code: the link still copies
+  // Offline before the code's library ever loaded, or dozens of lists, too many for a code: the link still copies.
+  loadQr().then(() => $("#qr").replaceChildren(qrSvg(shared))).catch(() => { $("#qr").hidden = true; });
 }
 // Who has the list: each phone writes itself onto it, with the name its owner gave in
 // Settings, if any. The server sees none of it.

@@ -257,11 +257,13 @@ class List {
 
   /* Local changes and undo */
 
-  // change applies [[id, field, value, fallback?], ...] as one step. fallback is the value
+  // change applies [[id, field, value, fallback?], ...] as one step, unless the list is
+  // closed. fallback is the value
   // to assume when the field was never stored, such as a default section's name, so undo
   // can restore it. With a label, the step can be undone. Returns what changed as
   // [id, field, newValue, previousValue] records.
   change(label, ops) {
+    if (this.s.closed) return null; // a closed list takes nothing more
     const t = this.tick();
     const recs = [];
     for (const [id, field, value, fallback] of ops) {
@@ -540,7 +542,7 @@ class List {
   // A phone writes itself onto a list the first time it has it, with its name if it has one.
   hello() {
     const me = MEMBER + index.dev;
-    if (this.s.closed || this.valueOf(me, "on")) return; // a closed list takes nothing more
+    if (this.valueOf(me, "on")) return;
     this.change(null, [[me, "on", true], ...(index.name ? [[me, "name", index.name]] : [])]);
   }
 }

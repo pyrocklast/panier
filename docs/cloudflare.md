@@ -2,7 +2,7 @@
 
 Panier can run on Cloudflare Workers' free plan, with nothing to install or keep running yourself. GitHub deploys it each time `main` changes, after the tests pass.
 
-The free plan allows 100,000 requests and 13,000 GB-s of server time a day; a shopping list for two uses a small fraction of that. Lists stay end-to-end encrypted: Cloudflare stores only encrypted changes. [SECURITY.md](../SECURITY.md) explains what Cloudflare can and can't see.
+The free plan allows 100,000 requests and 13,000 GB-s of server time a day; a household's shopping lists use a small fraction of that. Lists stay end-to-end encrypted: Cloudflare stores only encrypted changes. [SECURITY.md](../SECURITY.md) explains what Cloudflare can and can't see.
 
 Allow about 20 minutes.
 

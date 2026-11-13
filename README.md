@@ -28,7 +28,7 @@ The server sees encrypted changes, when they're made, roughly how big they are, 
 
 ## Getting started
 
-First a server, then the two phones.
+First a server, then the phones.
 
 | | Cloudflare | Raspberry Pi |
 | --- | --- | --- |
@@ -68,7 +68,7 @@ Then, on the phones:
 - **Browsers:** Firefox 121, Chrome 123, Safari 17.5 or later.
 - **Where the lists live:** in the browser's storage on each phone, and encrypted on the server. If a phone's browser data is cleared, each list's link brings it back. Panier asks the browser to keep the lists even when space runs low; Settings shows whether it agreed.
 - **How long things stay:** ticked items show for five days, then are only suggested. Deleted items are forgotten after about six months.
-- **Size:** the server keeps up to 32 MB per list, about 88,000 changes: many years of weekly shopping for two. A full list says *List full* and keeps new changes on the phone.
+- **Size:** the server keeps up to 32 MB per list, about 88,000 changes: many years of weekly shopping for a household. A full list says *List full* and keeps new changes on the phone.
 - **Updates** download in the background when the app opens. It then reloads into the new version, waiting until you're not typing, editing or dragging.
 - **Vibration** when ticking works in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
 - **On Android**, Chrome colours the navigation bar from a single colour in the app's manifest, so it stays dark in light mode. Android's themed icons aren't used for web apps yet, though Panier has one ready.
@@ -77,7 +77,7 @@ Then, on the phones:
 
 - **The app** is plain HTML, CSS and JavaScript, with no framework and no build step. A service worker keeps it working offline. The font is Atkinson Hyperlegible Next, which keeps letters such as I, l and 1 apart.
 - **One key per list.** The phone that starts a list makes a random 256-bit key. Each phone derives from it the list's id, an access token and an AES-GCM encryption key. The list's link carries the key after `#`, a part of the address browsers never send to servers. A phone keeps an index of its lists' keys, and only the list on screen listens live.
-- **Changes.** Each change is encrypted on the phone, padded to 256 bytes so its size doesn't give away a name's length, and sent to the server. The server keeps them in order and pushes new ones to the other phone over a WebSocket.
+- **Changes.** Each change is encrypted on the phone, padded to 256 bytes so its size doesn't give away a name's length, and sent to the server. The server keeps them in order and pushes new ones to the other phones over a WebSocket.
 - **Merging.** Each field, such as an item's name, section, position or tick, keeps its latest write. Every phone can edit offline and they end up with the same list. Undo only reverses what nobody else has changed since.
 - **People.** Each phone writes itself onto each list it has, with the name given in Settings, inside the encrypted list. Removing someone means a new key: the list is copied under it and the old one closed on the server.
 - **Two servers**, with the same API and the same tests:
@@ -86,7 +86,7 @@ Then, on the phones:
 
 | Folder | What's in it |
 | --- | --- |
-| [`web/`](web/) | the app: `app.js` for the screen, `store.js` for storage, encryption and sync, `i18n.js` for the words |
+| [`web/`](web/) | the app: `app.js` for the screen, `store.js` for storage, encryption and sync, `md.js` for Markdown, `i18n.js` for the words |
 | [`worker/`](worker/) | the Cloudflare server |
 | `*.go` | the Go server |
 | [`deploy/install.sh`](deploy/install.sh) | the Raspberry Pi installer |
