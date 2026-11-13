@@ -395,14 +395,12 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sheet-card.placeholder { background-color: var(--slot); }
 .sheet-card.placeholder > * { visibility: hidden; }
 .sheet-card.placeholder.away { background-color: transparent; }
-/* New list: a blank sheet, last, its edge dashed, its name written where a list's is */
-.new-sheet { display: flex; min-width: 0; }
-.new-list { flex: 1; min-width: 0; box-sizing: border-box; align-items: flex-start; padding: 0 0 0 10px; border: 1.5px dashed var(--tear); border-radius: 12px; }
+/* New list: a blank strip across the page, under the sheets, its edge dashed, written on
+   like Add a section, with room for the name as it's typed */
+.sheets:empty { display: none; }
+.new-list { box-sizing: border-box; min-height: 56px; padding: 0 0 0 14px; border: 1.5px dashed var(--tear); border-radius: 12px; }
 .new-list:focus-within { border-style: solid; border-color: var(--ink); }
-.new-list :is(.add-plus, .add-x) { align-self: flex-start; height: 48px; }
-.new-list .add-plus { width: 30px; }
-.new-list .add-x { width: 40px; }
-#new-list { height: 48px; font-weight: 700; }
+#new-list { font-weight: 700; }
 #new-list::placeholder { font-weight: 400; }
 .lists-foot { display: flex; justify-content: center; margin: -8px 0 0; } /* as a list's foot */
 /* While a sheet is dragged, dropping it here asks to delete the list */
@@ -505,6 +503,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 [data-layout="compact"] .sheets { gap: 8px; }
 [data-layout="compact"] .sheet-open { padding-block: 10px 8px; }
 [data-layout="compact"] .sheet-first { display: none; } /* the name and the count */
+[data-layout="compact"] .new-list { min-height: 48px; }
 [data-layout="compact"] .list-name { padding: 8px 0; }
 [data-layout="compact"] .page-head h2 { font-size: 1.25rem; }
 [data-layout="compact"] .sec-head { min-height: 44px; }

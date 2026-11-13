@@ -17,7 +17,8 @@ let items = [];
 let sections = []; // the sections on screen, in order
 let sectionInfo = new Map(); // every section ever seen, for names and colours
 const settling = new Set();
-let settleTimer = null, flashId = null, renderPending = false;
+let settleTimer = null, renderPending = false;
+let flashId = null, flashQuiet = false; // the item to bring into view at the next redraw, tinted unless quiet
 const ui = { sugSec: null, sug: [], sugIndex: -1, sugCol: 0, basketOpen: true };
 let wasReadOnly = false; // as the list on screen was last drawn
 
@@ -192,6 +193,7 @@ function submitAdd(sec, leaving = false) {
   }
   const id = store.newId();
   flashId = id;
+  flashQuiet = true; // just typed, right above the field: it needs no pointing out
   announce(t("Added {x}", { x: text }));
   // A new item is unticked without saying so; "deleted: false" is what lets undo remove it.
   act(t("adding {x}", { x: q(text) }), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "deleted", false]], opts);
@@ -781,7 +783,8 @@ function render() {
   syncShells();
   // What the other phones changed is tinted where it is, without scrolling to it.
   const tint = store.takeFresh();
-  if (flashId) tint.add(flashId);
+  if (flashId && !flashQuiet) tint.add(flashId);
+  flashQuiet = false;
   const kept = new Set();
   const fill = (ul, list) => { for (const i of list) kept.add(i.id); setRows(ul, list.map(i => rowOf(i, tint.has(i.id)))); };
   for (const s of sections) fill(shells[s.id].ul, shown(s.id));

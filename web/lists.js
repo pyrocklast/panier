@@ -1,7 +1,7 @@
 // The lists page. Each list lies on it as a sheet of its own paper, the sheets side by
 // side: its name, who else has it, the first three things to get and how many there are,
 // as this phone last saw them. Tap one to open it; hold to drag it to another place, or
-// onto the zone at the foot to delete it. The blank sheet at the end starts a new list.
+// onto the zone at the foot to delete it. The blank strip under them starts a new list.
 
 import * as store from "./store.js";
 import { t, plural, q, lang } from "./i18n.js";
@@ -28,7 +28,6 @@ const countOf = e => (e.closed ? t("Closed") : e.newer ? t("Update Panier to ope
 // Each sheet keeps its element from one drawing to the next, and only what changed is
 // written, so a sheet held or focused stays as it is while the lists catch up.
 const cards = new Map(); // list id → { li, btn, name, who, first, count, shown }
-const newSheet = $("#new-sheet"); // the blank sheet, always last
 function cardOf(e) {
   let c = cards.get(e.lid);
   if (!c) {
@@ -68,9 +67,9 @@ let needCode = false, notice = "";
 export function renderLists() {
   if (state.view !== "lists" || state.drag) return;
   const fk = activeFk(), all = store.lists(), first = !all.length;
-  setRows($("#sheets"), [...all.map(cardOf), newSheet]);
+  setRows($("#sheets"), all.map(cardOf));
   for (const lid of cards.keys()) if (!all.some(e => e.lid === lid)) cards.delete(lid);
-  $("#sheets").hidden = first;
+  $("#new-list-form").hidden = first;
   $("#setup-form").hidden = !first && !needCode;
   const msg = notice || (needCode ? t("This server wants its setup code for this.")
     : first ? t("Open the link from a phone that already has a list, or start one with your server's setup code.") : "");
@@ -105,9 +104,9 @@ function placeSheet(y, x) {
   }
   if (over) return;
   const ul = $("#sheets"), gap = 6; // half the space between sheets
-  let before = newSheet;
+  let before = null;
   for (const c of ul.children) {
-    if (c === state.drag.li || c === newSheet) continue;
+    if (c === state.drag.li) continue;
     const r = c.getBoundingClientRect();
     if (y < r.top - gap || (y <= r.bottom + gap && x < r.left + r.width / 2)) { before = c; break; }
   }
@@ -115,7 +114,7 @@ function placeSheet(y, x) {
 }
 function endSheetDrag() {
   const { lid, li, toRemove, ghost, before } = state.drag;
-  const order = [...$("#sheets").children].map(c => c.dataset.lid).filter(Boolean);
+  const order = [...$("#sheets").children].map(c => c.dataset.lid);
   ghost.remove();
   li.classList.remove("placeholder", "away"); // the same sheet stays on the page
   $("#remove-drop").classList.remove("over");
@@ -189,7 +188,7 @@ export function undoRemove() {
   renderLists();
 }
 
-// A new list starts from a name, typed on the blank sheet. The server makes it on the
+// A new list starts from a name, typed on the blank strip. The server makes it on the
 // strength of a list this phone already has there; the first needs the setup code, and
 // so does any other the server won't make that way. create keeps what was asked for
 // while the code is typed.
@@ -216,7 +215,12 @@ async function create(make, done) {
 addRow($("#new-list-form"), $("#new-list"), {
   add: () => {
     const name = clean($("#new-list").value, MAX_SECTION);
-    if (name) create(code => store.createList({ code, name }), lid => { emptyField($("#new-list")); announce(t("Added {x}", { x: name })); nav.showList(lid); });
+    if (name) create(code => store.createList({ code, name }), lid => {
+      emptyField($("#new-list"));
+      announce(t("Added {x}", { x: name }));
+      nav.showList(lid);
+      $("#add-ess").focus(); // a new list is for writing on: the keyboard stays up, in its first section
+    });
   },
 });
 export const MESSAGES = {

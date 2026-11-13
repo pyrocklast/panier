@@ -1454,7 +1454,9 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await newList(a, "Hardware store");
   assert.equal(await a.locator("#list-name").innerText(), "Hardware store", "a new list opens, named");
   assert.deepEqual(await names(a), ["Essentials", "Look out for", "Long term"]);
+  assert.equal(await a.evaluate(() => document.activeElement.id), "add-ess", "ready to write on: the cursor is in its first section");
   await add(a, "ess", "Screws");
+  assert.equal(await a.locator(".item.flash").count(), 0, "what was just typed isn't pointed out");
   await blur(a);
   await a.goBack(); // the phone's back gesture
   await a.locator("#lists").waitFor();

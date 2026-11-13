@@ -16,7 +16,7 @@ A phone holds any number of lists, each shared with its own people. The app open
 
 - **The lists page** is reached with the sheets at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to get, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
 - **Open** a list with a tap.
-- **New list:** type a name on the blank sheet after the others. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
+- **New list:** type a name on the blank strip under the sheets; the new list opens ready to write on. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
 - **Move** a list: hold it, then drag it to its new place. From a keyboard, Alt and an arrow move it one place earlier or later.
 - **Delete** a list: drag it onto the zone that appears at the foot, or press Delete on it from a keyboard. Lists are deleted only here, and only once asked. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
 - **Settings** is at the top right of the lists page.
