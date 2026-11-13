@@ -124,13 +124,18 @@ func (sv *server) live(w http.ResponseWriter, r *http.Request, l *list) {
 }
 
 type wsConn struct {
-	conn net.Conn
-	mu   sync.Mutex
+	conn   net.Conn
+	mu     sync.Mutex
+	closed bool // a close frame has gone: browsers fail a connection that sends anything after it
 }
 
 func (c *wsConn) send(op byte, payload []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.closed {
+		return net.ErrClosed
+	}
+	c.closed = op == opClose
 	c.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
 	_, err := c.conn.Write(wsFrame(op, payload))
 	return err

@@ -236,6 +236,24 @@ func TestLiveUpdates(t *testing.T) {
 	}
 }
 
+// The phone closing as a change comes in: the change must not follow the close.
+func TestNothingAfterClose(t *testing.T) {
+	a, b := net.Pipe()
+	got := make(chan []byte)
+	go func() { all, _ := io.ReadAll(b); got <- all }()
+	ws := &wsConn{conn: a}
+	if err := ws.send(opClose, nil); err != nil {
+		t.Fatal(err)
+	}
+	if ws.send(opText, []byte("2")) == nil {
+		t.Fatal("a frame went after the close")
+	}
+	a.Close()
+	if all := <-got; !bytes.Equal(all, wsFrame(opClose, nil)) {
+		t.Fatalf("sent %x", all)
+	}
+}
+
 func TestLiveNeedsWebSocket(t *testing.T) {
 	ts := newTestServer(t, t.TempDir())
 	create(t, ts)
