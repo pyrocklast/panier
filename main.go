@@ -1,4 +1,4 @@
-// Panier is a private shopping list for two. This program serves the app and relays
+// Panier is a private, shared shopping list. This program serves the app and relays
 // end-to-end encrypted changes between phones; it cannot read the lists it stores.
 package main
 

@@ -176,8 +176,8 @@ const FR = {
   "No connection. {kept}, to be sent when you're back online.": "Pas de connexion. {kept}, à envoyer dès votre retour en ligne.",
   "The server isn't answering. {kept}, to be sent as soon as it answers.": "Le serveur ne répond pas. {kept}, à envoyer dès qu’il répondra.",
   "List closed": "Liste fermée",
-  "Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone.":
-    "Quelqu’un a fermé cette liste, pour tout le monde. Si elle a une nouvelle clé, demandez le nouveau lien. Ce qui est ici reste sur ce téléphone.",
+  "Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone until you delete it, from the lists page.":
+    "Quelqu’un a fermé cette liste, pour tout le monde. Si elle a une nouvelle clé, demandez le nouveau lien. Ce qui est ici reste sur ce téléphone jusqu’à ce que vous la supprimiez, depuis la page des listes.",
   "Update Panier": "Mettez Panier à jour",
   "This list was changed with a newer Panier, which updates itself: close the app and open it again. Nothing is sent from here meanwhile.":
     "Cette liste a été modifiée avec une version plus récente de Panier, qui se met à jour toute seule" + nb + ": fermez l’application et rouvrez-la. Rien n’est envoyé d’ici en attendant.",

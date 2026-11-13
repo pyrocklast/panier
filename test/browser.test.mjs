@@ -1476,6 +1476,11 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
 
   await offline(t.A, a);
   assert.ok(await eventually(async () => (await a.locator("#status").isVisible()) && (await a.locator("#status-text").innerText()) === "Offline", 4000), "offline, the lists page says so");
+  await a.fill("#new-list", "Garden");
+  await a.press("#new-list", "Enter");
+  assert.ok(await eventually(async () => /Couldn't reach the server/.test(await a.locator("#lists-msg").innerText())), "a list can't be made offline");
+  assert.equal(await a.inputValue("#new-list"), "Garden", "and its name stays in the field, to try again");
+  await a.fill("#new-list", "");
   await online(t.A, a);
   assert.ok(await eventually(async () => !(await a.locator("#status").isVisible())));
 
@@ -1486,6 +1491,19 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await a.goBack();
   await a.locator("#lists").waitFor();
   assert.deepEqual(await sheets(a), ["Shopping list", "Hardware store"], "with the lists page under it");
+
+  // The same phone, in another tab: a list deleted in one leaves the other too.
+  const tab = await t.A.newPage();
+  await tab.goto(BASE + "/");
+  await toLists(tab);
+  await a.locator(".sheet-open").nth(1).click();
+  await a.locator("#app").waitFor();
+  await tab.locator(".sheet-open").nth(1).focus();
+  await tab.keyboard.press("Delete");
+  await tab.click("#confirm-ok");
+  await a.locator("#lists").waitFor();
+  assert.deepEqual(await sheets(a), ["Shopping list"], "deleted in another tab, the list on screen gives way to the lists page");
+  assert.equal(await a.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith("panier2:")).length), 1, "and isn't written back");
   await t.close();
 });
 

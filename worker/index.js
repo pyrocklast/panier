@@ -235,10 +235,7 @@ export class ListV2 extends DurableObject {
       if (!/^\d{1,15}$/.test(since)) return text(400, "since must be a sequence number");
       n = Number(since);
     }
-    const changes = this.sql
-      .exec("SELECT seq, data FROM changes WHERE seq > ? ORDER BY seq LIMIT ?", n, MAX_PER_PAGE)
-      .toArray()
-      .map(r => ({ seq: r.seq, data: r.data }));
+    const changes = this.sql.exec("SELECT seq, data FROM changes WHERE seq > ? ORDER BY seq LIMIT ?", n, MAX_PER_PAGE).toArray();
     return json(200, { changes, latest: this.latest() });
   }
 

@@ -28,7 +28,7 @@ The list is written on the page itself, like paper: one left edge, ruled lines b
 - **The list's name** is the title at the top, *Shopping list* to start with. Tap it to rename it. It also names the exported file. At its right, the sheets lead to the lists page.
 - **The list's colour.** While you rename the list, colours show under its name: white and eight hues. The paper is warm paper dyed with the colour, the ruled lines a deeper dye, the title a deep shade of it, and the writing leans its way. The browser's bars follow, and the app opens in the colour without a flash of white.
 - **The eight colours weigh the same.** Each is a single hue, and every tone of it, from paper to tick box, is that hue at a lightness set by what it's for, so no colour shouts or fades beside another, in light or dark.
-- Both phones see the name and colour, and undo puts the old ones back.
+- Every phone sees the name and colour, and undo puts the old ones back.
 
 ## Sections
 
@@ -40,7 +40,7 @@ A list starts with three sections:
 | Look out for | amber | things to buy if you come across them |
 | Long term | indigo | things to get eventually |
 
-- **Rename** a section by tapping its name. Both phones see the new name. Emptying the name and leaving puts the old one back.
+- **Rename** a section by tapping its name. Every phone sees the new name. Emptying the name and leaving puts the old one back.
 - **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it at once. Its name is written in a deep shade of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
 - **Add a section** with *Add a section*, below the last one. It gets the first colour not used yet. Enter or `+` adds it, the cross clears what you typed, and the cursor then moves to its *Add item* row.
 - **Delete** a section once nothing is left to get in it: while you rename it, a cross appears. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.

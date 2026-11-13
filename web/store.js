@@ -16,7 +16,7 @@
 
 const INDEX = "panier2"; // this phone's id and name, and its lists
 const ENTRY = "panier2:"; // one list, by its id on this phone
-export const FORMAT = 1; // what this app reads; a list can ask for more with "@list" "format"
+const FORMAT = 1; // what this app reads; a list can ask for more with "@list" "format"
 const MAX_UNDO = 100;
 const text = new TextEncoder();
 
@@ -27,8 +27,7 @@ const fromB64u = s => fromB64(s.replace(/-/g, "+").replace(/_/g, "/"));
 const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export const newId = () => b64u(crypto.getRandomValues(new Uint8Array(9)));
-const KEY = /^[A-Za-z0-9_-]{43}$/;
-export const isKey = k => KEY.test(k);
+const KEY = /^[A-Za-z0-9_-]{43}$/; // a list key: 32 bytes, in base64url
 
 /* Listeners: kind is "local", "remote" or "status" for the list on screen, "lists" for the index */
 const listeners = new Set();
@@ -54,10 +53,10 @@ function saveIndexNow() {
 const saveIndex = () => { if (!indexTimer) indexTimer = setTimeout(saveIndexNow, 400); };
 const entryOf = lid => index.lists.find(e => e.lid === lid);
 
-// The lists, in order: { lid, key, name, color, toGet, first, closed, newer }, as last seen.
+// The lists, in order: { lid, key, name, color, toGet, first, with, closed, newer, folded },
+// as last seen.
 export const lists = () => index.lists;
 export const openId = () => index.open;
-export const dev = () => index.dev;
 
 /* ---------- One list ---------- */
 
@@ -495,6 +494,11 @@ class List {
   // only while the list is on screen: out of sight, nothing runs, and coming back
   // reconnects and catches up (see resume).
   async listen() {
+    if (this.listening) return; // stopped and started again before it noticed: it carries on
+    this.listening = true;
+    try { await this.listenLoop(); } finally { this.listening = false; }
+  }
+  async listenLoop() {
     let delay = 1000;
     while (this.live && !this.s.closed) {
       const session = this.session;
@@ -516,9 +520,8 @@ class List {
     if (this.live || !this.s.key || this.s.closed) return;
     this.live = true;
     try { await this.ready(); } catch (_) { this.live = false; return; }
-    if (!this.live) return;
-    this.pull();
-    this.listen();
+    await this.pull(); // first, as it's what finds a list closed, which has nothing to listen to
+    if (this.live) this.listen();
   }
   stopLive() {
     this.live = false;
@@ -537,7 +540,7 @@ class List {
   // A phone writes itself onto a list the first time it has it, with its name if it has one.
   hello() {
     const me = MEMBER + index.dev;
-    if (this.valueOf(me, "on")) return;
+    if (this.s.closed || this.valueOf(me, "on")) return; // a closed list takes nothing more
     this.change(null, [[me, "on", true], ...(index.name ? [[me, "name", index.name]] : [])]);
   }
 }
@@ -618,10 +621,10 @@ export function refreshAll() {
 
 // A link that opens one list, or several: their keys after "#k=", joined by dots.
 // Browsers never send what follows "#" to servers.
-export const linkFor = keys => location.origin + "/#k=" + keys.join(".");
+const linkFor = keys => location.origin + "/#k=" + keys.join(".");
 export const pairingLink = () => linkFor([cur.s.key]);
 export const allLink = () => linkFor(index.lists.filter(e => !e.closed).map(e => e.key));
-export const keysIn = s => (s || "").split(".").filter(isKey);
+export const keysIn = s => (s || "").split(".").filter(k => KEY.test(k));
 
 function add(key, fresh) {
   const lid = newId();
@@ -831,6 +834,14 @@ addEventListener("storage", e => {
   if (!l) return;
   clearTimeout(l.saveTimer);
   l.saveTimer = 0;
+  if (e.newValue === null) { // taken off this phone there: gone here too, never written back
+    l.stopLive();
+    l.gone = true;
+    loaded.delete(l.lid);
+    if (l === cur) cur = null;
+    emit("lists");
+    return;
+  }
   l.s = l.load();
   l.reset();
   if (l === cur) emit("remote");

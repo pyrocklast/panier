@@ -16,7 +16,8 @@ const colorOk = (c, fallback) => (COLORS.some(([id]) => id === c) ? c : fallback
 // The list's own colour tints the paper: white, the paper as it is, then the section
 // colours but ink.
 const LIST_COLORS = [["", "White"], ...COLORS.filter(([id]) => id !== "ess")];
-const listColor = () => { const c = store.listColor(); return LIST_COLORS.some(([id]) => id === c) ? c : ""; };
+const listColorOk = c => (LIST_COLORS.some(([id]) => id === c) ? c : "");
+const listColor = () => listColorOk(store.listColor());
 const MAX_ITEM = 120; // three lines on a phone
 const MAX_SECTION = 40; // and the list's name
 const LIST = "@list"; // where the list's own name is kept, among items and sections
@@ -24,7 +25,7 @@ const listName = () => store.listName() || t("Shopping list");
 const SETTLE_MS = 1500;
 const RECENT_MS = 5 * 24 * 3600 * 1000; // ticked items show in the ticked group for five days
 const LONG_PRESS_MS = 450;
-const draftsKey = () => "panier2-drafts:" + store.current(); // text typed into a list's "Add item" fields, kept until added
+const draftsKey = (lid = store.current()) => "panier2-drafts:" + lid; // text typed into a list's "Add item" fields, kept until added
 const $ = s => document.querySelector(s);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const PLAIN = (() => { try { const d = document.createElement("div"); d.contentEditable = "plaintext-only"; return d.contentEditable === "plaintext-only"; } catch (_) { return false; } })();
@@ -121,7 +122,8 @@ function icon(name) {
 // An "add" row: a plus, a field and, once something is typed, a cross. The plus adds what
 // was typed, like Enter, and the cross or Escape throws it away. Pressing either doesn't
 // leave the field, which would add it. With nothing typed, the plus just opens the field.
-function addRow(form, input, { add, clear, escape = clear }) {
+const emptyField = input => { input.value = ""; input.form.classList.remove("typing"); };
+function addRow(form, input, { add, clear = () => emptyField(input), escape = clear }) {
   const plus = form.querySelector(".add-plus"), x = form.querySelector(".add-x");
   const typed = () => !!input.value.trim();
   const keep = e => e.preventDefault(), keepIfTyped = e => { if (typed()) e.preventDefault(); };
@@ -240,13 +242,13 @@ function paint(fk, animate, move = false, snap = null) {
   }
   if (snap) glide(snap);
 }
-// Takes in what the store holds now, including the other phone's changes.
+// Takes in what the store holds now, including the other phones' changes.
 function sync() {
   renderPending = false;
   items = store.items();
   for (const id of [...settling]) { const it = find(id); if (!it || !it.checked) settling.delete(id); }
 }
-// Changes from the other phone wait while you are editing or dragging, and appear
+// Changes from the other phones wait while you are editing or dragging, and appear
 // without motion, so nothing slides away just as you reach for it.
 function refreshFromStore() {
   if (view !== "list") return;
@@ -309,8 +311,7 @@ function saveDraft(sec, text) {
   try { if (Object.keys(d).length) localStorage.setItem(draftsKey(), JSON.stringify(d)); else localStorage.removeItem(draftsKey()); } catch (_) {}
 }
 function clearAdd(sec) {
-  shells[sec].input.value = "";
-  shells[sec].form.classList.remove("typing");
+  emptyField(shells[sec].input);
   saveDraft(sec, "");
   if (ui.sugSec === sec) closeSug(); // not another field's, typed into just after leaving this one
 }
@@ -407,8 +408,7 @@ function nudge(id, dir) {
 function addSection(raw) {
   const name = clean(raw, MAX_SECTION);
   if (!name) return;
-  $("#add-sec").value = "";
-  $("#add-sec-form").classList.remove("typing");
+  emptyField($("#add-sec"));
   const id = store.newId(), key = "#" + id;
   const usedColors = new Set(sections.map(s => s.color));
   const color = PALETTE.find(c => !usedColors.has(c)) || PALETTE[sectionInfo.size % PALETTE.length];
@@ -655,8 +655,6 @@ function joinItem(id, text) {
   if (span) editItem(span, prev.id, null, null, prev.text.length + glue.length);
 }
 
-// While a section's name is being edited, its colours show under it: a tap recolours
-// the section at once, and the name stays in editing.
 // Colours to choose from while a name is edited: a tap recolours at once, and the name
 // stays in editing.
 function palette(name, colors, current, pick) {
@@ -1308,7 +1306,7 @@ function setHist(btn, label, verb) {
 let statusTimer = 0, statusShown = "";
 function statusInfo() {
   const { online, full, closed, waiting } = store.status();
-  if (closed) return { text: t("List closed"), detail: t("Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone.") };
+  if (closed) return { text: t("List closed"), detail: t("Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone until you delete it, from the lists page.") };
   if (store.newerFormat()) return { text: t("Update Panier"), detail: t("This list was changed with a newer Panier, which updates itself: close the app and open it again. Nothing is sent from here meanwhile.") };
   if (online && !full) return null;
   const kept = waiting
@@ -1367,7 +1365,7 @@ function render() {
   if (window.panierList) window.panierList(listColor());
   computeSections();
   syncShells();
-  // What the other phone changed is tinted where it is, without scrolling to it.
+  // What the other phones changed is tinted where it is, without scrolling to it.
   const tint = store.takeFresh();
   if (flashId) tint.add(flashId);
   const kept = new Set();
@@ -1488,7 +1486,7 @@ function openPair(all = false) {
   $("#qr").replaceChildren();
   $("#share-link").hidden = !navigator.share;
   openSheet($("#pair"));
-  loadQr().then(() => $("#qr").replaceChildren(qrSvg(shared)), () => {});
+  loadQr().then(() => $("#qr").replaceChildren(qrSvg(shared))).catch(() => {}); // offline, or too long for a code: the link still copies
 }
 // Who has the list: each phone writes itself onto it, with the name its owner gave in
 // Settings, if any. The server sees none of it.
@@ -1597,7 +1595,7 @@ function importOps(l) {
   const old = Date.now() - RECENT_MS - 864e5;
   let n = 0, k = 0;
   if (l.name) ops.push([LIST, "name", clean(l.name, MAX_SECTION)]);
-  if (l.color && LIST_COLORS.some(([c]) => c === l.color)) ops.push([LIST, "color", l.color]);
+  if (listColorOk(l.color)) ops.push([LIST, "color", l.color]);
   l.sections.forEach((sec, i) => {
     const name = sec.name ? clean(sec.name, MAX_SECTION) : "";
     const d = DEFAULTS.find(d => !used.has(d.id) && (name ? [d.name, d.en].some(x => keyOf(x) === keyOf(name)) : true));
@@ -1697,7 +1695,6 @@ $("#phone-open").addEventListener("click", () => closeThen($("#settings"), () =>
 // name, who else has it, the first three things to get and how many there are, as this
 // phone last saw them. Tap to open it; hold to drag it to another place, or onto the zone
 // at the foot to delete it.
-const listColorOk = c => (c && LIST_COLORS.some(([id]) => id === c) ? c : null);
 // Who else has a list, in a few quiet words under its name: two names at most, then a count.
 function withOf(e) {
   const w = e.with;
@@ -1853,7 +1850,7 @@ const removed = [];
 function removeList(lid) {
   const e = store.lists().find(x => x.lid === lid);
   if (!e) return;
-  const name = e.name || t("Shopping list"), dk = "panier2-drafts:" + lid;
+  const name = e.name || t("Shopping list"), dk = draftsKey(lid);
   let drafts = null;
   try { drafts = localStorage.getItem(dk); localStorage.removeItem(dk); } catch (_) {}
   removed.push({ label: t("deleting {x}", { x: q(name) }), r: store.remove(lid), drafts, dk });
@@ -1876,8 +1873,10 @@ function undoRemove() {
 // strength of a list this phone already has there; the first needs the setup code, and
 // so does any other the server won't make that way. create keeps what was asked for
 // while the code is typed.
-let pending = null;
+let pending = null, creating = false;
 async function create(make, done) {
+  if (creating) return; // Enter twice makes one list
+  creating = true;
   notice = "";
   try {
     const r = await make(null);
@@ -1889,17 +1888,16 @@ async function create(make, done) {
     needCode = store.lists().length > 0;
     renderLists();
     $("#setup-code").focus();
+  } finally {
+    creating = false;
   }
 }
+// The name stays in the field until the list is made: the server may not answer.
 addRow($("#new-list-form"), $("#new-list"), {
   add: () => {
     const name = clean($("#new-list").value, MAX_SECTION);
-    if (!name) return;
-    $("#new-list").value = "";
-    $("#new-list-form").classList.remove("typing");
-    create(code => store.createList({ code, name }), lid => { announce(t("Added {x}", { x: name })); showList(lid); });
+    if (name) create(code => store.createList({ code, name }), lid => { emptyField($("#new-list")); announce(t("Added {x}", { x: name })); showList(lid); });
   },
-  clear: () => { $("#new-list").value = ""; $("#new-list-form").classList.remove("typing"); },
 });
 const MESSAGES = {
   code: t("That setup code didn't work. Check it on the server and try again."),
@@ -1909,7 +1907,8 @@ const MESSAGES = {
 $("#setup-form").addEventListener("submit", async e => {
   e.preventDefault();
   const code = $("#setup-code").value;
-  if (!code.trim()) return;
+  if (!code.trim() || creating) return;
+  creating = true;
   const p = pending || { make: c => store.createList({ code: c }), done: lid => { showList(lid); openPair(); keepList(); } };
   try {
     const r = await p.make(code);
@@ -1920,16 +1919,15 @@ $("#setup-form").addEventListener("submit", async e => {
     p.done(r);
   } catch (err) {
     say(MESSAGES[err.message] || MESSAGES.server);
+  } finally {
+    creating = false;
   }
 });
 
 /* ---------- Wiring and start ---------- */
 
 // Adding a section moves the cursor to its Add item field.
-addRow($("#add-sec-form"), $("#add-sec"), {
-  add: () => addSection($("#add-sec").value),
-  clear: () => { $("#add-sec").value = ""; $("#add-sec-form").classList.remove("typing"); },
-});
+addRow($("#add-sec-form"), $("#add-sec"), { add: () => addSection($("#add-sec").value) });
 $("#list-name").addEventListener("click", e => { if (editingId !== LIST) editListName(e.currentTarget, e.clientX, e.clientY); });
 $("#list-name").addEventListener("keydown", e => {
   if (editingId === LIST) return;
@@ -1958,7 +1956,10 @@ document.addEventListener("visibilitychange", () => {
 });
 addEventListener("online", () => { if (view === "lists") store.refreshAll(); });
 store.subscribe(kind => {
-  if (kind === "lists") renderLists();
+  if (kind === "lists") {
+    if (view === "list" && !store.current()) showLists(); // taken off this phone in another tab
+    else renderLists();
+  }
   else if (view !== "list") return;
   else if (kind === "remote") {
     refreshFromStore();

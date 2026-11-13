@@ -292,12 +292,12 @@ func (l *list) add(data []string) (int, error) {
 }
 
 // since returns up to max changes after sequence number n, and the latest sequence number.
-func (l *list) since(n, max int) ([]change, int) {
+func (l *list) since(n, limit int) ([]change, int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	latest := len(l.changes)
 	out := []change{}
-	for i := max0(n); i < latest && len(out) < max; i++ {
+	for i := max(n, 0); i < latest && len(out) < limit; i++ {
 		out = append(out, change{Seq: i + 1, Data: l.changes[i]})
 	}
 	return out, latest
@@ -323,11 +323,4 @@ func (l *list) subscribe(limit int) (chan int, func(), bool) {
 		delete(l.subs, ch)
 		l.mu.Unlock()
 	}, true
-}
-
-func max0(n int) int {
-	if n < 0 {
-		return 0
-	}
-	return n
 }

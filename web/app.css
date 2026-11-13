@@ -356,6 +356,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
    first three things to get on three lines, blank or not, and how many in all. Only a
    sheet being dragged lifts. */
 :root[data-view="lists"] { --bg: light-dark(oklch(0.90 0.009 85), oklch(0.135 0.004 150)); --slot: light-dark(oklch(0.87 0.010 85), oklch(0.11 0.004 150)); }
+.lists { --press: light-dark(oklch(0.86 0.010 85), oklch(0.21 0.006 150)); } /* pressed into the desk, not lighter than it */
 /* The same header as a list's: the title on the left, at the right the way to what's around it */
 .lists-top { display: flex; align-items: flex-start; gap: 4px; margin: -4px 0 0; }
 .lists-top h1 { flex: 1; min-width: 0; margin: 0; padding: 4px 0; font-size: 1.625rem; line-height: 1.4; }
