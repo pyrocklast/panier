@@ -68,6 +68,14 @@ const blank = key => ({ key, clock: 0, seq: 0, items: {}, devs: [], outbox: [] }
 const DEFAULT_POS = { ess: 1, look: 2, long: 3 };
 const isItem = id => id[0] !== "#" && id[0] !== "@";
 const MEMBER = "@m/"; // a phone on the list: "@m/" + its id, with "on" and, if given, "name"
+// What other phones send is checked before it's merged: a change this app couldn't have
+// written, from a broken or hostile phone, is passed over like one it can't read, so it
+// can neither stop the list syncing nor reach into the page. Fields this app doesn't
+// know, from a newer one, come in as they are.
+const TYPES = { text: "string", name: "string", section: "string", color: "string", pos: "number", checkedAt: "number", format: "number", checked: "boolean", deleted: "boolean", on: "boolean" };
+const fits = op => Array.isArray(op) && typeof op[0] === "string" && typeof op[1] === "string" && !!op[0] &&
+  !(op[0] in Object.prototype) && !(op[1] in Object.prototype) && Number.isSafeInteger(op[3]) && op[3] > 0 &&
+  (!Object.hasOwn(TYPES, op[1]) || typeof op[2] === TYPES[op[1]]);
 
 // Changes are padded with spaces to a multiple of 256 bytes before encryption, so the
 // server can't tell an item's name length from the size of what it stores. A change
@@ -434,7 +442,9 @@ class List {
             let ch = null;
             try { ch = await this.open(c.data); } catch (_) { /* unreadable change: written with another key, skip it */ }
             if (!this.still(st, session)) return;
-            if (ch) for (const [id, field, value, t] of ch.o) {
+            if (ch && typeof ch.d === "string" && Array.isArray(ch.o)) for (const op of ch.o) {
+              if (!fits(op)) continue;
+              const [id, field, value, t] = op;
               st.clock = Math.max(st.clock, t);
               if (this.put(id, field, value, t, ch.d)) {
                 changed = true;
@@ -656,22 +666,25 @@ export function addKeys(keys) {
 // createList makes a new list on the server: vouched for by a list this phone already
 // has there, or with the server's setup code when it has none, or none will. Throws
 // "code" when the setup code is needed (or was wrong), "server" when unreachable.
+// register asks the server for a new list, with keys d: with the setup code, or vouched
+// for by a list it already holds.
+const register = (d, { code = null, by = null }) => fetch("/api/lists", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", ...(by ? { Authorization: "Bearer " + by.auth } : { "X-Setup-Code": code.trim() }) },
+  body: JSON.stringify({ id: d.id, auth: d.auth, ...(by ? { by: by.id } : {}) }),
+});
 export async function createList({ code = null, name = "" } = {}) {
   const raw = crypto.getRandomValues(new Uint8Array(32));
   const d = await derive(raw);
-  const body = { id: d.id, auth: d.auth };
-  const post = (headers, extra = {}) => fetch("/api/lists", {
-    method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify({ ...body, ...extra }),
-  });
   let res = null;
   try {
-    if (code !== null) res = await post({ "X-Setup-Code": code.trim() });
+    if (code !== null) res = await register(d, { code });
     else {
       for (const e of index.lists) {
         if (e.closed) continue;
         const v = get(e.lid);
         await v.ready();
-        res = await post({ Authorization: "Bearer " + v.session.auth }, { by: v.session.id });
+        res = await register(d, { by: v.session });
         if (res.status !== 403) break;
       }
     }
@@ -756,13 +769,7 @@ export async function changeKey() {
   const raw = crypto.getRandomValues(new Uint8Array(32));
   const d = await derive(raw);
   let res;
-  try {
-    res = await fetch("/api/lists", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + old.session.auth },
-      body: JSON.stringify({ id: d.id, auth: d.auth, by: old.session.id }),
-    });
-  } catch (_) { throw new Error("server"); }
+  try { res = await register(d, { by: old.session }); } catch (_) { throw new Error("server"); }
   if (!res.ok) throw new Error(res.status === 403 ? "full" : "server");
   const copy = new List(old.lid, blank(b64u(raw)));
   copy.unsaved = true; // written only once the old list is closed: until then, it is the one kept

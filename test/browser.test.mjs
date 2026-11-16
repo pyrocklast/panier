@@ -114,6 +114,32 @@ async function renameList(pg, to) {
   await pg.keyboard.press("Enter");
 }
 
+// Sends changes to a list from page pg, as another phone with the list's key would: each
+// change { d: its device, o: [[id, field, value, time], ...] }, encrypted as store.js does.
+async function sendAs(pg, key, changes) {
+  await pg.evaluate(async ([key, changes]) => {
+    const enc = new TextEncoder(), raw = Uint8Array.from(atob(key.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+    const base = await crypto.subtle.importKey("raw", raw, "HKDF", false, ["deriveBits", "deriveKey"]);
+    const p = info => ({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: enc.encode(info) });
+    const bytes = b => String.fromCharCode(...new Uint8Array(b));
+    const id = [...new Uint8Array(await crypto.subtle.deriveBits(p("panier list id"), base, 128))].map(x => x.toString(16).padStart(2, "0")).join("");
+    const auth = btoa(bytes(await crypto.subtle.deriveBits(p("panier auth"), base, 256))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const k = await crypto.subtle.deriveKey(p("panier encryption"), base, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+    const sealed = [];
+    for (const c of changes) {
+      const plain = enc.encode(JSON.stringify(c)), padded = new Uint8Array(Math.ceil((plain.length + 1) / 256) * 256).fill(0x20);
+      padded.set(plain);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(id) }, k, padded));
+      const out = new Uint8Array(12 + ct.length);
+      out.set(iv);
+      out.set(ct, 12);
+      sealed.push(btoa(bytes(out)));
+    }
+    await fetch("/api/lists/" + id + "/changes", { method: "POST", headers: { Authorization: "Bearer " + auth, "Content-Type": "application/json" }, body: JSON.stringify({ changes: sealed }) });
+  }, [key, changes]);
+}
+
 // Waits until nothing is gliding (see motion.js), so positions measured next are final.
 const still = pg => pg.waitForFunction(() => !document.getAnimations().some(a => (a.id === "glide" || a.id === "fly") && a.playState === "running"));
 
@@ -1760,29 +1786,36 @@ test("one link sets up another phone with every list", async () => {
 test("a list changed with a newer Panier is left alone", async () => {
   const t = await pair();
   const { a, b } = t;
-  // A newer Panier on a third phone asks for format 99: its change, encrypted with the list's key.
-  await b.evaluate(async key => {
-    const enc = new TextEncoder(), raw = Uint8Array.from(atob(key.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
-    const base = await crypto.subtle.importKey("raw", raw, "HKDF", false, ["deriveBits", "deriveKey"]);
-    const p = info => ({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: enc.encode(info) });
-    const bytes = b => String.fromCharCode(...new Uint8Array(b));
-    const id = [...new Uint8Array(await crypto.subtle.deriveBits(p("panier list id"), base, 128))].map(x => x.toString(16).padStart(2, "0")).join("");
-    const auth = btoa(bytes(await crypto.subtle.deriveBits(p("panier auth"), base, 256))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-    const k = await crypto.subtle.deriveKey(p("panier encryption"), base, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
-    const padded = new Uint8Array(256).fill(0x20);
-    padded.set(enc.encode(JSON.stringify({ d: "newer", o: [["@list", "format", 99, Date.now() + 1000]] })));
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(id) }, k, padded));
-    const out = new Uint8Array(12 + ct.length);
-    out.set(iv);
-    out.set(ct, 12);
-    await fetch("/api/lists/" + id + "/changes", { method: "POST", headers: { Authorization: "Bearer " + auth, "Content-Type": "application/json" }, body: JSON.stringify({ changes: [btoa(bytes(out))] }) });
-  }, t.key);
+  // A newer Panier on a third phone asks for format 99.
+  await sendAs(b, t.key, [{ d: "newer", o: [["@list", "format", 99, Date.now() + 1000]] }]);
   assert.ok(await eventually(async () => (await a.locator("#status").isVisible()) && (await a.locator("#status-text").innerText()) === "Update Panier", 8000));
   assert.ok(await eventually(async () => !(await a.locator("#add-ess").isVisible())), "it is only read: nothing to add");
   assert.equal((await stored(a)).outbox.length, 0, "and nothing to send");
   await toLists(a);
   assert.deepEqual(await counts(a), ["Update Panier to open it"]);
+  await t.close();
+});
+
+test("changes this app couldn't have written are passed over, and the list keeps syncing", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  const now = Date.now();
+  // A broken or hostile phone with the key: a change that isn't a list of changes, one that
+  // reaches for the page's objects, wrong types, and times that would stop the clock.
+  await sendAs(b, t.key, [
+    { d: "odd", o: "not a list" },
+    { d: "odd", o: [["__proto__", "polluted", true, now], ["x1", "constructor", "?", now], ["toString", "text", "Nope", now]] },
+    { d: "odd", o: [["x2", "text", { not: "text" }, now], ["x3", "text", "Late", 1e300], ["x4", "text", "Never", "soon"]] },
+    { d: 42, o: [["x5", "text", "From no phone", now]] },
+  ]);
+  await add(b, "ess", "Bread");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Bread"), "what came after still arrives");
+  assert.equal(await a.evaluate(() => ({}).polluted), undefined, "nothing reached the page's objects");
+  const st = await stored(a);
+  assert.ok(Number.isSafeInteger(st.clock) && st.clock < now + 60000, "the clock still moves");
+  const kept = Object.entries(st.items).filter(([id, f]) => !/^[@#]/.test(id) && !(f.text && typeof f.text[0] === "string"));
+  assert.deepEqual(kept.map(([id]) => id), [], "nothing of it was kept");
+  assert.deepEqual(Object.keys(st.items).filter(id => /^x\d$/.test(id)), []);
   await t.close();
 });
 
