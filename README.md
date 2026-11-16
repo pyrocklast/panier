@@ -1,6 +1,6 @@
 # Panier
 
-Shopping lists shared between phones, end-to-end encrypted, with no accounts. It runs on Cloudflare's free plan or on a Raspberry Pi at home.
+Private lists, shared between phones: end-to-end encrypted, with no accounts. It runs on Cloudflare's free plan or on a Raspberry Pi at home.
 
 <p align="center"><img src="docs/screens.png" width="560" alt="Panier on two phones. Left, in light mode, the lists page: six lists as sheets of paper, each tinted its own colour, Groceries shared with Alex. Right, in dark mode, the end of the Groceries list: its sections named in their colours, and three ticked items below a dashed line, each box filled with its section’s colour."></p>
 
@@ -12,7 +12,7 @@ Shopping lists shared between phones, end-to-end encrypted, with no accounts. It
 - **No accounts.** Another phone joins a list by scanning a QR code from one that has it.
 - **Offline.** It works without signal and catches up when the connection returns.
 - **An app from the browser.** It installs from Firefox, Chrome or Safari, with no app store.
-- **Made for shopping.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, the last five days of ticked items, drag to reorder, and undo for everything.
+- **Made for everyday lists.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, the last five days of ticked items, drag to reorder, and undo for everything.
 - **Markdown in and out.** A list exports as a Markdown checklist, and any Markdown checklist, or a few pasted lines, comes in.
 - **In English and French**, light and dark.
 

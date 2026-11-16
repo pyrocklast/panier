@@ -1,7 +1,7 @@
 {
   "name": "Panier",
   "short_name": "Panier",
-  "description": "Private shopping lists, shared between phones",
+  "description": "Private lists, shared between phones",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
