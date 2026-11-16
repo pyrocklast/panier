@@ -12,7 +12,7 @@ Shopping lists shared between phones, end-to-end encrypted, with no accounts. It
 - **No accounts.** Another phone joins a list by scanning a QR code from one that has it.
 - **Offline.** It works without signal and catches up when the connection returns.
 - **An app from the browser.** It installs from Firefox, Chrome or Safari, with no app store.
-- **Made for shopping.** Coloured sections, quantities such as *500 g flour*, suggestions from what you bought before, the last five days of ticked items, drag to reorder, and undo for everything.
+- **Made for shopping.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, the last five days of ticked items, drag to reorder, and undo for everything.
 - **Markdown in and out.** A list exports as a Markdown checklist, and any Markdown checklist, or a few pasted lines, comes in.
 - **In English and French**, light and dark.
 

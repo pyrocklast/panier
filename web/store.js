@@ -9,7 +9,7 @@
 // link) is all a phone needs.
 //
 // A phone keeps an index of its lists, in the order they're shown, with what each one
-// looked like last time (its name, colour and what's left to get), so the lists page
+// looked like last time (its name, colour and what's left to tick), so the lists page
 // draws without opening them; and one storage entry per list. Only the list on screen
 // listens live. The others catch up when the lists page shows, and send what they have
 // waiting whenever the connection returns.
@@ -234,7 +234,7 @@ class List {
     }
     return out.sort((a, b) => b.me - a.me || a.since - b.since);
   }
-  // What the lists page shows of this list: its name and colour, how much is left to get,
+  // What the lists page shows of this list: its name and colour, how much is left to tick,
   // and the first three of those, in the order the list shows them.
   summarize() {
     const e = entryOf(this.lid);

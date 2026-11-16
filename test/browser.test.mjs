@@ -603,7 +603,7 @@ test("leaving the Add item field adds the item, and the tap still works", async 
   await a.fill("#add-ess", "bread");
   await blur(a);
   await sleep(400);
-  assert.deepEqual((await texts(a, "Essentials")).filter(x => x.toLowerCase() === "bread"), ["bread"], "a name bought before brings that item back, as typed");
+  assert.deepEqual((await texts(a, "Essentials")).filter(x => x.toLowerCase() === "bread"), ["bread"], "a name ticked before brings that item back, as typed");
   assert.ok(!(await ticked(a)).includes("Bread"), "rather than adding a copy");
 
   await a.fill("#add-look", "LEMONS"); // not Milk, which was ticked a moment ago and is about to leave for the ticked group
@@ -1145,7 +1145,7 @@ test("Enter adds just what was typed; a suggestion comes back when tapped, witho
   assert.deepEqual(await a.locator("#list .items .qty").allInnerTexts(), ["2 litres", "500 g", "2 kg"], "longer units count as quantities too, in French as well");
   for (const x of ["2 litres of milk", "500 g flour", "2 kg de pommes"]) await item(a, x).locator(".boxcell").click();
   await sleep(1900);
-  assert.deepEqual(await ticked(a), ["2 kg de pommes", "500 g flour", "2 litres of milk"], "the ticked group still shows what was bought");
+  assert.deepEqual(await ticked(a), ["2 kg de pommes", "500 g flour", "2 litres of milk"], "the ticked group still shows what was ticked");
 
   await a.fill("#add-ess", "mil");
   assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Milk"], "suggested by name alone");
@@ -1318,7 +1318,7 @@ test("in French when the phone is in French", async () => {
   assert.equal(await a.getAttribute("#undo", "aria-label"), `Annuler${nb}: ajouter «${nb}2 lait${nb}»`);
 
   await a.click("#lists-open");
-  assert.equal(await a.locator(".sheet-count").innerText(), "1 à acheter");
+  assert.equal(await a.locator(".sheet-count").innerText(), "1 à cocher");
   await a.click("#settings-open");
   assert.equal(await a.locator("#settings-title").innerText(), "Paramètres");
   await a.click("#settings-close");
@@ -1472,9 +1472,9 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await blur(a);
   await toLists(a);
   assert.deepEqual(await sheets(a), ["Shopping list"]);
-  assert.deepEqual(await counts(a), ["3 to get"]);
+  assert.deepEqual(await counts(a), ["3 to tick"]);
   assert.deepEqual(await a.locator(".sheet-item").allInnerTexts(), ["2 milk", "Bread", "Ripe avocados"], "and the first three of them");
-  assert.equal(await a.locator(".sheet-open").getAttribute("aria-label"), "Shopping list, with 1 other phone, 3 to get");
+  assert.equal(await a.locator(".sheet-open").getAttribute("aria-label"), "Shopping list, with 1 other phone, 3 to tick");
   assert.equal(await a.locator(".sheet-with").innerText(), "with 1 other phone", "who else has it, quietly");
 
   await newList(a, "Hardware store");
@@ -1487,7 +1487,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await a.goBack(); // the phone's back gesture
   await a.locator("#lists").waitFor();
   assert.ok(await eventually(async () => (await sheets(a)).join() === "Shopping list,Hardware store"));
-  assert.deepEqual(await counts(a), ["3 to get", "1 to get"]);
+  assert.deepEqual(await counts(a), ["3 to tick", "1 to tick"]);
   const [one, two] = await a.locator(".sheet-card").evaluateAll(els => els.map(el => el.getBoundingClientRect()));
   assert.ok(Math.abs(one.top - two.top) < 1 && two.left > one.right && Math.abs(one.height - two.height) < 1, "side by side, the same size");
 
@@ -1500,7 +1500,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await a.locator(".sheet-open").nth(1).click();
   await a.locator("#app").waitFor();
   await a.goBack();
-  assert.ok(await eventually(async () => (await counts(a))[0] === "4 to get"), "a list not on screen catches up as the lists page shows");
+  assert.ok(await eventually(async () => (await counts(a))[0] === "4 to tick"), "a list not on screen catches up as the lists page shows");
 
   await offline(t.A, a);
   assert.ok(await eventually(async () => (await a.locator("#status").isVisible()) && (await a.locator("#status-text").innerText()) === "Offline", 4000), "offline, the lists page says so");
@@ -1608,7 +1608,7 @@ test("lists come in from Markdown, from plain text, and from several pasted line
   assert.deepEqual(await names(a), ["Garden", "Essentials"], "its sections, and no others");
   assert.deepEqual(await texts(a, "Garden"), ["Hose"]);
   assert.deepEqual(await texts(a, "Essentials"), ["2 bulbs"]);
-  assert.deepEqual(await ticked(a), [], "what was bought before isn't shown as ticked");
+  assert.deepEqual(await ticked(a), [], "what was ticked before isn't shown as ticked");
   await section(a, "Garden").locator(".add-input").fill("se");
   assert.deepEqual(await section(a, "Garden").locator(".sug .t").allInnerTexts(), ["Seeds"], "but suggested");
   await section(a, "Garden").locator(".add-input").fill("");
@@ -1742,7 +1742,7 @@ test("changing a list's key leaves everyone else with it closed, until they open
   await b.locator("#app").waitFor();
   assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk,Bread"), "the new link brings the list back");
   await toLists(b);
-  assert.ok(await eventually(async () => (await counts(b)).join() === "Closed,2 to get"), "beside the closed one");
+  assert.ok(await eventually(async () => (await counts(b)).join() === "Closed,2 to tick"), "beside the closed one");
 
   assert.ok(await eventually(async () => (await b.locator(".sheet-card").nth(1).locator(".sheet-with").innerText()) === "with 1 other phone"));
   await dragTo(b, b.locator(".sheet-card").nth(1), async () => (await b.locator("#remove-drop").boundingBox()).y + 20);
@@ -1785,7 +1785,7 @@ test("one link sets up another phone with every list", async () => {
   const other = await phone(p.errors), o = other.page;
   await o.goto(BASE + "/#k=" + keys.join("."));
   await o.locator("#lists").waitFor();
-  assert.ok(await eventually(async () => (await sheets(o)).join() === "Shopping list,Hardware store" && (await counts(o)).join() === "1 to get,1 to get"));
+  assert.ok(await eventually(async () => (await sheets(o)).join() === "Shopping list,Hardware store" && (await counts(o)).join() === "1 to tick,1 to tick"));
   await other.ctx.close();
   await p.close();
 });

@@ -14,7 +14,7 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 
 A phone holds any number of lists, each shared with its own people. The app opens on the list last used.
 
-- **The lists page** is reached with *Lists*, at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to get, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
+- **The lists page** is reached with *Lists*, at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to tick, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
 - **Open** a list with a tap.
 - **New list:** type a name on the blank strip under the sheets; the new list opens ready to write on. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
 - **Move** a list: hold it, then drag it to its new place. From a keyboard, Alt and an arrow move it one place earlier or later.
@@ -43,7 +43,7 @@ A list starts with three sections:
 - **Rename** a section by tapping its name. Every phone sees the new name. Emptying the name and leaving puts the old one back.
 - **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it at once. Its name is written in a deep shade of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
 - **Add a section** with *Add a section*, below the last one. It gets the first colour not used yet. Enter or `+` adds it, the cross clears what you typed, and the cursor then moves to its *Add item* row.
-- **Delete** a section once nothing is left to get in it: while you rename it, a cross appears. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
+- **Delete** a section once nothing is left to tick in it: while you rename it, a cross appears. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 
 ## Adding items
 
@@ -51,14 +51,14 @@ A list starts with three sections:
 - **Enter** or `+` adds the item and keeps the field open for the next one.
 - **Leaving the field** adds what you typed, so nothing is lost, and what you tapped to leave stays where it is on screen. A notification or switching apps doesn't cut it short. Text left in the field when the app closes is added the next time it opens.
 - **The cross** at the end of the row throws away what you typed, and the cursor stays in the field. Escape does the same from a keyboard, once any suggestions are closed.
-- **Something already on the list** is highlighted instead of added twice. Typing the full name of something bought before puts that item back, into the section you are typing in.
+- **Something already on the list** is highlighted instead of added twice. Typing the full name of something ticked before puts that item back, into the section you are typing in.
 - **Quantities.** A number at the start, such as *2 milk*, *2× milk*, *500 g flour*, *1.5kg potatoes*, *2 litres of milk* or *3 paquets de pâtes*, is shown in bold, slightly apart from the name. It's left out when comparing names: *2 litres of milk* is still Milk, typing *3 milk* while it's on the list changes the quantity, and *mil* suggests Milk.
-- A quantity is for one shop. The ticked group still shows it, so unticking a mistake puts the item back as it was, but a suggestion brings the item back without it.
+- A quantity is for this time only. The ticked group still shows it, so unticking a mistake puts the item back as it was, but a suggestion brings the item back without it.
 
 ## Suggestions
 
-- From the second letter, items bought before are suggested above the field, where the phone's keyboard can't hide them.
-- Accents and capitals don't matter. Names that start with what you typed come first, then names with a word that does, then the most recently bought. Five at most.
+- From the second letter, items ticked before are suggested above the field, where the phone's keyboard can't hide them.
+- Accents and capitals don't matter. Names that start with what you typed come first, then names with a word that does, then the most recently ticked. Five at most.
 - **Tap a suggestion** to put the item back, with any quantity typed so far: *2 mil*, then Milk, gives *2 milk*. Enter only adds what you typed.
 - **The × on a suggestion** removes that item for good, for typos such as *Mlik*. Undo brings it back.
 
@@ -66,7 +66,7 @@ A list starts with three sections:
 
 - **Tap the square** to tick an item: it fills with its section's colour. A short vibration confirms it in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row leave together and the list doesn't move under your thumb.
-- They then slide into **the ticked group**, below the sections, after a dashed tear line. Its boxes fill with the colours of what's been got. It shows what was ticked in the last five days, latest first, so you can check what was bought lately. Its heading, such as *3 ticked*, folds it away.
+- They then slide into **the ticked group**, below the sections, after a dashed tear line. Its boxes fill with the colours of what's been ticked. It shows what was ticked in the last five days, latest first, so you can check what was done lately. Its heading, such as *3 ticked*, folds it away.
 - Older ticked items are hidden, but still suggested when you type.
 - **Untick** an item by tapping its square: it goes back to the end of its section, or of the first section if its own was deleted.
 - **Drag** an item onto the drop zone under the ticked group's heading to tick it, or drag a ticked item into a section to put it back exactly where you drop it.
@@ -103,11 +103,11 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 - [x] Eggs
 ```
 
-`#` is the list's name, `##` each section in order, `- [ ]` an item to get, `- [x]` one bought before, under its section. Colours ride in comments after the headings, which notes apps hide.
+`#` is the list's name, `##` each section in order, `- [ ]` an item to tick, `- [x]` one ticked before, under its section. Colours ride in comments after the headings, which notes apps hide.
 
 - **Export the list**, at the bottom of a list, saves it as a `.md` file named after it.
 - **Export all lists**, in Settings, saves every list in one file, each under its own `#`.
-- **From a file**, on the lists page, brings in a list, or several from one file. It reads any Markdown checklist: other bullets, numbered lines, headings of any level, plain lines, where a line followed by items names a section. Items bought before come in as suggestions, not ticked.
+- **From a file**, on the lists page, brings in a list, or several from one file. It reads any Markdown checklist: other bullets, numbered lines, headings of any level, plain lines, where a line followed by items names a section. Items ticked before come in as suggestions, not in the ticked group.
 - **Pasting several lines** into *Add item* adds one item per line, in that section, in one step to undo. Names already on the list are left as they are.
 
 ## People

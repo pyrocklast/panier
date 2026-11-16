@@ -155,7 +155,7 @@ function clearAdd(sec) {
   saveDraft(sec, "");
   if (ui.sugSec === sec) closeSug(); // not another field's, typed into just after leaving this one
 }
-// Puts an item bought before back on the list as text, into sec: picked from its
+// Puts an item ticked before back on the list as text, into sec: picked from its
 // suggestion, or, when added, typed in full. When it was ticked doesn't matter once it's
 // back, so it isn't written: the change stays under 256 bytes (see store.js).
 function revive(id, sec, text, opts = {}, added = false) {
@@ -179,7 +179,7 @@ function submitAdd(sec, leaving = false) {
   if (!text) { clearAdd(sec); return; }
   const same = items.filter(i => nameKey(i.text) === nameKey(text));
   const ex = same.find(inList) || same[0];
-  // The same name bought before: that item comes back, as typed, rather than a copy.
+  // The same name ticked before: that item comes back, as typed, rather than a copy.
   if (ex && ex.checked && !settling.has(ex.id)) return revive(ex.id, sec, text, opts, true);
   clearAdd(sec);
   if (ex) { // already on the list: highlighted, with the quantity just typed, if any
@@ -199,8 +199,8 @@ function submitAdd(sec, leaving = false) {
   act(t("adding {x}", { x: q(text) }), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "deleted", false]], opts);
 }
 // Several lines pasted into an Add item field: one item each, in that section, in one
-// step to undo. Names already on the list stay as they are; those bought before come back.
-// Lines ticked in Markdown ("- [x]") are kept as bought before, to be suggested.
+// step to undo. Names already on the list stay as they are; those ticked before come back.
+// Lines ticked in Markdown ("- [x]") are kept as ticked before, to be suggested.
 function addMany(sec, pasted) {
   closeSug(); // what was typed before stays in the field
   const ops = [], seen = new Set(), old = Date.now() - RECENT_MS - 864e5;
@@ -264,7 +264,7 @@ function renameSection(id, name) {
   announce(t("Renamed section to {x}", { x: name }));
   act(t("renaming section {x}", { x: q(info.name) }), [["#" + id, "name", name, fallback]], { leaving: true });
 }
-// A section can only be deleted once it has nothing to get, and the last one stays.
+// A section can only be deleted once it has nothing to tick, and the last one stays.
 const canDelete = id => sections.length > 1 && !items.some(i => i.section === id && inList(i));
 function deleteSection(id) {
   const name = nameOf(id);
@@ -311,7 +311,7 @@ function editItem(span, id, x, y, caret) {
 
 // Enter inside an item's text splits it in two: the first part stays, the second becomes
 // the next item, ready to edit. As when adding or renaming, a part that's already on the
-// list isn't added twice, and one bought before comes back.
+// list isn't added twice, and one ticked before comes back.
 let lastSplit = null; // so Backspace can join the two parts back exactly
 function splitItem(id, first, second, glue) {
   const it = find(id);
@@ -328,7 +328,7 @@ function splitItem(id, first, second, glue) {
   const d2 = dupOf(second);
   if (nameKey(second) === nameKey(first)) { /* "milk milk": one is enough */ }
   else if (d2 && inList(d2)) { flashId = d2.id; msg = t("{x} is already on the list", { x: d2.text }); }
-  else if (d2) { ops.push([d2.id, "text", second], ...here(d2.id)); next = d2.id; } // bought before: back as typed
+  else if (d2) { ops.push([d2.id, "text", second], ...here(d2.id)); next = d2.id; } // ticked before: back as typed
   else {
     next = store.newId();
     ops.push([next, "text", second], ...here(next), [next, "deleted", false]);
@@ -394,7 +394,7 @@ function recolour(id, color, label) {
   act(t("changing the colour of {x}", { x: q(nameOf(id)) }), [["#" + id, "color", color, fallback]], { animate: false });
 }
 
-/* ---------- Suggestions from everything bought before ---------- */
+/* ---------- Suggestions from everything ticked before ---------- */
 
 function suggestions(text) {
   const n = nameKey(text);
@@ -409,7 +409,7 @@ function suggestions(text) {
     scored.push({ it, score: at === 0 ? 0 : wordStart ? 1 : 2 });
   }
   scored.sort((a, b) => a.score - b.score || b.it.checkedAt - a.it.checkedAt);
-  // Shown by name only, so one name is suggested once, even if it was bought twice.
+  // Shown by name only, so one name is suggested once, even if it was ticked twice.
   const seen = new Set(), out = [];
   for (const { it } of scored) {
     const k = nameKey(it.text);
@@ -430,7 +430,7 @@ function highlight(text, query) {
 }
 // Each suggestion is a row of two cells: the item, which brings it back, and a × that
 // removes it for good. With the keyboard, arrows move between them and Enter picks.
-// Suggestions show the name alone: the quantity bought last time stays behind.
+// Suggestions show the name alone: the quantity ticked last time stays behind.
 const sugCellId = (sec, i, col) => "sug-" + sec + "-" + i + (col ? "-x" : "");
 function paintSug(sec, list) {
   const sh = shells[sec], query = splitQty(sh.input.value).name;
@@ -494,7 +494,7 @@ function buildShell(id) {
     clear: () => clearAdd(id),
     escape: () => (ui.sugSec === id ? closeSug() : clearAdd(id)),
   });
-  const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Bought before"), hidden: true });
+  const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Ticked before"), hidden: true });
   const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id } });
   name.addEventListener("click", e => {
     if (state.suppressClick) { state.suppressClick = false; return; }
@@ -791,7 +791,7 @@ function render() {
   const since = Date.now() - RECENT_MS;
   const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= since).sort((a, b) => b.checkedAt - a.checkedAt);
   $("#basket").classList.toggle("empty", basket.length === 0);
-  // "3 ticked": true while shopping and after, unlike a basket; the last five days show, newest first
+  // "3 ticked": true while the list is in use and after, unlike a basket; the last five days show, newest first
   $("#basket-count").textContent = plural(basket.length, "{n} ticked", "{n} ticked");
   $("#basket-toggle").setAttribute("aria-expanded", String(ui.basketOpen));
   const bl = $("#basket-list");

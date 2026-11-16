@@ -1,5 +1,5 @@
 // The lists page. Each list lies on it as a sheet of its own paper, the sheets side by
-// side: its name, who else has it, the first three things to get and how many there are,
+// side: its name, who else has it, the first three things to tick and how many there are,
 // as this phone last saw them. Tap one to open it; hold to drag it to another place, or
 // onto the zone at the foot to delete it. The blank strip under them starts a new list.
 
@@ -24,7 +24,7 @@ function withOf(e) {
   const who = names.length ? [...names, ...(more ? [plural(more, "{n} other", "{n} others")] : [])] : [plural(more, "{n} other phone", "{n} other phones")];
   return t("with {x}", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(who) });
 }
-const countOf = e => (e.closed ? t("Closed") : e.newer ? t("Update Panier to open it") : e.toGet ? plural(e.toGet, "{n} to get", "{n} to get") : t("Nothing to get"));
+const countOf = e => (e.closed ? t("Closed") : e.newer ? t("Update Panier to open it") : e.toGet ? plural(e.toGet, "{n} to tick", "{n} to tick") : t("Nothing to tick"));
 // Each sheet keeps its element from one drawing to the next, and only what changed is
 // written, so a sheet held or focused stays as it is while the lists catch up.
 const cards = new Map(); // list id → { li, btn, name, who, first, count, shown }

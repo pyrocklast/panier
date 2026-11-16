@@ -66,7 +66,7 @@ export function retext(old, typed) {
   const n = splitQty(typed);
   return n.qty ? n.qty + n.sep + splitQty(old).name : old;
 }
-// What an item bought before comes back as from its suggestion: its name, with the
+// What an item ticked before comes back as from its suggestion: its name, with the
 // quantity typed so far, if any. Its old quantity stays behind.
 export const fromHint = (old, typed) => (splitQty(typed).qty ? retext(old, typed) : bare(old));
 
@@ -81,7 +81,7 @@ export function between(a, b) {
 
 // Works out which sections to show. A section stays on screen while it has items to
 // get, or text being typed into it, even if someone deleted it meanwhile; inList says
-// which items are still to get, which on screen includes those just ticked.
+// which items are still to tick, which on screen includes those just ticked.
 export function layout(storedSections, its, typing = [], inList = i => !i.checked) {
   const stored = new Map(storedSections.map(s => [s.id, s]));
   const all = new Map();
@@ -102,8 +102,8 @@ export function layout(storedSections, its, typing = [], inList = i => !i.checke
   return { all, shown: shown.length ? shown : [[...all.values()].sort(order)[0]] };
 }
 
-// A list as Export writes it: its sections as on screen, each with its items to get,
-// then those bought before, latest first.
+// A list as Export writes it: its sections as on screen, each with its items to tick,
+// then those ticked before, latest first.
 export function sheetOfList({ name, color, sections: stored, items: its }) {
   const { shown } = layout(stored, its);
   const at = new Map(shown.map((s, k) => [s.id, k]));
@@ -115,7 +115,7 @@ export function sheetOfList({ name, color, sections: stored, items: its }) {
 
 // The changes that make a list as read from Markdown: its sections in order, the three
 // a list starts with kept when a section has one of their names, the others deleted;
-// each name once; what was bought before kept out of the ticked group, to be suggested.
+// each name once; what was ticked before kept out of the ticked group, to be suggested.
 export function importOps(l) {
   const ops = [], used = new Set(), colours = new Set(), seen = new Set();
   const old = Date.now() - RECENT_MS - 864e5;

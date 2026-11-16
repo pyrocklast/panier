@@ -6,8 +6,8 @@
 //   - [ ] 2 milk
 //   - [x] Eggs
 //
-// "#" is a list's name, "##" each of its sections in order, "- [ ]" an item to get and
-// "- [x]" one bought before, under its section, so unticking puts it back there.
+// "#" is a list's name, "##" each of its sections in order, "- [ ]" an item to tick and
+// "- [x]" one ticked before, under its section, so unticking puts it back there.
 // Colours ride in comments after the headings, which Markdown hides. A file can hold
 // several lists, each under its own "#".
 //
