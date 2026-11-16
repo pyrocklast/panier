@@ -54,12 +54,12 @@ const itemOf = line => {
   return m ? { text: one(m[1].replace(/^\[\s?\]\s+/, "")), checked: false } : null;
 };
 
-// fromMarkdown reads lists from a file: { lists, skipped }, skipped counting the lines it
-// couldn't use. A list or section without a name has name null; one without a colour,
-// color null; a list's sections in order, an item's text as written.
+// fromMarkdown reads the lists in a file, leaving out lines it can't use, such as quotes,
+// tables and code. A list or section without a name has name null; one without a
+// colour, color null; a list's sections in order, an item's text as written.
 export function fromMarkdown(text) {
   const lines = String(text).replace(/^﻿/, "").replace(/\r\n?/g, "\n").split("\n");
-  let k = 0, skipped = 0, fence = false;
+  let k = 0, fence = false;
   if (lines[0] && lines[0].trim() === "---") { // front matter, as notes apps write it
     const end = lines.findIndex((l, i) => i > 0 && l.trim() === "---");
     if (end > 0) k = end + 1;
@@ -80,8 +80,8 @@ export function fromMarkdown(text) {
   const next = i => { for (let j = i + 1; j < lines.length; j++) if (lines[j].trim()) return lines[j]; return null; };
   for (let i = k; i < lines.length; i++) {
     const line = lines[i];
-    if (/^\s*(```|~~~)/.test(line)) { fence = !fence; skipped++; continue; }
-    if (fence) { if (line.trim()) skipped++; continue; }
+    if (/^\s*(```|~~~)/.test(line)) { fence = !fence; continue; }
+    if (fence) continue;
     if (!line.trim()) continue;
     const h = HEADING.exec(line);
     if (h) {
@@ -92,7 +92,7 @@ export function fromMarkdown(text) {
     }
     const it = itemOf(line);
     if (it) { add(it); continue; }
-    if (NOISE.test(line)) { skipped++; continue; }
+    if (NOISE.test(line)) continue;
     const plain = one(line), after = next(i);
     if (!lists.length && DATED.test(plain) && !(after && itemOf(after))) { newList(plain.replace(DATED, ""), null); continue; }
     if (after && itemOf(after) && plain.length <= 60) { newSection(named(plain).name, named(plain).color); continue; }
@@ -107,7 +107,7 @@ export function fromMarkdown(text) {
     if (!l.sections.length) l.sections.push({ name: null, color: null, items: [] });
     for (const s of bought) l.sections[0].items.push(...s.items);
   }
-  return { lists: lists.filter(l => l.name || l.sections.some(s => s.items.length || s.name)), skipped };
+  return lists.filter(l => l.name || l.sections.some(s => s.items.length || s.name));
 }
 
 // pastedItems reads what was pasted into an Add item field: several lines become several

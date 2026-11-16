@@ -157,6 +157,7 @@ function askDelete(lid) {
       ok: t("Delete for everyone"),
       run: async () => {
         await store.deleteForEveryone(lid);
+        try { localStorage.removeItem(draftsKey(lid)); } catch (_) {} // what was typed in it goes too
         $("#confirm").close();
         announce(t("Deleted {x} for everyone", { x: name }));
         lostFocus($("#sheets .sheet-open") || $("#new-list"));
@@ -255,7 +256,7 @@ $("#import-file").addEventListener("change", async e => {
   if (!f) return;
   let text = "";
   try { text = await f.text(); } catch (_) {}
-  const { lists } = fromMarkdown(text);
+  const lists = fromMarkdown(text);
   if (!lists.length) return say(t("There's no list to bring in from {x}.", { x: f.name }));
   const made = lists.map(importOps);
   create(async code => {

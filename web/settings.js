@@ -43,12 +43,12 @@ $("#settings-close").addEventListener("click", () => $("#settings").close());
 $("#compact-layout").addEventListener("change", e => {
   const l = e.target.checked ? "compact" : "";
   try { if (l) localStorage.setItem(LAYOUT_KEY, l); else localStorage.removeItem(LAYOUT_KEY); } catch (_) {}
-  if (window.panierLayout) window.panierLayout(l);
+  window.panierLayout(l);
 });
 for (const r of document.querySelectorAll('input[name="theme"]')) {
   r.addEventListener("change", () => {
     try { if (r.value) localStorage.setItem(THEME_KEY, r.value); else localStorage.removeItem(THEME_KEY); } catch (_) {}
-    if (window.panierTheme) window.panierTheme(r.value);
+    window.panierTheme(r.value);
   });
 }
 $("#my-name").addEventListener("change", e => store.setMyName(clean(e.target.value, MAX_SECTION)));

@@ -778,7 +778,7 @@ function render() {
   document.title = name;
   wasReadOnly = readOnly();
   $("#app").classList.toggle("readonly", wasReadOnly);
-  if (window.panierList) window.panierList(listColor());
+  window.panierList(listColor());
   computeSections();
   syncShells();
   // What the other phones changed is tinted where it is, without scrolling to it.

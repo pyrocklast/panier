@@ -71,7 +71,8 @@ func main() {
 	}()
 
 	log.Printf("Panier %s listening on %s, data in %s", version, *addr, *data)
-	log.Printf("To create a list, open https://<your address>/#setup=%s on the first phone", code)
+	// The setup code is a secret, so it stays out of the log: -setup-code prints it.
+	log.Printf("To start the first list, open https://<your address>/#setup=<code> on a phone; %s -data %s -setup-code prints the code", os.Args[0], *data)
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}

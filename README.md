@@ -115,7 +115,7 @@ BASE=http://127.0.0.1:8080 SETUP=<code> STORE=./data node --test test/browser.te
 
 `BROWSER=firefox` runs the browser tests in Firefox, and `LAYOUT=compact` in the compact layout. [`test/update.test.mjs`](test/update.test.mjs) explains how to run the update test.
 
-On every push to `main` and every pull request, GitHub runs the Go tests, the update test, and the API and browser tests on both servers in Chromium, and on the Go server in Firefox. When they pass on `main`, it deploys to Cloudflare. Publishing a release (tag `v…`) builds the Go server for the Raspberry Pi (`arm64`, `armv7`, `armv6`) and `amd64`, with checksums.
+On every push to `main` or `next` and every pull request, GitHub runs the Go tests, the update test, and the API and browser tests on both servers in Chromium, and on the Go server in Firefox. When they pass on `main`, it deploys to Cloudflare; on `next`, to a test copy of its own, *Panier next*, which installs beside Panier with lists of its own, so changes are tried on real phones before they're merged. Publishing a release (tag `v…`) builds the Go server for the Raspberry Pi (`arm64`, `armv7`, `armv6`) and `amd64`, with checksums.
 
 ## Next
 

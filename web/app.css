@@ -254,16 +254,16 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 
 .linkbtn { min-height: 44px; border: 0; background: none; padding: 0 8px; color: var(--muted); font-size: 0.875rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
-/* Connection status: shown only when something is wrong, bottom left, opposite undo */
+/* Connection status: shown only when something is wrong, bottom left, opposite undo. Its
+   words say it, calmly: red is kept for deleting. */
 .status {
   position: fixed; z-index: 30; left: max(16px, env(safe-area-inset-left, 0px), (100vw - 34rem) / 2 + 16px); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: min(320px, calc(100vw - 32px));
 }
 .status-pill {
-  display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 18px 0 16px; border: 0; border-radius: 999px;
+  display: inline-flex; align-items: center; height: 52px; padding: 0 18px; border: 0; border-radius: 999px;
   background: var(--surface); box-shadow: var(--float); font-weight: 700; cursor: pointer;
 }
-.status-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--danger); }
 .status-detail {
   margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--surface); box-shadow: var(--float);
   font-size: 0.875rem; line-height: 1.45;
@@ -420,7 +420,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   background: var(--press); color: var(--ink); font: inherit; font-size: 1.0625rem; letter-spacing: 0.04em;
 }
 .setup input:focus { outline: 2px solid var(--ess); outline-offset: 0; }
-.lists :is(.setup input) { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); } /* on the lists page's grey, a white field */
+.lists .setup input { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); } /* on the lists page's grey, a white field */
 
 /* Buttons */
 .btn {

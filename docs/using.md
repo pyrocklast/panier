@@ -66,7 +66,7 @@ A list starts with three sections:
 
 - **Tap the square** to tick an item: it fills with its section's colour. A short vibration confirms it in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row leave together and the list doesn't move under your thumb.
-- They then slide into **the ticked group**, below the sections, after a dashed tear line, which fills with the colours of what's been got. It shows what was ticked in the last five days, latest first, so you can check what was bought lately. Its heading, such as *3 ticked*, folds it away.
+- They then slide into **the ticked group**, below the sections, after a dashed tear line. Its boxes fill with the colours of what's been got. It shows what was ticked in the last five days, latest first, so you can check what was bought lately. Its heading, such as *3 ticked*, folds it away.
 - Older ticked items are hidden, but still suggested when you type.
 - **Untick** an item by tapping its square: it goes back to the end of its section, or of the first section if its own was deleted.
 - **Drag** an item onto the drop zone under the ticked group's heading to tick it, or drag a ticked item into a section to put it back exactly where you drop it.
@@ -130,7 +130,7 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 *Settings*, at the top of the lists page, opens a page of its own; the phone's back gesture closes it. Settings are chosen on each phone.
 
 - **You:** your name, shown to the people you share lists with.
-- **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and each list on one line on the lists page.
+- **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page.
 - **Data:**
   - Whether the browser keeps the lists even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep them on this phone* asks again.
   - How much space each list takes on this phone.
@@ -149,7 +149,9 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 
 In suggestions, ↓ and ↑ choose one, → moves to its ×, Enter picks it and Shift+Delete removes it.
 
-Changes are announced to screen readers. Light and dark follow the phone unless chosen in Settings, and reduced motion is respected. On the list, text, tick boxes and buttons keep WCAG AA contrast on every list and section colour, in both themes.
+On the lists page, Alt and an arrow move a list, and Delete deletes it, once asked.
+
+Changes are announced to screen readers. Light and dark follow the phone unless chosen in Settings, and reduced motion is respected. Text, tick boxes and buttons keep WCAG AA contrast on every list and section colour, in both themes, on a list and on the lists page.
 
 ## Languages
 

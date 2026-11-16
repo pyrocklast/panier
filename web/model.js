@@ -95,7 +95,11 @@ export function layout(storedSections, its, typing = [], inList = i => !i.checke
   const used = new Set(its.filter(inList).map(i => i.section));
   for (const id of typing) used.add(id);
   for (const id of used) if (!all.has(id)) all.set(id, { id, name: t("Untitled"), color: PALETTE[0], pos: 100, deleted: false });
-  return { all, shown: [...all.values()].filter(s => !s.deleted || used.has(s.id)).sort((a, b) => a.pos - b.pos || (a.id < b.id ? -1 : 1)) };
+  const order = (a, b) => a.pos - b.pos || (a.id < b.id ? -1 : 1);
+  const shown = [...all.values()].filter(s => !s.deleted || used.has(s.id)).sort(order);
+  // Two phones can each delete one of the last two sections at once: the first of them
+  // stays on screen, so there's always somewhere to add an item.
+  return { all, shown: shown.length ? shown : [[...all.values()].sort(order)[0]] };
 }
 
 // A list as Export writes it: its sections as on screen, each with its items to get,

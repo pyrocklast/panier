@@ -60,7 +60,7 @@ function showList(lid) {
   follow();
   $("#lists").hidden = true;
   $("#app").hidden = false;
-  if (window.panierView) window.panierView("");
+  window.panierView("");
   if (switched) window.scrollTo(0, 0);
   list.show(lid);
   // Opened from the keyboard, the cursor moves to the list's name rather than stay on a
@@ -74,7 +74,7 @@ function showLists() {
   follow();
   $("#app").hidden = true;
   $("#lists").hidden = false;
-  if (window.panierView) window.panierView("lists");
+  window.panierView("lists");
   document.title = "Panier";
   store.refreshAll();
   lists.renderLists();
