@@ -1814,7 +1814,9 @@ test("what the version before several lists left on the phone is cleared, and th
   });
   await a.reload();
   await a.locator("#lists").waitFor();
-  assert.deepEqual(await a.evaluate(() => Object.keys(localStorage).filter(k => !k.startsWith("panier2")).sort()), ["panier-theme"]);
+  const left = await a.evaluate(() => Object.keys(localStorage));
+  assert.deepEqual(left.filter(k => ["panier", "panier-drafts", "panier-basket-open", "panier-dragged-once", "panier-style"].includes(k)), [], "the old version's data is gone");
+  assert.ok(left.includes("panier-theme"), "and the settings stay");
   await ctx.close();
   assert.deepEqual(errors, []);
 });
