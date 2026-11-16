@@ -60,13 +60,26 @@ const index = pg => pg.evaluate(() => JSON.parse(localStorage.getItem("panier2")
 const stored = pg => pg.evaluate(() => JSON.parse(localStorage.getItem("panier2:" + JSON.parse(localStorage.getItem("panier2")).open)));
 const openKey = pg => pg.evaluate(() => { const ix = JSON.parse(localStorage.getItem("panier2")); return ix.lists.find(e => e.lid === ix.open).key; });
 
+// A list made with the setup link opens with its name to type, as a plain sheet. The
+// tests name it as lists used to be called, and give it the three sections lists
+// started with before plain sheets, which most of them use.
+async function started(pg) {
+  await pg.locator("#list-name.editing").waitFor();
+  await pg.keyboard.type((await pg.evaluate(() => document.documentElement.lang)) === "fr" ? "Liste de courses" : "Shopping list");
+  await pg.keyboard.press("Enter");
+  await pg.evaluate(async () => {
+    const store = await import("/store.js"), { DEFAULTS } = await import("/model.js"), list = await import("/list.js");
+    store.change(null, [["#ess", "name", DEFAULTS[0].name], ["#look", "deleted", false], ["#long", "deleted", false]]);
+    list.repaint();
+  });
+}
+
 // Two phones sharing a new list: A creates it, B joins with the pairing link.
 async function pair(options) {
   const errors = [];
   const A = await phone(errors, options), B = await phone(errors, options);
   await A.page.goto(BASE + "/#setup=" + SETUP.toLowerCase());
-  await A.page.locator("#pair").waitFor();
-  await A.page.click("#pair-close");
+  await started(A.page);
   const key = await openKey(A.page);
   await B.page.goto(BASE + "/#k=" + key);
   await B.page.locator("#app").waitFor();
@@ -234,9 +247,8 @@ test("a link opened in a tab where the app is already open is followed", async (
   await a.locator("#lists").waitFor();
   assert.ok(await a.locator("#setup-form").isVisible(), "the first time, the lists page asks for the setup code");
   await a.evaluate(c => { location.hash = "setup=" + c.toLowerCase(); }, SETUP); // pasted into the address bar
-  await a.locator("#pair").waitFor();
-  assert.ok(await a.locator("#app").isVisible(), "a setup link starts the list");
-  await a.click("#pair-close");
+  await a.locator("#list-name.editing").waitFor();
+  assert.ok(await a.locator("#app").isVisible(), "a setup link starts the list, named first");
   await ctx.close();
   assert.deepEqual(errors, []);
 });
@@ -248,8 +260,7 @@ test("a link to another list adds it beside this one, and keeps what this one ha
   await blur(a);
   const other = await browser.newContext(), o = await other.newPage();
   await o.goto(BASE + "/#setup=" + SETUP.toLowerCase());
-  await o.locator("#pair").waitFor();
-  await o.click("#pair-close");
+  await started(o);
   await add(o, "ess", "Garden hose");
   await blur(o);
   assert.ok(await eventually(async () => { const st = await stored(o); return st && !st.outbox.length && Object.values(st.items).some(f => f.text && f.text[0] === "Garden hose"); }), "sent before that phone closes");
@@ -422,7 +433,7 @@ test("sections can be renamed, added, and deleted once empty", async () => {
 test("the list has a name, at the top, renamed with a tap", async () => {
   const t = await pair();
   const { a, b } = t;
-  assert.equal(await a.locator("#list-name").innerText(), "Shopping list", "a new list has a name to start with");
+  assert.equal(await a.locator("#list-name").innerText(), "Shopping list", "named as it started");
   assert.equal(await a.title(), "Shopping list");
   const box = await a.locator("#list-name").boundingBox();
   assert.ok(box.height >= 44, "big enough to tap");
@@ -1436,8 +1447,7 @@ async function alone(options) {
   const errors = [];
   const P = await phone(errors, options);
   await P.page.goto(BASE + "/#setup=" + SETUP.toLowerCase());
-  await P.page.locator("#pair").waitFor();
-  await P.page.click("#pair-close");
+  await started(P.page);
   return { ...P, errors, async close() { await P.ctx.close(); assert.deepEqual(errors, [], "no errors in the page"); } };
 }
 const sheets = pg => pg.locator(".sheet-name").evaluateAll(els => els.map(e => (e.firstChild ? e.firstChild.textContent : ""))); // the name, without who else has it
@@ -1479,8 +1489,8 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
 
   await newList(a, "Hardware store");
   assert.equal(await a.locator("#list-name").innerText(), "Hardware store", "a new list opens, named");
-  assert.deepEqual(await names(a), ["Essentials", "Look out for", "Long term"]);
-  assert.equal(await a.evaluate(() => document.activeElement.id), "add-ess", "ready to write on: the cursor is in its first section");
+  assert.equal(await a.locator("#list .sec-head:visible").count(), 0, "a plain sheet");
+  assert.equal(await a.evaluate(() => document.activeElement.id), "add-ess", "ready to write on: the cursor is in its Add item");
   await add(a, "ess", "Screws");
   assert.equal(await a.locator(".item.flash").count(), 0, "what was just typed isn't pointed out");
   await blur(a);
@@ -1533,6 +1543,50 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   assert.deepEqual(await sheets(a), ["Shopping list"], "deleted in another tab, the list on screen gives way to the lists page");
   assert.equal(await a.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith("panier2:")).length), 1, "and isn't written back");
   await t.close();
+});
+
+test("a new list is a plain sheet, named first; sections come when added, and lists made before keep their three", async () => {
+  const errors = [];
+  const { ctx, page: a } = await phone(errors);
+  await a.goto(BASE + "/#setup=" + SETUP.toLowerCase());
+  await a.locator("#list-name.editing").waitFor();
+  assert.equal(await a.locator("#pair").evaluate(d => d.open), false, "nothing pops up over it");
+  assert.equal(await a.evaluate(() => document.activeElement.id), "list-name", "the first list opens with its name to type");
+  assert.equal(await a.locator("#list .sec-head:visible").count(), 0, "no section heading");
+  await a.keyboard.press("Escape");
+  assert.equal(await a.locator("#list-name").innerText(), "");
+  assert.equal(await a.locator("#list-name").getAttribute("data-placeholder"), "Name this list", "left without a name, it asks for one");
+  await toLists(a);
+  assert.deepEqual(await sheets(a), ["Untitled list"]);
+  await a.locator(".sheet-open").click();
+  await a.click("#list-name");
+  await a.keyboard.type("Hardware store");
+  await a.keyboard.press("Enter");
+  assert.equal(await a.evaluate(() => document.activeElement.id), "add-ess", "named with Enter, the cursor goes on to Add item");
+  assert.ok(await eventually(async () => (await a.title()) === "Hardware store"));
+  for (const x of ["Screws", "Sandpaper"]) await add(a, "ess", x);
+  await a.fill("#add-sec", "Garden");
+  await a.press("#add-sec", "Enter");
+  const garden = await a.locator("#list > .sec").last().getAttribute("data-sec");
+  await add(a, garden, "Hose");
+  await blur(a);
+  assert.deepEqual(await a.locator("#list .sec-head:visible").allInnerTexts(), ["Garden"], "a heading for the section added, none for the first");
+  await a.focus("#h-" + garden);
+  await a.keyboard.press("Alt+ArrowUp");
+  assert.equal(await a.locator("#list > .sec").first().getAttribute("data-sec"), "ess", "the items without a heading stay first");
+  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
+  assert.equal(readFileSync(await dl.path(), "utf8"), "# Hardware store\n\n- [ ] Screws\n- [ ] Sandpaper\n\n## Garden <!-- teal -->\n- [ ] Hose\n", "and in Markdown, before any heading");
+
+  await toLists(a);
+  await newList(a, "Pharmacy");
+  assert.equal(await a.locator("#list .sec-head:visible").count(), 0, "a list made later starts plain too");
+  // A list made before plain sheets, which wrote no start into itself, keeps its three.
+  await toLists(a);
+  await a.evaluate(async () => (await import("/store.js")).createList({}));
+  await a.locator(".sheet-open", { hasText: "Untitled list" }).click();
+  assert.deepEqual(await names(a), ["Essentials", "Look out for", "Long term"]);
+  await ctx.close();
+  assert.deepEqual(errors, []);
 });
 
 test("lists are reordered by dragging, and deleted once asked, on the lists page or at the foot of the list; undo brings them back", async () => {
@@ -1620,7 +1674,7 @@ test("lists come in from Markdown, from plain text, and from several pasted line
   const txt = "Essentials\n- [ ] 2 eggs\n\nLook out for\n- [ ] Ripe avocados\n- [x] Milk\n";
   await a.setInputFiles("#import-file", { name: "groceries.txt", mimeType: "text/plain", buffer: Buffer.from(txt) });
   await a.locator("#app").waitFor();
-  assert.equal(await a.locator("#list-name").innerText(), "Shopping list", "no setup code the second time");
+  assert.equal(await a.locator("#list-name").innerText(), "", "no setup code the second time, and with no title in the file, a list to name");
   assert.deepEqual(await names(a), ["Essentials", "Look out for"]);
   assert.deepEqual(await texts(a, "Essentials"), ["2 eggs"]);
   await a.fill("#add-ess", "mi");

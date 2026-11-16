@@ -9,8 +9,9 @@ import * as list from "./list.js";
 import * as lists from "./lists.js";
 import { paintStatus } from "./bar.js";
 import { follow } from "./sheets.js";
-import { openPair, peopleChanged } from "./share.js";
+import { peopleChanged } from "./share.js";
 import { keepList } from "./settings.js";
+import { startOps } from "./model.js";
 
 $("#lists-open").addEventListener("click", showLists);
 $("#delete-open").addEventListener("click", () => lists.askDelete(state.lid)); // which shows the lists page once it's gone
@@ -100,10 +101,10 @@ async function init() {
   }
   if (params.get("setup") && !store.lists().length) {
     try {
-      const lid = await store.createList({ code: params.get("setup") });
+      const lid = await store.createList({ code: params.get("setup"), ops: startOps() });
       begin(lid);
-      openPair();
       keepList();
+      list.editName(); // a new list is named first
       return;
     } catch (err) {
       lists.say(lists.MESSAGES[err.message] || lists.MESSAGES.server);
@@ -123,6 +124,7 @@ function begin(lid, toLists = false) {
 }
 nav.showList = showList;
 nav.showLists = showLists;
+nav.editName = list.editName;
 translatePage();
 init();
 // A pairing or setup link opened in this tab, with the app already open: it starts afresh

@@ -5,7 +5,9 @@
 import { t, lang } from "./i18n.js";
 import { newId } from "./store.js";
 
-// The three sections every list starts with. They can be renamed, recoloured or deleted like any other.
+// The three sections lists started with before plain sheets, and which lists made then
+// still have unless renamed: their names aren't stored until changed. Imports match them
+// by name. They can be renamed, recoloured or deleted like any other.
 export const DEFAULTS = [
   { id: "ess", name: t("Essentials"), en: "Essentials", color: "ess", pos: 1 },
   { id: "look", name: t("Look out for"), en: "Look out for", color: "look", pos: 2 },
@@ -24,6 +26,11 @@ export const listColorOk = c => (LIST_COLORS.some(([id]) => id === c) ? c : "");
 export const MAX_ITEM = 120; // three lines on a phone
 export const MAX_SECTION = 40; // and the list's name
 export const LIST = "@list"; // where the list's own name is kept, among items and sections
+
+// A new list is a plain sheet: one section without a name, which shows no heading, and
+// the other two the old start had, deleted. Each new list writes this into itself, so
+// lists made before keep their three sections.
+export const startOps = (name = "") => [["#ess", "name", ""], ["#look", "deleted", true], ["#long", "deleted", true], ...(name ? [[LIST, "name", name]] : [])];
 
 export const RECENT_MS = 5 * 24 * 3600 * 1000; // ticked items show in the ticked group for five days
 
@@ -80,7 +87,7 @@ export function between(a, b) {
 }
 
 // Works out which sections to show. A section stays on screen while it has items to
-// get, or text being typed into it, even if someone deleted it meanwhile; inList says
+// tick, or text being typed into it, even if someone deleted it meanwhile; inList says
 // which items are still to tick, which on screen includes those just ticked.
 export function layout(storedSections, its, typing = [], inList = i => !i.checked) {
   const stored = new Map(storedSections.map(s => [s.id, s]));
@@ -95,7 +102,8 @@ export function layout(storedSections, its, typing = [], inList = i => !i.checke
   const used = new Set(its.filter(inList).map(i => i.section));
   for (const id of typing) used.add(id);
   for (const id of used) if (!all.has(id)) all.set(id, { id, name: t("Untitled"), color: PALETTE[0], pos: 100, deleted: false });
-  const order = (a, b) => a.pos - b.pos || (a.id < b.id ? -1 : 1);
+  // The section without a name, which has no heading, always comes first.
+  const order = (a, b) => !!a.name - !!b.name || a.pos - b.pos || (a.id < b.id ? -1 : 1);
   const shown = [...all.values()].filter(s => !s.deleted || used.has(s.id)).sort(order);
   // Two phones can each delete one of the last two sections at once: the first of them
   // stays on screen, so there's always somewhere to add an item.
@@ -110,12 +118,14 @@ export function sheetOfList({ name, color, sections: stored, items: its }) {
   const secs = shown.map(s => ({ name: s.name, color: s.color, items: [] }));
   for (const i of its.filter(i => !i.checked).sort((a, b) => a.pos - b.pos)) secs[at.get(i.section) ?? 0].items.push({ text: i.text, checked: false });
   for (const i of its.filter(i => i.checked).sort((a, b) => b.checkedAt - a.checkedAt)) secs[at.get(i.section) ?? 0].items.push({ text: i.text, checked: true });
-  return { name: name || t("Shopping list"), color: color || "", sections: secs };
+  return { name: name || t("Untitled list"), color: color || "", sections: secs };
 }
 
-// The changes that make a list as read from Markdown: its sections in order, the three
-// a list starts with kept when a section has one of their names, the others deleted;
-// each name once; what was ticked before kept out of the ticked group, to be suggested.
+// The changes that make a list as read from Markdown, on top of a new list's start: its
+// sections in order, items before the first heading in the section without a name, the
+// three of the old start kept when a section has one of their names, the others
+// deleted; each name once; what was ticked before kept out of the ticked group, to be
+// suggested.
 export function importOps(l) {
   const ops = [], used = new Set(), colours = new Set(), seen = new Set();
   const old = Date.now() - RECENT_MS - 864e5;
@@ -129,7 +139,7 @@ export function importOps(l) {
     const color = colorOk(sec.color, d ? d.color : PALETTE.find(c => !colours.has(c)) || PALETTE[0]);
     used.add(id);
     colours.add(color);
-    ops.push([key, "name", name || (d ? d.name : t("Untitled"))], [key, "pos", i + 1], [key, "color", color], [key, "deleted", false]);
+    ops.push([key, "name", name || (i === 0 ? "" : d ? d.name : t("Untitled"))], [key, "pos", i + 1], [key, "color", color], [key, "deleted", false]);
     sec.items.forEach((it, j) => {
       const text = clean(it.text), nk = text && nameKey(text);
       if (!text || seen.has(nk)) return;

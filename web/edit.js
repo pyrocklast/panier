@@ -52,6 +52,7 @@ function aroundCursor(span) {
 // there; with onJoin, Backspace at its very start joins it to what's above, when canJoin
 // allows; with onEmpty, leaving the text empty calls it instead of restoring the old text.
 // onDone runs whenever editing ends, and onUnchanged when it ends with the text as it was.
+// onSave(text, entered) is told whether editing ended with Enter.
 export function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSave, onDelete, deleteLabel, onSplit, canJoin, onJoin, onEmpty, below, onDone, onUnchanged }) {
   if (state.editing || state.drag) return;
   state.editing = key;
@@ -68,7 +69,7 @@ export function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSa
     else { r.selectNodeContents(span); r.collapse(false); }
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
   } catch (_) {}
-  let cancelled = false, binned = false, done = false;
+  let cancelled = false, binned = false, done = false, entered = false;
   const bin = onDelete && h("button", {
     type: "button", class: "bin", "aria-label": deleteLabel,
     onpointerdown: e => e.preventDefault(), onmousedown: e => e.preventDefault(),
@@ -85,7 +86,7 @@ export function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSa
     // A split between words joins back with a space; one inside a word, without.
     const glue = c && c.collapsed && !/\s$/.test(c.head) && !/^\s/.test(c.tail) ? "" : " ";
     if (a && b) finish(() => onSplit(a, b, glue));
-    else span.blur();
+    else { entered = true; span.blur(); }
   };
   const back = e => {
     const c = onJoin && aroundCursor(span);
@@ -141,7 +142,7 @@ export function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSa
       if (onUnchanged && !binned) onUnchanged();
       return;
     }
-    if (onSave(text) === false) show();
+    if (onSave(text, entered) === false) show();
   }
   span.addEventListener("keydown", onKey);
   span.addEventListener("beforeinput", onBefore);

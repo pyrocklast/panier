@@ -43,7 +43,7 @@ First a server, then the phones.
 
 Then, on the phones:
 
-1. On the first phone, open the setup link from the guide. It creates the first list.
+1. On the first phone, open the setup link from the guide. It creates the first list, which opens with its name to type.
 2. On another phone, scan the QR code that *Add someone to this list* shows.
 3. Install the app on each phone: in Firefox, **⋮ → Install**; in Chrome, **⋮ → Install app**; on an iPhone, Safari's **Share → Add to Home Screen**.
 4. Save the list's link in a password manager.
@@ -54,7 +54,7 @@ Then, on the phones:
 - **Tick:** tap the square. Ticked items move to the ticked group after a moment, and stay there for five days.
 - **Edit:** tap the words. Clear them to delete the item.
 - **Move:** hold an item, or a section's name, for half a second, then drag.
-- **Sections:** tap a section's name to rename it or change its colour. *Add a section* is below the last one.
+- **Sections:** a new list is a plain sheet. *Add a section*, below the items, adds a heading when it helps; tap a heading to rename it or change its colour.
 - **The list:** tap its name to rename it or choose its paper's colour.
 - **Lists:** *Lists*, at the top right of a list, or the back gesture, leads to the lists page: tap a list to open it, *New list* to start one, hold one to move it, or drop it at the foot to delete it, which asks first. *Delete the list*, at the foot of a list, does the same.
 - **Import:** *From a file* on the lists page brings in a Markdown or text list; several lines pasted into *Add item* become several items.

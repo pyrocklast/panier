@@ -278,7 +278,11 @@ class List {
     if (this.s.closed) return null; // a closed list takes nothing more
     const t = this.tick();
     const recs = [];
-    for (const [id, field, value, fallback] of ops) {
+    // Every write in a step has the same time, so the last one given to a field is the
+    // one kept, such as a section an import names after a new list's start.
+    const last = new Map();
+    for (const op of ops) last.set(op[0] + "\n" + op[1], op);
+    for (const [id, field, value, fallback] of last.values()) {
       const stored = this.valueOf(id, field);
       const prev = stored === undefined ? fallback : stored;
       if (prev !== undefined && same(prev, value)) continue;
@@ -667,9 +671,6 @@ export function addKeys(keys) {
   return out;
 }
 
-// createList makes a new list on the server: vouched for by a list this phone already
-// has there, or with the server's setup code when it has none, or none will. Throws
-// "code" when the setup code is needed (or was wrong), "server" when unreachable.
 // register asks the server for a new list, with keys d: with the setup code, or vouched
 // for by a list it already holds.
 const register = (d, { code = null, by = null }) => fetch("/api/lists", {
@@ -677,7 +678,12 @@ const register = (d, { code = null, by = null }) => fetch("/api/lists", {
   headers: { "Content-Type": "application/json", ...(by ? { Authorization: "Bearer " + by.auth } : { "X-Setup-Code": code.trim() }) },
   body: JSON.stringify({ id: d.id, auth: d.auth, ...(by ? { by: by.id } : {}) }),
 });
-export async function createList({ code = null, name = "" } = {}) {
+// createList makes a new list on the server: vouched for by a list this phone already
+// has there, or with the server's setup code when it has none, or none will. ops is what
+// the list starts with (see startOps in model.js), and, for an import, what it holds: one
+// step, as if typed. Throws "code" when the setup code is needed (or was wrong), "server"
+// when unreachable. Returns the list's id on this phone.
+export async function createList({ code = null, ops = [] } = {}) {
   const raw = crypto.getRandomValues(new Uint8Array(32));
   const d = await derive(raw);
   let res = null;
@@ -701,17 +707,10 @@ export async function createList({ code = null, name = "" } = {}) {
   l.session = d;
   l.deriving = Promise.resolve(d);
   l.hello();
-  if (name) l.change(null, [["@list", "name", name]]);
+  if (ops.length) l.change(null, ops);
   l.summarize();
   emit("lists");
   return l.lid;
-}
-
-// A new list holding ops, for an import: one step, as if typed. Returns its id.
-export async function createFrom(ops, opts) {
-  const lid = await createList(opts);
-  get(lid).change(null, ops);
-  return lid;
 }
 
 // remove takes a list off this phone; it stays on the server for the others. Returns

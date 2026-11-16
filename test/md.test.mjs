@@ -65,6 +65,17 @@ test("a plain-text list reads too: a line with items after it names a section", 
   assert.deepEqual(lists[0].sections.map(s => [s.name, s.items.map(i => i.text)]), [["Essentials", ["2 eggs"]], ["Look out for", ["Ripe avocados", "Bread"]]]);
 });
 
+test("a plain sheet's items come before any section, both ways", () => {
+  const plain = { name: "Hardware store", color: "", sections: [
+    { name: "", color: "ess", items: [{ text: "Screws", checked: false }] },
+    { name: "Garden", color: "teal", items: [{ text: "Hose", checked: true }] },
+  ] };
+  const md = toMarkdown([plain]);
+  assert.equal(md, "# Hardware store\n\n- [ ] Screws\n\n## Garden <!-- teal -->\n- [x] Hose\n");
+  assert.deepEqual(fromMarkdown(md)[0].sections.map(s => [s.name, s.items.map(i => i.text)]), [[null, ["Screws"]], ["Garden", ["Hose"]]]);
+  assert.equal(toMarkdown([{ name: "Empty", color: "", sections: [{ name: "", color: "ess", items: [] }] }]), "# Empty\n");
+});
+
 test("pasting several lines gives one item each; one line is just text", () => {
   assert.equal(pastedItems("Milk"), null);
   assert.equal(pastedItems("Milk\n\n"), null);

@@ -23,7 +23,8 @@ const ui = { sugSec: null, sug: [], sugIndex: -1, sugCol: 0, basketOpen: true };
 let wasReadOnly = false; // as the list on screen was last drawn
 
 const find = id => items.find(i => i.id === id);
-const nameOf = id => (sectionInfo.get(id) || { name: t("this section") }).name;
+// A section by name; the one without a name, at the top, goes by the list's.
+const nameOf = id => { const s = sectionInfo.get(id); return s ? s.name || listName() : t("this section"); };
 const colorOf = id => (sectionInfo.has(id) ? sectionInfo.get(id).color : "muted");
 const isShown = id => sections.some(s => s.id === id);
 const inList = i => !i.checked || settling.has(i.id);
@@ -372,22 +373,26 @@ function editSection(span, id, x, y) {
   });
 }
 // The list's name, at the top, is renamed the same way as a section's, its colour chosen
-// under it.
+// under it. A list without a name says "Name this list" there; named with Enter, the
+// cursor goes on to its first Add item, ready to write on.
 function editListName(span, x, y) {
   if (readOnly()) return;
-  const orig = listName();
+  const orig = store.listName() || "";
   edit(span, {
     key: LIST, row: span.closest(".list-top"), orig, max: MAX_SECTION, x, y,
-    below: palette(orig, LIST_COLORS, listColor(), (c, label) => {
+    below: palette(listName(), LIST_COLORS, listColor(), (c, label) => {
       announce(t("{x} is now {y}", { x: listName(), y: t(label).toLowerCase() }));
       act(t("changing the colour of {x}", { x: q(listName()) }), [[LIST, "color", c, ""]], { animate: false });
     }),
-    onSave: name => {
+    onSave: (name, entered) => {
       announce(t("Renamed the list to {x}", { x: name }));
-      act(t("renaming the list {x}", { x: q(orig) }), [[LIST, "name", name, t("Shopping list")]], { leaving: true });
+      act(t("renaming the list {x}", { x: q(orig || listName()) }), [[LIST, "name", name, ""]], { leaving: true });
+      if (entered && !orig && sections.length) $("#add-" + sections[0].id).focus();
     },
   });
 }
+// Naming a new list, as it opens: the first list, made with the setup code.
+export const editName = () => editListName($("#list-name"));
 function recolour(id, color, label) {
   const fallback = (DEFAULTS.find(d => d.id === id) || {}).color;
   announce(t("{x} is now {y}", { x: nameOf(id), y: t(label).toLowerCase() }));
@@ -552,8 +557,11 @@ function syncShells() {
     sh.el.style.setProperty("--sec", "var(--" + s.color + ")");
     if (sh.el.dataset.color !== s.color) sh.el.dataset.color = s.color;
     if (state.editing !== "#" + s.id && sh.name.textContent !== s.name) sh.name.textContent = s.name;
+    // A section without a name shows no heading: its items sit under the list's name.
+    sh.el.classList.toggle("plain", !s.name);
+    if (s.name) sh.el.setAttribute("aria-labelledby", "h-" + s.id); else sh.el.removeAttribute("aria-labelledby");
     sh.name.setAttribute("aria-label", readOnly() ? s.name : t("{x}, rename", { x: s.name }));
-    sh.input.setAttribute("aria-label", t("Add item to {x}", { x: s.name }));
+    sh.input.setAttribute("aria-label", s.name ? t("Add item to {x}", { x: s.name }) : t("Add item"));
     if (list.children[i] !== sh.el) list.insertBefore(sh.el, list.children[i] || null);
   });
 }
@@ -727,7 +735,7 @@ function placeSection(y) {
   const list = $("#list");
   let before = null;
   for (const c of list.children) {
-    if (c === state.drag.el) continue;
+    if (c === state.drag.el || c.classList.contains("plain")) continue; // the section without a name stays first
     const r = c.getBoundingClientRect();
     if (y < r.top + r.height / 2) { before = c; break; }
   }
@@ -762,7 +770,7 @@ function endSectionDrag() {
 function moveSection(id, dir) {
   if (readOnly()) return;
   const order = sections.map(s => s.id), i = order.indexOf(id), j = i + dir;
-  if (j < 0 || j >= order.length) return;
+  if (j < 0 || j >= order.length || !sections[j].name) return; // the section without a name stays first
   [order[i], order[j]] = [order[j], order[i]];
   announce(t(dir < 0 ? "{x} moved up" : "{x} moved down", { x: nameOf(id) }));
   act(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order), { focusKey: "name-" + id });
@@ -772,10 +780,10 @@ function moveSection(id, dir) {
 
 function render() {
   if (state.view !== "list" || !store.current()) return; // the lists page shows; the list draws when it's back
-  const name = listName(), title = $("#list-name");
+  const name = store.listName() || "", title = $("#list-name"); // without one, it says "Name this list" (app.css)
   if (state.editing !== LIST && title.textContent !== name) title.textContent = name;
-  title.setAttribute("aria-label", readOnly() ? name : t("{x}, rename", { x: name }));
-  document.title = name;
+  title.setAttribute("aria-label", readOnly() ? listName() : name ? t("{x}, rename", { x: name }) : t("Name this list"));
+  document.title = name || "Panier";
   wasReadOnly = readOnly();
   $("#app").classList.toggle("readonly", wasReadOnly);
   window.panierList(listColor());
@@ -818,6 +826,7 @@ function exportList() {
 }
 
 $("#export-btn").addEventListener("click", exportList);
+$("#list-name").dataset.placeholder = t("Name this list");
 
 // Adding a section moves the cursor to its Add item field.
 addRow($("#add-sec-form"), $("#add-sec"), { add: () => addSection($("#add-sec").value) });

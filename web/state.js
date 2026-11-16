@@ -15,12 +15,12 @@ export const state = {
   pointerDown: false,
   removed: [], // lists deleted from this phone since the app opened, for undo
 };
-// app.js fills these in: showList(lid) and showLists().
+// app.js fills these in: showList(lid), showLists() and editName(), which starts naming the list on screen.
 export const nav = {};
 
 // A closed list, or one from a newer Panier, is only read: what's done here could never be
 // sent, so nothing can be added, edited, moved or ticked.
 export const readOnly = () => state.view === "list" && (store.status().closed || store.newerFormat());
-export const listName = () => store.listName() || t("Shopping list");
+export const listName = () => store.listName() || t("Untitled list");
 export const listColor = () => listColorOk(store.listColor());
 export const draftsKey = (lid = store.current()) => "panier2-drafts:" + lid; // text typed into a list's "Add item" fields, kept until added

@@ -26,7 +26,7 @@ async function paintSettings() {
   $("#compact-layout").checked = document.documentElement.dataset.layout === "compact";
   $("#my-name").value = store.myName();
   const all = store.lists();
-  $("#sizes").replaceChildren(...all.map(e => h("li", {}, h("span", {}, e.name || t("Shopping list")), h("span", {}, size(store.storedSize(e.lid))))));
+  $("#sizes").replaceChildren(...all.map(e => h("li", {}, h("span", {}, e.name || t("Untitled list")), h("span", {}, size(store.storedSize(e.lid))))));
   $("#export-all").hidden = $("#phone-open").hidden = !all.length;
   $("#about-server").textContent = location.host;
   const [kept, keys] = await Promise.all([isKept(), caches.keys().catch(() => [])]);

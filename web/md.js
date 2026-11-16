@@ -7,7 +7,8 @@
 //   - [x] Eggs
 //
 // "#" is a list's name, "##" each of its sections in order, "- [ ]" an item to tick and
-// "- [x]" one ticked before, under its section, so unticking puts it back there.
+// "- [x]" one ticked before, under its section, so unticking puts it back there. Items
+// before the first "##" are in the section without a name, which has no heading.
 // Colours ride in comments after the headings, which Markdown hides. A file can hold
 // several lists, each under its own "#".
 //
@@ -27,7 +28,8 @@ export function toMarkdown(lists) {
   return lists.map(l => {
     const out = ["# " + one(l.name) + tag(l.color)];
     for (const s of l.sections) {
-      out.push("", "## " + one(s.name) + tag(s.color));
+      if (s.name) out.push("", "## " + one(s.name) + tag(s.color));
+      else if (s.items.length) out.push("");
       for (const i of s.items) out.push((i.checked ? "- [x] " : "- [ ] ") + one(i.text));
     }
     return out.join("\n");

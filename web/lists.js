@@ -7,13 +7,12 @@ import * as store from "./store.js";
 import { t, plural, q, lang } from "./i18n.js";
 import { fromMarkdown } from "./md.js";
 import { state, nav, draftsKey } from "./state.js";
-import { clean, MAX_SECTION, listColorOk, importOps } from "./model.js";
+import { clean, MAX_SECTION, listColorOk, importOps, startOps } from "./model.js";
 import { $, h, fillText, addRow, emptyField, announce, activeFk, buzz, setRows } from "./dom.js";
 import { bindPress, beginDrag } from "./press.js";
 import { float } from "./motion.js";
 import { noteUndo, paintDock } from "./bar.js";
 import { confirmSheet } from "./sheets.js";
-import { openPair } from "./share.js";
 import { keepList } from "./settings.js";
 
 // Who else has a list, in a few quiet words under its name: two names at most, then a count.
@@ -44,7 +43,7 @@ function cardOf(e) {
     bindPress(li, { can: () => true, start: (offY, y, offX, x) => startSheetDrag(li, e.lid, offY, y, offX, x) });
     cards.set(e.lid, (c = { li, btn, name, who, first, count, shown: "" }));
   }
-  const nm = e.name || t("Shopping list"), cnt = countOf(e), gone = !!(e.closed || e.newer), first = gone ? [] : e.first || [];
+  const nm = e.name || t("Untitled list"), cnt = countOf(e), gone = !!(e.closed || e.newer), first = gone ? [] : e.first || [];
   const w = gone ? "" : withOf(e);
   const shown = JSON.stringify([nm, cnt, first, e.color, gone, w]);
   if (c.shown !== shown) {
@@ -130,7 +129,7 @@ function moveSheet(lid, dir) {
   [order[i], order[j]] = [order[j], order[i]];
   store.reorder(order);
   const e = store.lists().find(x => x.lid === lid);
-  announce(t(dir < 0 ? "{x} moved earlier" : "{x} moved later", { x: e.name || t("Shopping list") }));
+  announce(t(dir < 0 ? "{x} moved earlier" : "{x} moved later", { x: e.name || t("Untitled list") }));
   renderLists();
   const el = document.querySelector('[data-fk="sheet-' + lid + '"]');
   if (el) el.focus();
@@ -144,7 +143,7 @@ function moveSheet(lid, dir) {
 export function askDelete(lid) {
   const e = store.lists().find(x => x.lid === lid);
   if (!e) return;
-  const name = e.name || t("Shopping list"), w = e.with, others = !!(w && (w.names.length || w.nameless));
+  const name = e.name || t("Untitled list"), w = e.with, others = !!(w && (w.names.length || w.nameless));
   confirmSheet({
     title: t("Delete {x}?", { x: q(name) }),
     text: e.closed ? t("It's closed already: this takes what's left of it off this phone.")
@@ -171,7 +170,7 @@ const lostFocus = el => { if (!document.activeElement || document.activeElement 
 function removeList(lid) {
   const e = store.lists().find(x => x.lid === lid);
   if (!e) return;
-  const name = e.name || t("Shopping list"), dk = draftsKey(lid);
+  const name = e.name || t("Untitled list"), dk = draftsKey(lid);
   let drafts = null;
   try { drafts = localStorage.getItem(dk); localStorage.removeItem(dk); } catch (_) {}
   state.removed.push({ label: t("deleting {x}", { x: q(name) }), r: store.remove(lid), drafts, dk });
@@ -217,7 +216,7 @@ async function create(make, done) {
 addRow($("#new-list-form"), $("#new-list"), {
   add: () => {
     const name = clean($("#new-list").value, MAX_SECTION);
-    if (name) create(code => store.createList({ code, name }), lid => {
+    if (name) create(code => store.createList({ code, ops: startOps(name) }), lid => {
       emptyField($("#new-list"));
       announce(t("Added {x}", { x: name }));
       nav.showList(lid);
@@ -235,7 +234,7 @@ $("#setup-form").addEventListener("submit", async e => {
   const code = $("#setup-code").value;
   if (!code.trim() || creating) return;
   creating = true;
-  const p = pending || { make: c => store.createList({ code: c }), done: lid => { nav.showList(lid); openPair(); keepList(); } };
+  const p = pending || { make: c => store.createList({ code: c, ops: startOps() }), done: lid => { nav.showList(lid); keepList(); nav.editName(); } };
   try {
     const r = await p.make(code);
     pending = null;
@@ -262,7 +261,7 @@ $("#import-file").addEventListener("change", async e => {
   const made = lists.map(importOps);
   create(async code => {
     const lids = [];
-    for (const m of made) { lids.push(await store.createFrom(m.ops, { code })); code = null; }
+    for (const m of made) { lids.push(await store.createList({ code, ops: [...startOps(), ...m.ops] })); code = null; }
     return lids;
   }, lids => {
     const n = made.reduce((a, m) => a + m.n, 0);

@@ -4,7 +4,7 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 
 ## Starting
 
-- **The first phone** opens the app's address and types the server's setup code (see [docs/cloudflare.md](cloudflare.md) or [docs/raspberry-pi.md](raspberry-pi.md) for where it comes from). The first list starts with three sections.
+- **The first phone** opens the app's address and types the server's setup code (see [docs/cloudflare.md](cloudflare.md) or [docs/raspberry-pi.md](raspberry-pi.md) for where it comes from). The first list opens with its name to type.
 - **Another phone** joins with *Add someone to this list*, at the bottom of the list: it shows a QR code to scan, and buttons to share or copy the link.
 - **Keep a copy of each list's link** in a password manager. It is the key to the list: it's the only way to get the list back if every phone is lost, and anyone who has it can open the list.
 - **Install it** so it opens like an app, full screen and offline: in Firefox, **⋮ → Install** (or **Add to home screen**); in Chrome, **⋮ → Install app**; on an iPhone, Safari's **Share → Add to Home Screen**.
@@ -25,25 +25,19 @@ A phone holds any number of lists, each shared with its own people. The app open
 
 The list is written on the page itself, like paper: one left edge, ruled lines between items and under section names, and an underline where you type. Only what is lifted off the page has a shadow: something being dragged, the undo button, the sheets.
 
-- **The list's name** is the title at the top, *Shopping list* to start with. Tap it to rename it. It also names the exported file. At its right, *Lists* leads to the lists page.
+- **The list's name** is the title at the top. A new list is named as it's made; one without a name says *Name this list* there, and is *Untitled list* elsewhere. Tap it to rename it. It also names the exported file. At its right, *Lists* leads to the lists page.
 - **The list's colour.** While you rename the list, colours show under its name: white and eight hues. The paper is warm paper dyed with the colour, the ruled lines a deeper dye, the title a deep shade of it, and the writing leans its way. The browser's bars follow, and the app opens in the colour without a flash of white.
 - **The eight colours weigh the same.** Each is a single hue, and every tone of it, from paper to tick box, is that hue at a lightness set by what it's for, so no colour shouts or fades beside another, in light or dark.
 - Every phone sees the name and colour, and undo puts the old ones back.
 
 ## Sections
 
-A list starts with three sections:
+A new list is a plain sheet: its items sit under its name, with no heading. *Add a section* adds headings when they help: the items without one stay first, above them. Lists made before plain sheets keep the three sections they started with, *Essentials*, *Look out for* and *Long term*.
 
-| Section | Colour | For |
-| --- | --- | --- |
-| Essentials | ink | everyday things the home runs on |
-| Look out for | amber | things to buy if you come across them |
-| Long term | indigo | things to get eventually |
-
-- **Rename** a section by tapping its name. Every phone sees the new name. Emptying the name and leaving puts the old one back.
+- **Rename** a section by tapping its heading. Every phone sees the new name. Emptying the name and leaving puts the old one back.
 - **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it at once. Its name is written in a deep shade of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
 - **Add a section** with *Add a section*, below the last one. It gets the first colour not used yet. Enter or `+` adds it, the cross clears what you typed, and the cursor then moves to its *Add item* row.
-- **Delete** a section once nothing is left to tick in it: while you rename it, a cross appears. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
+- **Delete** a section once nothing is left to tick in it: while you rename it, a cross appears. The items without a heading, at the top, always have their place. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 
 ## Adding items
 
@@ -103,7 +97,7 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 - [x] Eggs
 ```
 
-`#` is the list's name, `##` each section in order, `- [ ]` an item to tick, `- [x]` one ticked before, under its section. Colours ride in comments after the headings, which notes apps hide.
+`#` is the list's name, `##` each section in order, `- [ ]` an item to tick, `- [x]` one ticked before, under its section. Items before the first `##` are those without a heading. Colours ride in comments after the headings, which notes apps hide.
 
 - **Export the list**, at the bottom of a list, saves it as a `.md` file named after it.
 - **Export all lists**, in Settings, saves every list in one file, each under its own `#`.
@@ -155,4 +149,4 @@ Changes are announced to screen readers. Light and dark follow the phone unless 
 
 ## Languages
 
-Panier is in English and French, following the phone's language. The starting section names follow it too, until one is renamed: *Essentiels*, *À l’occasion*, *À long terme*, and the list is called *Liste de courses*. The words live in [`web/i18n.js`](../web/i18n.js); another language is one more table there.
+Panier is in English and French, following the phone's language. The words live in [`web/i18n.js`](../web/i18n.js); another language is one more table there.
