@@ -30,6 +30,7 @@ const FR = {
   "Data": "Données",
   "Keep them on this phone": "Les garder sur ce téléphone",
   "Export the list": "Exporter la liste",
+  "Delete the list": "Supprimer la liste",
   "Export all lists": "Exporter toutes les listes",
   "Set up another phone": "Préparer un autre téléphone",
   "You": "Vous",

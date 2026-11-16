@@ -136,11 +136,12 @@ function moveSheet(lid, dir) {
   if (el) el.focus();
 }
 
-// A list is deleted only here, on the lists page, dropped on the zone at the foot or with
-// the Delete key, and only once asked. From this phone, the others keep it and its link
+// A list is deleted only once asked: on the lists page, dropped on the zone at the foot or
+// with the Delete key, or with Delete the list, at the foot of the list itself, which a
+// screen reader on a phone can reach. From this phone, the others keep it and its link
 // brings it back, and undo does too, until the app closes. For everyone, it asks again,
 // as nothing brings it back.
-function askDelete(lid) {
+export function askDelete(lid) {
   const e = store.lists().find(x => x.lid === lid);
   if (!e) return;
   const name = e.name || t("Shopping list"), w = e.with, others = !!(w && (w.names.length || w.nameless));

@@ -60,14 +60,9 @@ test("any Markdown checklist reads: other bullets, numbers, headings of any leve
   ], "the quote and the code block left out");
 });
 
-test("the first export's text files read too, what was bought before going back in the first section", () => {
-  for (const [title, bought] of [["Shopping list, 12 November 2026", "Bought before"], ["Liste de courses, 1er décembre 2026", "Déjà achetés"]]) {
-    const lists = fromMarkdown([title, "", "Essentials", "- [ ] 2 eggs", "", "Look out for", "- [ ] Ripe avocados", "", bought, "- [x] Milk", ""].join("\n"));
-    assert.equal(lists.length, 1);
-    assert.equal(lists[0].name, title.split(",")[0]);
-    assert.deepEqual(lists[0].sections.map(s => s.name), ["Essentials", "Look out for"]);
-    assert.deepEqual(lists[0].sections[0].items, [{ text: "2 eggs", checked: false }, { text: "Milk", checked: true }]);
-  }
+test("a plain-text list reads too: a line with items after it names a section", () => {
+  const lists = fromMarkdown(["Essentials", "- [ ] 2 eggs", "", "Look out for", "- Ripe avocados", "Bread", ""].join("\n"));
+  assert.deepEqual(lists[0].sections.map(s => [s.name, s.items.map(i => i.text)]), [["Essentials", ["2 eggs"]], ["Look out for", ["Ripe avocados", "Bread"]]]);
 });
 
 test("pasting several lines gives one item each; one line is just text", () => {

@@ -13,7 +13,7 @@
 //
 // Reading is lenient, so lists from elsewhere come in too: any heading below "#" is a
 // section, any bullet or numbered line an item, and so is a plain line, unless items
-// follow it, as section names did in the text files the first export wrote.
+// follow it, when it names a section, as plain-text lists often do.
 
 // Colours by name in files, by id in the app.
 const COLOURS = { ess: "ink", green: "green", teal: "teal", blue: "blue", long: "indigo", plum: "plum", rose: "rose", look: "amber", olive: "olive" };
@@ -39,8 +39,6 @@ const COLOUR = /\s*<!--\s*([a-z]+)\s*-->\s*$/i;
 const TASK = /^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s+(.*)$/;
 const BULLET = /^\s*(?:[-*+•]|\d+[.)])\s+(.*)$/;
 const NOISE = /^\s*(?:>|\||<!--|-{3,}\s*$|\*{3,}\s*$|_{3,}\s*$)/; // quotes, tables, comments, rules
-const DATED = /,\s+\d{1,2}(?:er)?\s+\S+\s+\d{4}$/; // the first export's title: "Shopping list, 12 November 2026"
-const BOUGHT = /^(?:bought before|déjà achetés)$/i; // and its last section
 
 function named(s) {
   const m = COLOUR.exec(s);
@@ -94,18 +92,8 @@ export function fromMarkdown(text) {
     if (it) { add(it); continue; }
     if (NOISE.test(line)) continue;
     const plain = one(line), after = next(i);
-    if (!lists.length && DATED.test(plain) && !(after && itemOf(after))) { newList(plain.replace(DATED, ""), null); continue; }
     if (after && itemOf(after) && plain.length <= 60) { newSection(named(plain).name, named(plain).color); continue; }
     add({ text: plain, checked: false });
-  }
-  // The first export listed what was bought before in a section of its own: those items
-  // go back into the first section, still ticked.
-  for (const l of lists) {
-    const bought = l.sections.filter(s => s.name && BOUGHT.test(s.name) && s.items.every(i => i.checked));
-    if (!bought.length) continue;
-    l.sections = l.sections.filter(s => !bought.includes(s));
-    if (!l.sections.length) l.sections.push({ name: null, color: null, items: [] });
-    for (const s of bought) l.sections[0].items.push(...s.items);
   }
   return lists.filter(l => l.name || l.sections.some(s => s.items.length || s.name));
 }

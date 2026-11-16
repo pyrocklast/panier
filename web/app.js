@@ -13,6 +13,7 @@ import { openPair, peopleChanged } from "./share.js";
 import { keepList } from "./settings.js";
 
 $("#lists-open").addEventListener("click", showLists);
+$("#delete-open").addEventListener("click", () => lists.askDelete(state.lid)); // which shows the lists page once it's gone
 // Undo is the list's on a list, and on the lists page brings back a list deleted from this phone.
 const undo = () => (state.view === "lists" ? lists.undoRemove() : list.undo());
 const redo = () => { if (state.view === "list") list.redo(); };

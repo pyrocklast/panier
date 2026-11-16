@@ -36,14 +36,12 @@
   <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" vector-effect="non-scaling-stroke"/></symbol>
   <symbol id="i-cross" viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" vector-effect="non-scaling-stroke"/></symbol>
   <symbol id="i-back" viewBox="0 0 20 20"><path d="M7.5 4.4L3.1 8.75l4.4 4.35M3.75 8.75h8.75a4.4 4.4 0 0 1 0 8.75H10" vector-effect="non-scaling-stroke"/></symbol>
-  <symbol id="i-settings" viewBox="0 0 20 20"><path d="M3 6h8.5M15.5 6H17M3 14h1.5M8.5 14H17" vector-effect="non-scaling-stroke"/><circle cx="13.5" cy="6" r="2" vector-effect="non-scaling-stroke"/><circle cx="6.5" cy="14" r="2" vector-effect="non-scaling-stroke"/></symbol>
-  <symbol id="i-lists" viewBox="0 0 20 20"><path d="M6.5 4.5V3.75c0-.69.56-1.25 1.25-1.25h7.5c.69 0 1.25.56 1.25 1.25v10c0 .69-.56 1.25-1.25 1.25h-.75M4.75 5.5h7.5c.69 0 1.25.56 1.25 1.25v10c0 .69-.56 1.25-1.25 1.25h-7.5c-.69 0-1.25-.56-1.25-1.25v-10c0-.69.56-1.25 1.25-1.25z" vector-effect="non-scaling-stroke"/></symbol>
 </svg>
 
 <main class="wrap" id="app" hidden>
   <div class="list-top">
     <h1 class="list-head"><span class="list-name" id="list-name" role="button" tabindex="0" data-fk="list-name"></span></h1>
-    <button type="button" class="ib lists-btn" id="lists-open" aria-label="Lists" title="Lists" data-fk="lists-open"><svg class="icon" width="22" height="22" aria-hidden="true"><use href="#i-lists"/></svg></button>
+    <button type="button" class="head-btn" id="lists-open" data-fk="lists-open">Lists</button>
   </div>
   <div id="list"></div>
   <form class="add-sec" id="add-sec-form" autocomplete="off">
@@ -67,6 +65,7 @@
   <footer class="foot">
     <button type="button" class="linkbtn" id="pair-open">Add someone to this list</button>
     <button type="button" class="linkbtn" id="export-btn">Export the list</button>
+    <button type="button" class="linkbtn" id="delete-open">Delete the list</button>
   </footer>
 </main>
 
@@ -74,7 +73,7 @@
 <main class="wrap lists" id="lists" hidden>
   <div class="lists-top">
     <h1>Panier</h1>
-    <button type="button" class="ib lists-btn" id="settings-open" aria-label="Settings" title="Settings" data-fk="settings-open"><svg class="icon" width="22" height="22" aria-hidden="true"><use href="#i-settings"/></svg></button>
+    <button type="button" class="head-btn" id="settings-open" data-fk="settings-open">Settings</button>
   </div>
   <p class="lists-msg" id="lists-msg" hidden></p>
   <!-- The lists in a grid, then a blank strip to start another on -->

@@ -14,18 +14,18 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 
 A phone holds any number of lists, each shared with its own people. The app opens on the list last used.
 
-- **The lists page** is reached with the sheets at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to get, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
+- **The lists page** is reached with *Lists*, at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to get, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
 - **Open** a list with a tap.
 - **New list:** type a name on the blank strip under the sheets; the new list opens ready to write on. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
 - **Move** a list: hold it, then drag it to its new place. From a keyboard, Alt and an arrow move it one place earlier or later.
-- **Delete** a list: drag it onto the zone that appears at the foot, or press Delete on it from a keyboard. Lists are deleted only here, and only once asked. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
+- **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, at the foot of the list itself. It always asks first. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
 - **Settings** is at the top right of the lists page.
 
 ## The page
 
 The list is written on the page itself, like paper: one left edge, ruled lines between items and under section names, and an underline where you type. Only what is lifted off the page has a shadow: something being dragged, the undo button, the sheets.
 
-- **The list's name** is the title at the top, *Shopping list* to start with. Tap it to rename it. It also names the exported file. At its right, the sheets lead to the lists page.
+- **The list's name** is the title at the top, *Shopping list* to start with. Tap it to rename it. It also names the exported file. At its right, *Lists* leads to the lists page.
 - **The list's colour.** While you rename the list, colours show under its name: white and eight hues. The paper is warm paper dyed with the colour, the ruled lines a deeper dye, the title a deep shade of it, and the writing leans its way. The browser's bars follow, and the app opens in the colour without a flash of white.
 - **The eight colours weigh the same.** Each is a single hue, and every tone of it, from paper to tick box, is that hue at a lightness set by what it's for, so no colour shouts or fades beside another, in light or dark.
 - Every phone sees the name and colour, and undo puts the old ones back.
@@ -107,7 +107,7 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 
 - **Export the list**, at the bottom of a list, saves it as a `.md` file named after it.
 - **Export all lists**, in Settings, saves every list in one file, each under its own `#`.
-- **From a file**, on the lists page, brings in a list, or several from one file. It reads any Markdown checklist: other bullets, numbered lines, headings of any level, plain lines. It also reads the `.txt` files the earlier *Export the list* saved. Items bought before come in as suggestions, not ticked.
+- **From a file**, on the lists page, brings in a list, or several from one file. It reads any Markdown checklist: other bullets, numbered lines, headings of any level, plain lines, where a line followed by items names a section. Items bought before come in as suggestions, not ticked.
 - **Pasting several lines** into *Add item* adds one item per line, in that section, in one step to undo. Names already on the list are left as they are.
 
 ## People

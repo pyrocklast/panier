@@ -9,13 +9,15 @@
     "run_worker_first": ["/api/*"]
   },
   // ListV2 holds the lists since the clean start of several lists (see docs/roadmap.md).
-  // List holds the lists from before, untouched, until a migration deletes them.
+  // List held the lists from before; once every one had come back by import, v3 deleted
+  // it, with their data.
   "durable_objects": {
     "bindings": [{ "name": "LISTS", "class_name": "ListV2" }]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["List"] },
-    { "tag": "v2", "new_sqlite_classes": ["ListV2"] }
+    { "tag": "v2", "new_sqlite_classes": ["ListV2"] },
+    { "tag": "v3", "deleted_classes": ["List"] }
   ],
   // Served on your workers.dev address; a custom domain can be added at deploy time.
   "workers_dev": true,
@@ -30,7 +32,8 @@
       },
       "migrations": [
         { "tag": "v1", "new_sqlite_classes": ["List"] },
-        { "tag": "v2", "new_sqlite_classes": ["ListV2"] }
+        { "tag": "v2", "new_sqlite_classes": ["ListV2"] },
+        { "tag": "v3", "deleted_classes": ["List"] }
       ]
     }
   }

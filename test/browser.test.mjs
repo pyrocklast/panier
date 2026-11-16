@@ -1535,7 +1535,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await t.close();
 });
 
-test("lists are reordered by dragging, and deleted only from the lists page, once asked; undo brings them back", async () => {
+test("lists are reordered by dragging, and deleted once asked, on the lists page or at the foot of the list; undo brings them back", async () => {
   const p = await alone();
   const a = p.page;
   await toLists(a);
@@ -1575,7 +1575,14 @@ test("lists are reordered by dragging, and deleted only from the lists page, onc
   await a.click("#list-name");
   assert.equal(await a.locator(".list-top .bin").count(), 0, "nor does the list's name");
   await a.keyboard.press("Escape");
-  await toLists(a);
+  // At the foot of the list, where a screen reader on a phone reaches it: it asks the same.
+  await a.click("#delete-open");
+  assert.equal(await a.locator("#confirm-title").innerText(), "Delete “Market”?", "the list's own foot asks too");
+  await a.click("#confirm-ok");
+  await a.locator("#lists").waitFor();
+  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list"], "and the lists page shows, without it");
+  await a.click("#undo");
+  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"]);
   await a.locator(".sheet-open").nth(2).focus();
   await a.keyboard.press("Delete");
   assert.equal(await a.locator("#confirm-title").innerText(), "Delete “Market”?", "the Delete key asks too");
@@ -1586,7 +1593,7 @@ test("lists are reordered by dragging, and deleted only from the lists page, onc
   await p.close();
 });
 
-test("lists come in from Markdown, from the earlier text export too, and from several pasted lines", async () => {
+test("lists come in from Markdown, from plain text, and from several pasted lines", async () => {
   const errors = [];
   const { ctx, page: a } = await phone(errors);
   await a.goto(BASE + "/");
@@ -1610,8 +1617,8 @@ test("lists come in from Markdown, from the earlier text export too, and from se
   assert.equal(readFileSync(await dl.path(), "utf8"), md.replace("## Essentials\n", "## Essentials <!-- ink -->\n"), "and exports as it came in");
 
   await toLists(a);
-  const txt = "Shopping list, 12 November 2026\n\nEssentials\n- [ ] 2 eggs\n\nLook out for\n- [ ] Ripe avocados\n\nBought before\n- [x] Milk\n";
-  await a.setInputFiles("#import-file", { name: "shopping-list-2026-11-12.txt", mimeType: "text/plain", buffer: Buffer.from(txt) });
+  const txt = "Essentials\n- [ ] 2 eggs\n\nLook out for\n- [ ] Ripe avocados\n- [x] Milk\n";
+  await a.setInputFiles("#import-file", { name: "groceries.txt", mimeType: "text/plain", buffer: Buffer.from(txt) });
   await a.locator("#app").waitFor();
   assert.equal(await a.locator("#list-name").innerText(), "Shopping list", "no setup code the second time");
   assert.deepEqual(await names(a), ["Essentials", "Look out for"]);
@@ -1794,6 +1801,22 @@ test("a list changed with a newer Panier is left alone", async () => {
   await toLists(a);
   assert.deepEqual(await counts(a), ["Update Panier to open it"]);
   await t.close();
+});
+
+test("what the version before several lists left on the phone is cleared, and the settings stay", async () => {
+  const errors = [];
+  const { ctx, page: a } = await phone(errors);
+  await a.goto(BASE + "/");
+  await a.evaluate(() => {
+    localStorage.setItem("panier", JSON.stringify({ key: "an old list's key", items: {}, outbox: [] }));
+    for (const k of ["panier-drafts", "panier-basket-open", "panier-dragged-once", "panier-style"]) localStorage.setItem(k, "1");
+    localStorage.setItem("panier-theme", "dark");
+  });
+  await a.reload();
+  await a.locator("#lists").waitFor();
+  assert.deepEqual(await a.evaluate(() => Object.keys(localStorage).filter(k => !k.startsWith("panier2")).sort()), ["panier-theme"]);
+  await ctx.close();
+  assert.deepEqual(errors, []);
 });
 
 test("changes this app couldn't have written are passed over, and the list keeps syncing", async () => {
