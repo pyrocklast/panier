@@ -47,8 +47,9 @@ test("a new version takes over in the same launch, once you've stopped typing", 
     const page = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage();
     page.on("pageerror", e => errors.push(String(e)));
     await page.goto(BASE + "/#setup=" + code);
-    await page.locator("#pair").waitFor();
-    await page.click("#pair-close");
+    await page.locator("#list-name.editing").waitFor(); // the first list opens with its name to type
+    await page.keyboard.type("Groceries");
+    await page.keyboard.press("Enter");
     await page.fill("#add-ess", "Milk");
     await page.press("#add-ess", "Enter");
     assert.ok(await eventually(async () => (await page.evaluate(() => caches.keys())).includes("panier-old")));
