@@ -1589,6 +1589,46 @@ test("a new list is a plain sheet, named first; sections come when added, and li
   assert.deepEqual(errors, []);
 });
 
+test("on a phone on its side, what's ticked lies beside the list, and an item dragged across is ticked", async () => {
+  const p = await alone({ viewport: { width: 892, height: 400 } });
+  const a = p.page;
+  assert.equal(await a.evaluate(() => document.documentElement.dataset.layout), "compact", "the compact layout, by itself");
+  for (const x of ["Milk", "Bread", "Eggs"]) await add(a, "ess", x);
+  await blur(a);
+  await item(a, "Milk").locator(".boxcell").click();
+  assert.ok(await eventually(async () => (await ticked(a)).join() === "Milk"));
+  const list = await a.locator("#list").boundingBox(), basket = await a.locator("#basket").boundingBox();
+  assert.ok(basket.x >= list.x + list.width && basket.y < list.y + list.height, "beside the list, not under it");
+
+  await still(a);
+  const bread = await item(a, "Bread").boundingBox();
+  const from = { x: bread.x + 80, y: bread.y + bread.height / 2 }, to = { x: basket.x + 60, y: from.y + 20 };
+  await a.mouse.move(from.x, from.y);
+  await a.mouse.down();
+  for (let i = 1; i <= 15; i++) { await a.mouse.move(from.x + ((to.x - from.x) * i) / 15, from.y + ((to.y - from.y) * i) / 15); await sleep(20); }
+  await sleep(150);
+  await a.mouse.up();
+  assert.ok(await eventually(async () => (await ticked(a)).join() === "Bread,Milk"), "dragged across, it's ticked");
+  assert.deepEqual(await texts(a, "Essentials"), ["Eggs"]);
+
+  await a.click("#pair-open");
+  await a.locator("#qr svg").waitFor();
+  const qr = await a.locator("#qr").boundingBox(), title = await a.locator("#pair-title").boundingBox();
+  assert.ok(qr.y + qr.height <= 400 && qr.x + qr.width <= title.x, "the share sheet fits, its code beside its words");
+  await a.click("#pair-close");
+  await toLists(a);
+  assert.equal(await a.locator(".sheet-first").first().isVisible(), false, "the lists page shows names and counts");
+
+  await a.setViewportSize({ width: 390, height: 844 }); // turned upright
+  assert.ok(await eventually(async () => (await a.evaluate(() => document.documentElement.dataset.layout || "")) === LAYOUT), "and gives the layout back");
+  if (!LAYOUT) {
+    await a.click("#settings-open");
+    assert.equal(await a.locator("#compact-layout").isChecked(), false, "Settings shows what was chosen");
+    await a.click("#settings-close");
+  }
+  await p.close();
+});
+
 test("lists are reordered by dragging, and deleted once asked, on the lists page or at the foot of the list; undo brings them back", async () => {
   const p = await alone();
   const a = p.page;

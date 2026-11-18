@@ -66,6 +66,7 @@ Then, on the phones:
 ## Good to know
 
 - **Browsers:** Firefox 121, Chrome 123, Safari 17.5 or later.
+- **Sideways, or on a tablet or computer,** what's ticked lies beside the list rather than under it, and the lists page has more sheets to a row.
 - **Where the lists live:** in the browser's storage on each phone, and encrypted on the server. If a phone's browser data is cleared, each list's link brings it back. Panier asks the browser to keep the lists even when space runs low; Settings shows whether it agreed.
 - **How long things stay:** ticked items show for five days, then are only suggested. Deleted items are forgotten after about six months.
 - **Size:** the server keeps up to 32 MB per list, about 88,000 changes: many years of weekly shopping for a household. A full list says *List full* and keeps new changes on the phone.

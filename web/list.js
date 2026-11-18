@@ -617,7 +617,7 @@ function itemEl(id) {
     else if (e.key === "Delete") { e.preventDefault(); del(id); }
   });
   li.append(cell, text);
-  bindPress(li, { can: () => !readOnly() && !!li.closest("#list .items, #basket-list"), start: (offY, y) => startDrag(li, id, offY, y) });
+  bindPress(li, { can: () => !readOnly() && !!li.closest("#list .items, #basket-list"), start: (offY, y, offX, x) => startDrag(li, id, offY, y, offX, x) });
   return { li, chk, text, shown: null };
 }
 
@@ -636,26 +636,31 @@ function letGo() {
   return snap;
 }
 
-function startDrag(li, id, offY, y) {
+function startDrag(li, id, offY, y, offX, x) {
   landAll();
   li.style.opacity = "";
   const ghost = float(li.cloneNode(true), li.getBoundingClientRect(), "ghost", y - offY);
   li.classList.add("placeholder");
   // A ticked item can go back into a section; over the ticked group, it returns to its place there.
   const ticked = li.parentElement.id === "basket-list";
-  document.documentElement.classList.add("dragging");
+  document.documentElement.classList.add("dragging"); // which shows the ticked group, to drop on
   document.documentElement.classList.toggle("drag-ticked", ticked);
   const home = { ul: li.parentElement, next: li.nextElementSibling, sec: li.style.getPropertyValue("--sec") };
-  beginDrag({ id, li, ghost, offY, y, toTick: null, ticked, home, place, end: endDrag });
+  // On a wide screen, the ticked group lies beside the list (app.css): the item then
+  // follows the finger sideways too, and goes there to be ticked.
+  const beside = $("#basket").getBoundingClientRect().left >= $("#list").getBoundingClientRect().right;
+  beginDrag({ id, li, ghost, offY, y, ...(beside ? { offX, x } : {}), beside, toTick: null, ticked, home, place, end: endDrag });
 }
 
 function setSec(sec) {
   state.drag.li.style.setProperty("--sec", sec);
   state.drag.ghost.style.setProperty("--sec", sec);
 }
-function place(y) {
-  // Over the ticked group, from its heading down: the item will be ticked, or stay ticked.
-  const toTick = y > $("#basket").getBoundingClientRect().top - 8;
+function place(y, x) {
+  // Over the ticked group, from its heading down, or beside the list on a wide screen: the
+  // item will be ticked, or stay ticked.
+  const b = $("#basket").getBoundingClientRect();
+  const toTick = state.drag.beside ? x > b.left - 8 : y > b.top - 8;
   if (toTick !== state.drag.toTick) {
     if (toTick && state.drag.toTick === false) buzz(8);
     state.drag.toTick = toTick;

@@ -1,6 +1,8 @@
 // Applies what Settings chose on this phone before the page draws, so it never flashes
 // another look: the theme and the compact layout, and the list's colour as last seen here
-// (list.js keeps it up to date). Settings calls these again when they change.
+// (list.js keeps it up to date). Settings calls these again when they change. A phone on
+// its side, wide and short, takes the compact layout whatever was chosen, and gives it
+// back when turned upright.
 (function () {
   var root = document.documentElement;
   var set = function (name, value) { if (value) root.setAttribute(name, value); else root.removeAttribute(name); };
@@ -15,7 +17,12 @@
     for (var i = 0; i < metas.length; i++) metas[i].setAttribute("content", rgb);
   };
   window.panierTheme = function (t) { set("data-theme", t === "light" || t === "dark" ? t : ""); bars(); };
-  window.panierLayout = function (l) { set("data-layout", l === "compact" ? l : ""); };
+  var sideways = matchMedia("(min-width: 44rem) and (max-height: 32rem)"), chosen = ""; // as in app.css
+  window.panierLayout = function (l) {
+    chosen = l === "compact" ? l : "";
+    set("data-layout", chosen || (sideways.matches ? "compact" : ""));
+  };
+  sideways.addEventListener("change", function () { window.panierLayout(chosen); });
   // The lists page isn't paper: it takes no list's colour, and the colour stays stored
   // for the next list opened.
   window.panierView = function (v) {

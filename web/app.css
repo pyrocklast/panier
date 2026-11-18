@@ -50,6 +50,7 @@
   --danger: light-dark(#c0392b, #ff8a80);
   --float: 0 14px 34px -10px light-dark(rgb(20 30 25 / 0.28), rgb(0 0 0 / 0.6)), 0 0 0 1px light-dark(rgb(20 30 25 / 0.06), #2f3733);
   --ff: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --page: 34rem; /* the page's width, wider on a wide screen */
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
@@ -100,7 +101,7 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .icon { fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .wrap {
-  max-width: 34rem; margin-inline: auto; box-sizing: border-box;
+  max-width: var(--page); margin-inline: auto; box-sizing: border-box;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
@@ -265,7 +266,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* Connection status: shown only when something is wrong, bottom left, opposite undo. Its
    words say it, calmly: red is kept for deleting. */
 .status {
-  position: fixed; z-index: 30; left: max(16px, env(safe-area-inset-left, 0px), (100vw - 34rem) / 2 + 16px); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  position: fixed; z-index: 30; left: max(16px, env(safe-area-inset-left, 0px), (100vw - var(--page)) / 2 + 16px); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: min(320px, calc(100vw - 32px));
 }
 .status-pill {
@@ -279,7 +280,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 
 /* Undo and redo */
 .dock {
-  position: fixed; z-index: 30; right: max(16px, env(safe-area-inset-right, 0px), (100vw - 34rem) / 2 + 16px); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  position: fixed; z-index: 30; right: max(16px, env(safe-area-inset-right, 0px), (100vw - var(--page)) / 2 + 16px); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--surface); box-shadow: var(--float);
 }
 :root:has(.add-input:focus, .text.editing, .sec-name.editing, .list-name.editing) :is(.dock, .status) { visibility: hidden; }
@@ -413,7 +414,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .lists-foot { display: flex; justify-content: center; margin: -8px 0 0; } /* as a list's foot */
 /* While a sheet is dragged, dropping it here asks to delete the list */
 .remove-drop {
-  display: none; position: fixed; z-index: 21; left: max(16px, (100vw - 34rem) / 2 + 16px); right: max(16px, (100vw - 34rem) / 2 + 16px);
+  display: none; position: fixed; z-index: 21; left: max(16px, (100vw - var(--page)) / 2 + 16px); right: max(16px, (100vw - var(--page)) / 2 + 16px);
   bottom: calc(16px + env(safe-area-inset-bottom, 0px)); min-height: 64px; place-items: center; box-sizing: border-box;
   border: 2px dashed var(--danger); border-radius: 12px; background: var(--bg); color: var(--danger); font-weight: 700;
   transition: background-color 0.15s;
@@ -502,7 +503,31 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 }
 .field input:focus { outline: 2px solid var(--ess); outline-offset: 0; }
 
-/* Compact layout, chosen in Settings: every row 44 px, tighter gaps, titles of 20 px.
+/* A wide screen, a phone on its side or a tablet: what's ticked lies beside the list
+   rather than under it, torn off to the side and always in view, so a ticked item crosses
+   over to it; the lists page has as many sheets to a row as fit. A short one, a phone on
+   its side, also takes the compact layout (theme.js), and the share sheet puts its code
+   beside its words, so it fits. */
+@media (min-width: 44rem) {
+  :root { --page: 60rem; }
+  #app.wrap { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); column-gap: 40px; align-items: start; }
+  #app > .list-top { grid-column: 1 / -1; }
+  #app > :is(#list, .add-sec, .foot) { grid-column: 1; }
+  #app > .basket {
+    grid-column: 2; grid-row: 2 / span 3; position: sticky; top: calc(12px + env(safe-area-inset-top, 0px));
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto;
+    margin: 0; padding: 0 0 0 28px; background: repeating-linear-gradient(180deg, var(--tear) 0 6px, transparent 6px 12px) left top / 2px 100% no-repeat;
+  }
+  .sheets { grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); }
+}
+@media (min-width: 44rem) and (max-height: 32rem) {
+  #pair[open] { display: grid; grid-template-columns: 12rem minmax(0, 1fr); column-gap: 24px; align-content: start; width: min(44rem, calc(100vw - 32px)); }
+  #pair > * { grid-column: 2; }
+  #pair > .qr { grid-column: 1; grid-row: 1 / span 6; align-self: start; }
+}
+
+/* Compact layout, chosen in Settings, or taken by a phone on its side: every row 44 px,
+   tighter gaps, titles of 20 px.
    Everything you tap stays at least 44 px tall. */
 [data-layout="compact"] main.wrap { padding-top: 12px; gap: 12px; }
 [data-layout="compact"] #list { gap: 20px; }

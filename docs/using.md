@@ -119,12 +119,20 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 - Without a connection, the app keeps working. A pill at the bottom left shows *Offline*; tap it to see how many changes are waiting. They are sent when the connection returns. *Can't reach the server* means the phone is online but the server isn't answering.
 - *List full* means the server has no room left for the list (32 MB, many years of use). Changes are kept on the phone.
 
+## Sideways and on wider screens
+
+On a phone turned on its side, or a tablet or computer, the page uses the width:
+
+- **A list** lies in one wider column, and what's ticked lies beside it, torn off to the side, in view as you scroll. A ticked item crosses over to it, and an item dragged across is ticked.
+- **The lists page** has as many sheets to a row as fit.
+- **A phone on its side** also takes the compact layout, so more fits in its height, and the share sheet puts its code beside its words.
+
 ## Settings
 
 *Settings*, at the top of the lists page, opens a page of its own; the phone's back gesture closes it. Settings are chosen on each phone.
 
 - **You:** your name, shown to the people you share lists with.
-- **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page.
+- **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page. A phone on its side uses it whatever is chosen, and gives it back when turned upright.
 - **Data:**
   - Whether the browser keeps the lists even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep them on this phone* asks again.
   - How much space each list takes on this phone.
