@@ -23,7 +23,7 @@ const size = n => (n < 1024 ? t("{n} bytes", { n }) : n < 1048576 ? t("{n} KB", 
 async function paintSettings() {
   const theme = (() => { try { return localStorage.getItem(THEME_KEY) || ""; } catch (_) { return ""; } })();
   for (const r of document.querySelectorAll('input[name="theme"]')) r.checked = r.value === theme;
-  $("#compact-layout").checked = (() => { try { return localStorage.getItem(LAYOUT_KEY) === "compact"; } catch (_) { return false; } })(); // as chosen, not as a phone on its side shows it
+  $("#compact-layout").checked = document.documentElement.dataset.layout === "compact";
   $("#my-name").value = store.myName();
   const all = store.lists();
   $("#sizes").replaceChildren(...all.map(e => h("li", {}, h("span", {}, e.name || t("Untitled list")), h("span", {}, size(store.storedSize(e.lid))))));

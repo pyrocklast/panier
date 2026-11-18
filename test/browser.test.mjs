@@ -1594,7 +1594,7 @@ test("a new list is a plain sheet, named first; sections come when added, and li
 test("on a phone on its side, what's ticked lies beside the list, and an item dragged across is ticked", async () => {
   const p = await alone({ viewport: { width: 892, height: 400 } });
   const a = p.page;
-  assert.equal(await a.evaluate(() => document.documentElement.dataset.layout), "compact", "the compact layout, by itself");
+  assert.equal(await a.evaluate(() => document.documentElement.dataset.layout || ""), LAYOUT, "the layout chosen, as upright");
   for (const x of ["Milk", "Bread", "Eggs"]) await add(a, "ess", x);
   await blur(a);
   await item(a, "Milk").locator(".boxcell").click();
@@ -1619,15 +1619,9 @@ test("on a phone on its side, what's ticked lies beside the list, and an item dr
   assert.ok(qr.y + qr.height <= 400 && qr.x + qr.width <= title.x, "the share sheet fits, its code beside its words");
   await a.click("#pair-close");
   await toLists(a);
-  assert.equal(await a.locator(".sheet-first").first().isVisible(), false, "the lists page shows names and counts");
-
-  await a.setViewportSize({ width: 390, height: 844 }); // turned upright
-  assert.ok(await eventually(async () => (await a.evaluate(() => document.documentElement.dataset.layout || "")) === LAYOUT), "and gives the layout back");
-  if (!LAYOUT) {
-    await a.click("#settings-open");
-    assert.equal(await a.locator("#compact-layout").isChecked(), false, "Settings shows what was chosen");
-    await a.click("#settings-close");
-  }
+  assert.equal(await a.locator(".sheet-first").first().isVisible(), !LAYOUT, "the lists page shows each list's first things, unless compact");
+  const sheets = await a.locator(".sheet-card").evaluateAll(els => els.map(e => e.getBoundingClientRect().width));
+  assert.ok(sheets[0] < 892 / 3, "with more sheets to a row");
   await p.close();
 });
 

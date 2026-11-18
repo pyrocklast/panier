@@ -505,9 +505,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 
 /* A wide screen, a phone on its side or a tablet: what's ticked lies beside the list
    rather than under it, torn off to the side and always in view, so a ticked item crosses
-   over to it; the lists page has as many sheets to a row as fit. A short one, a phone on
-   its side, also takes the compact layout (theme.js), and the share sheet puts its code
-   beside its words, so it fits. */
+   over to it; the lists page has as many sheets to a row as fit, each as the chosen layout
+   draws it. On a short one, a phone on its side, the share sheet puts its code beside its
+   words, so it fits. */
 @media (min-width: 44rem) {
   :root { --page: 60rem; }
   #app.wrap { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); column-gap: 40px; align-items: start; }
@@ -526,8 +526,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   #pair > .qr { grid-column: 1; grid-row: 1 / span 6; align-self: start; }
 }
 
-/* Compact layout, chosen in Settings, or taken by a phone on its side: every row 44 px,
-   tighter gaps, titles of 20 px.
+/* Compact layout, chosen in Settings: every row 44 px, tighter gaps, titles of 20 px.
    Everything you tap stays at least 44 px tall. */
 [data-layout="compact"] main.wrap { padding-top: 12px; gap: 12px; }
 [data-layout="compact"] #list { gap: 20px; }

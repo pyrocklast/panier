@@ -125,14 +125,14 @@ On a phone turned on its side, or a tablet or computer, the page uses the width:
 
 - **A list** lies in one wider column, and what's ticked lies beside it, torn off to the side, in view as you scroll. A ticked item crosses over to it, and an item dragged across is ticked.
 - **The lists page** has as many sheets to a row as fit.
-- **A phone on its side** also takes the compact layout, so more fits in its height, and the share sheet puts its code beside its words.
+- **A phone on its side** keeps the layout chosen in Settings: the compact one fits more in its height. The share sheet puts its code beside its words, so it fits.
 
 ## Settings
 
 *Settings*, at the top of the lists page, opens a page of its own; the phone's back gesture closes it. Settings are chosen on each phone.
 
 - **You:** your name, shown to the people you share lists with.
-- **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page. A phone on its side uses it whatever is chosen, and gives it back when turned upright.
+- **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page.
 - **Data:**
   - Whether the browser keeps the lists even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep them on this phone* asks again.
   - How much space each list takes on this phone.
