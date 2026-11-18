@@ -72,6 +72,8 @@ async function started(pg) {
     store.change(null, [["#ess", "name", DEFAULTS[0].name], ["#look", "deleted", false], ["#long", "deleted", false]]);
     list.repaint();
   });
+  // Sent before anyone joins, so another phone has the sections from its first download.
+  assert.ok(await eventually(() => pg.evaluate(async () => (await import("/store.js")).status().waiting === 0)), "the list's start is sent");
 }
 
 // Two phones sharing a new list: A creates it, B joins with the pairing link.
