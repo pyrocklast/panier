@@ -1622,6 +1622,10 @@ test("on a phone on its side, what's ticked lies beside the list, and an item dr
   assert.equal(await a.locator(".sheet-first").first().isVisible(), !LAYOUT, "the lists page shows each list's first things, unless compact");
   const sheets = await a.locator(".sheet-card").evaluateAll(els => els.map(e => e.getBoundingClientRect().width));
   assert.ok(sheets[0] < 892 / 3, "with more sheets to a row");
+  await a.click("#settings-open");
+  const you = await a.locator("#set-you").boundingBox(), name = await a.locator("#my-name").boundingBox();
+  assert.ok(you.x + you.width <= name.x && Math.abs(you.y - name.y) < 40, "Settings puts each heading beside what it holds");
+  await a.click("#settings-close");
   await p.close();
 });
 

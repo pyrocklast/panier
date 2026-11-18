@@ -125,6 +125,7 @@ On a phone turned on its side, or a tablet or computer, the page uses the width:
 
 - **A list** lies in one wider column, and what's ticked lies beside it, torn off to the side, in view as you scroll. A ticked item crosses over to it, and an item dragged across is ticked.
 - **The lists page** has as many sheets to a row as fit.
+- **Settings** puts each part's heading on the left, beside what it holds.
 - **A phone on its side** keeps the layout chosen in Settings: the compact one fits more in its height. The share sheet puts its code beside its words, so it fits.
 
 ## Settings

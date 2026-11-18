@@ -113,10 +113,10 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .list-top { display: flex; align-items: flex-start; gap: 4px; margin: -4px 0 0; }
 .list-head { flex: 1; min-width: 0; margin: 0; display: flex; font-size: 1.625rem; line-height: 1.4; color: var(--title); }
 /* At the right of a page's title, in words, the way to what's around it: the lists page
-   from a list, Settings from the lists page */
+   from a list, Settings from the lists page. Quiet beside the title, which it serves. */
 .head-btn {
   flex: none; height: 44px; margin: 0 -12px 0 0; padding: 0 12px; border: 0; border-radius: 999px; background: none;
-  color: var(--title); font-weight: 700; cursor: pointer;
+  color: var(--muted); cursor: pointer;
 }
 /* While the name is edited, it has the whole row */
 .list-top.editing .head-btn { display: none; }
@@ -520,6 +520,14 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   }
   .sheets { grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); }
 }
+/* Settings on a wide screen: each part in a row, its heading on the left, what it holds
+   on the right */
+@media (min-width: 44rem) {
+  .page-in { max-width: 52rem; }
+  .set { display: grid; grid-template-columns: 13rem minmax(0, 1fr); column-gap: 32px; align-items: start; }
+  .set > * { grid-column: 2; }
+  .set > h3 { grid-column: 1; grid-row: 1; margin: 0; padding-top: 2px; }
+}
 @media (min-width: 44rem) and (max-height: 32rem) {
   #pair[open] { display: grid; grid-template-columns: 12rem minmax(0, 1fr); column-gap: 24px; align-content: start; width: min(44rem, calc(100vw - 32px)); }
   #pair > * { grid-column: 2; }
@@ -536,7 +544,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 [data-layout="compact"] .sheet-open { padding-block: 10px 8px; }
 [data-layout="compact"] .sheet-first { display: none; } /* the name and the count */
 [data-layout="compact"] .new-list { min-height: 48px; }
-[data-layout="compact"] .list-name { padding: 8px 0; }
+[data-layout="compact"] :is(.list-name, .lists-top h1) { padding: 8px 0; } /* 44 px, in line with what's beside it */
 [data-layout="compact"] .page-head h2 { font-size: 1.25rem; }
 [data-layout="compact"] .sec-head { min-height: 44px; }
 [data-layout="compact"] .sec-name { padding: 10px 0; }
