@@ -381,14 +381,19 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sheet[open]::backdrop { animation: dim 0.24s ease-out; }
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
 @keyframes dim { from { opacity: 0; } }
-/* Opening a list from the lists page, its sheet grows into the page; Lists, at the top of
-   the list, shrinks the page back into its sheet (app.js). The sheet keeps its own size
-   while the page grows from it or shrinks into it, so neither is stretched. */
-:root:not([data-view]) { view-transition-name: paper; }
-::view-transition-group(*) { animation-duration: 0.32s; animation-timing-function: var(--ease-move); }
-::view-transition-group(paper) { z-index: 1; overflow: hidden; border-radius: 12px; } /* above the page fading in behind it */
-::view-transition-old(paper), ::view-transition-new(paper) { height: 100%; object-fit: cover; object-position: left top; animation-duration: 0.16s; }
-:root[data-turn="open"]::view-transition-old(paper), :root[data-turn="close"]::view-transition-new(paper) { object-fit: none; }
+/* Opening a list from the lists page, the list's page grows out of its sheet; Lists, at
+   the top of the list, shrinks the page back into its sheet (app.js). The page moves as
+   one picture, scaled whole and cut to the sheet's shape, over the lists page standing
+   still; it shows as it leaves the sheet and fades as it reaches it. Opening, it leaves
+   at once and slows into place; closing, it starts gently and slows into the sheet. Only
+   its scale, place, cut and opacity change, so the phone needn't redraw the page. */
+:root[data-turn]::view-transition-group(root) { animation: none; }
+:root[data-turn]::view-transition-old(root), :root[data-turn]::view-transition-new(root) { animation: none; mix-blend-mode: normal; transform-origin: 0 0; }
+:root[data-turn="open"]::view-transition-new(root) { animation: turn-open 0.32s var(--ease-rise) both; }
+:root[data-turn="close"]::view-transition-old(root) { z-index: 1; animation: turn-close 0.32s var(--ease-move) both; }
+:root[data-turn] :is(.dock, .status) { opacity: 0; animation: none; } /* undo rises once the page has turned, not as part of the picture */
+@keyframes turn-open { from { transform: var(--turn-at); clip-path: var(--turn-cut); opacity: 0; } 25% { opacity: 1; } to { transform: none; clip-path: inset(0 round 0px); } }
+@keyframes turn-close { from { transform: none; clip-path: inset(0 round 0px); } 70% { opacity: 1; } to { transform: var(--turn-at); clip-path: var(--turn-cut); opacity: 0; } }
 
 /* Motion: items glide from motion.js; this only turns the rest off when asked */
 @media (prefers-reduced-motion: reduce) {

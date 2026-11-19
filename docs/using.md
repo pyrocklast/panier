@@ -15,7 +15,7 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 A phone holds any number of lists, each shared with its own people. The app opens on the list last used.
 
 - **The lists page** is reached with *Lists*, at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to tick, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
-- **Open** a list with a tap: its sheet grows into the page. *Lists*, at the top of the list, shrinks the page back into its sheet.
+- **Open** a list with a tap: the list grows out of its sheet to fill the screen. *Lists*, at the top of the list, shrinks it back into its sheet.
 - **New list:** type a name on the blank strip under the sheets; the new list opens ready to write on. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
 - **Move** a list: hold it, then drag it to its new place; the others glide aside. From a keyboard, Alt and an arrow move it one place earlier or later.
 - **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, at the foot of the list itself. It always asks first. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
