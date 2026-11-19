@@ -157,9 +157,6 @@ async function sendAs(pg, key, changes) {
 
 // Waits until nothing is gliding (see motion.js), so positions measured next are final.
 const still = pg => pg.waitForFunction(() => !document.getAnimations().some(a => (a.id === "glide" || a.id === "fly") && a.playState === "running"));
-// Waits until the page has turned between a list and its sheet (app.js), which changes
-// what's shown a moment after the tap.
-const turned = pg => pg.waitForFunction(() => !document.documentElement.dataset.turn);
 
 // Drags an item with the mouse to a point; returns before releasing if hold is set.
 async function dragTo(pg, from, toY, { hold = false } = {}) {
@@ -290,7 +287,7 @@ test("a link to another list adds it beside this one, and keeps what this one ha
   await toLists(a);
   await a.locator("#lists").waitFor();
   assert.ok(await eventually(async () => (await a.locator(".sheet-name").allInnerTexts()).length === 2));
-  await a.locator("#sheets .sheet-open").first().click(); await turned(a);
+  await a.locator("#sheets .sheet-open").first().click();
   assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Bread", 10000), "and the first still has what it hadn't sent");
   assert.ok(await eventually(async () => (await texts(t.b, "Essentials")).join() === "Milk,Bread", 10000), "which it now sends");
   await t.close();
@@ -1298,7 +1295,7 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   assert.ok(Math.max(...night) < 30, "dark colours when Dark is chosen: " + night);
   assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), rgbText(night), "the browser's bars follow");
   await a.click("#settings-close");
-  await a.locator("#sheets .sheet-open").first().click(); await turned(a);
+  await a.locator("#sheets .sheet-open").first().click();
   await a.locator("#app").waitFor();
   const dark = await paperOf(a);
   assert.ok(Math.max(...dark) < 45 && dark.join() !== night.join(), "and the list is dark paper, lighter than the desk: " + dark);
@@ -1314,7 +1311,7 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   await a.locator("#settings .switch").click();
   assert.ok(await sheet() < roomy - 40, "the compact layout: each list in one line");
   await a.click("#settings-close");
-  await a.locator("#sheets .sheet-open").first().click(); await turned(a);
+  await a.locator("#sheets .sheet-open").first().click();
   const row = () => a.evaluate(() => Math.round(document.querySelector("#list .item").getBoundingClientRect().height));
   assert.equal(await row(), 44, "and rows of 44 px");
   await a.reload();
@@ -1363,7 +1360,7 @@ test("in French when the phone is in French", async () => {
   await a.click("#settings-open");
   assert.equal(await a.locator("#settings-title").innerText(), "Paramètres");
   await a.click("#settings-close");
-  await a.locator("#sheets .sheet-open").click(); await turned(a);
+  await a.locator("#sheets .sheet-open").click();
   await a.locator("#app").waitFor();
 
   assert.ok(await eventually(async () => (await texts(b, "Essentiels")).join() === "2 lait"), "sent before going offline");
@@ -1484,7 +1481,6 @@ const sheets = pg => pg.locator("#sheets .sheet-name").evaluateAll(els => els.ma
 const counts = pg => pg.locator("#sheets .sheet-count").allInnerTexts();
 async function toLists(pg) {
   await pg.click("#lists-open");
-  await turned(pg);
   await pg.locator("#lists").waitFor();
 }
 async function newList(pg, name) {
@@ -1538,7 +1534,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await add(b, "ess", "Eggs");
   await blur(b);
   assert.ok(await eventually(async () => { const st = await stored(b); return !st.outbox.length && Object.values(st.items).some(f => f.text && f.text[0] === "Eggs"); }), "sent, and saved");
-  await a.locator("#sheets .sheet-open").nth(1).click(); await turned(a);
+  await a.locator("#sheets .sheet-open").nth(1).click();
   await a.locator("#app").waitFor();
   await a.goBack();
   assert.ok(await eventually(async () => (await counts(a))[0] === "4 to tick"), "a list not on screen catches up as the lists page shows");
@@ -1553,7 +1549,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await online(t.A, a);
   assert.ok(await eventually(async () => !(await a.locator("#status").isVisible())));
 
-  await a.locator("#sheets .sheet-open").nth(1).click(); await turned(a);
+  await a.locator("#sheets .sheet-open").nth(1).click();
   await a.reload();
   await a.locator("#app").waitFor();
   assert.equal(await a.locator("#list-name").innerText(), "Hardware store", "the app opens on the list last used");
@@ -1565,7 +1561,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   const tab = await t.A.newPage();
   await tab.goto(BASE + "/");
   await toLists(tab);
-  await a.locator("#sheets .sheet-open").nth(1).click(); await turned(a);
+  await a.locator("#sheets .sheet-open").nth(1).click();
   await a.locator("#app").waitFor();
   await tab.locator("#sheets .sheet-open").nth(1).focus();
   await tab.keyboard.press("Delete");
@@ -1589,7 +1585,7 @@ test("a new list is a plain sheet, named first; sections come when added, and li
   assert.equal(await a.locator("#list-name").getAttribute("data-placeholder"), "Name this list", "left without a name, it asks for one");
   await toLists(a);
   assert.deepEqual(await sheets(a), ["Untitled list"]);
-  await a.locator("#sheets .sheet-open").click(); await turned(a);
+  await a.locator("#sheets .sheet-open").click();
   await a.click("#list-name");
   await a.keyboard.type("Hardware store");
   await a.keyboard.press("Enter");
@@ -1614,7 +1610,7 @@ test("a new list is a plain sheet, named first; sections come when added, and li
   // A list made before plain sheets, which wrote no start into itself, keeps its three.
   await toLists(a);
   await a.evaluate(async () => (await import("/store.js")).createList({}));
-  await a.locator("#sheets .sheet-open", { hasText: "Untitled list" }).click(); await turned(a);
+  await a.locator("#sheets .sheet-open", { hasText: "Untitled list" }).click();
   assert.deepEqual(await names(a), ["Essentials", "Look out for", "Long term"]);
   await ctx.close();
   assert.deepEqual(errors, []);
@@ -1689,7 +1685,7 @@ test("lists are reordered by dragging, and deleted once asked, on the lists page
   await a.click("#undo");
   assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "back where it was");
 
-  await a.locator("#sheets .sheet-open").nth(2).click(); await turned(a);
+  await a.locator("#sheets .sheet-open").nth(2).click();
   await a.click("#pair-open");
   assert.equal(await a.locator("#members").innerText(), "Only you, so far.");
   assert.equal(await a.locator("#rekey-open").isVisible(), false, "no one to remove");
@@ -1771,7 +1767,7 @@ test("the people on a list: names on the share sheet, undo says who; three phone
   await b.fill("#my-name", "Alex");
   await b.press("#my-name", "Enter");
   await b.click("#settings-close");
-  await b.locator("#sheets .sheet-open").click(); await turned(b);
+  await b.locator("#sheets .sheet-open").click();
   await a.click("#pair-open");
   assert.ok(await eventually(async () => (await a.locator("#members").innerText()) === "On this list: you and Alex."));
   assert.ok(await a.locator("#pair-name").isVisible(), "a phone without a name is asked for one where names matter");
@@ -1792,7 +1788,7 @@ test("the people on a list: names on the share sheet, undo says who; three phone
   await toLists(a);
   assert.equal(await a.locator(".sheet-with").innerText(), "with Alex and 1 other", "the lists page says who else has a list, quietly");
   assert.match(await a.locator("#sheets .sheet-open").getAttribute("aria-label"), /^Shopping list, with Alex and 1 other, /);
-  await a.locator("#sheets .sheet-open").click(); await turned(a);
+  await a.locator("#sheets .sheet-open").click();
   await a.locator("#app").waitFor();
 
   await add(a, "ess", "Bread");
@@ -2005,7 +2001,7 @@ test("on a slow phone, a step back in history that lands late undoes nothing tha
   // Each step back lands most of a second late, as on a busy phone.
   await a.evaluate(() => { const back = history.back.bind(history); history.back = () => setTimeout(back, 800); });
   await toLists(a);
-  await a.locator("#sheets .sheet-open").click(); await turned(a);
+  await a.locator("#sheets .sheet-open").click();
   await sleep(1500);
   assert.equal(await a.locator("#app").isVisible(), true, "the list opened at once stays open");
   await a.goBack();
@@ -2016,7 +2012,7 @@ test("on a slow phone, a step back in history that lands late undoes nothing tha
   assert.equal(await a.locator("#pair").isVisible(), true, "a sheet opened from another stays open");
   await a.goBack();
   assert.ok(await eventually(async () => !(await a.locator("#pair").isVisible()) && (await a.locator("#lists").isVisible())), "back closes it, onto the lists page");
-  await a.locator("#sheets .sheet-open").click(); await turned(a);
+  await a.locator("#sheets .sheet-open").click();
   await a.click("#pair-open");
   await a.click("#pair-close");
   await toLists(a);

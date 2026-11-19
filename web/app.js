@@ -4,7 +4,7 @@
 import * as store from "./store.js";
 import { translatePage } from "./i18n.js";
 import { state, nav } from "./state.js";
-import { $, reduceMotion } from "./dom.js";
+import { $ } from "./dom.js";
 import * as list from "./list.js";
 import * as lists from "./lists.js";
 import { paintStatus } from "./bar.js";
@@ -13,7 +13,7 @@ import { peopleChanged } from "./share.js";
 import { keepList } from "./settings.js";
 import { startOps } from "./model.js";
 
-$("#lists-open").addEventListener("click", () => turn(state.lid, false, showLists));
+$("#lists-open").addEventListener("click", showLists);
 $("#delete-open").addEventListener("click", () => lists.askDelete(state.lid)); // which shows the lists page once it's gone
 // Undo is the list's on a list, and on the lists page brings back a list deleted from this phone.
 const undo = () => (state.view === "lists" ? lists.undoRemove() : list.undo());
@@ -50,47 +50,6 @@ store.subscribe(kind => {
     if (list.readOnlyChanged()) list.refreshFromStore();
   }
 });
-
-// Opening a list from its sheet on the lists page, the list's page grows out of the
-// sheet; Lists, at the top of the list, shrinks the page back into its sheet. The page
-// moves whole, as one picture, over the lists page standing still (app.css). Only these
-// taps turn the page: everything else that changes the view, such as the back gesture,
-// needs it changed at once, which the browser's transition can't do, as it changes the
-// page a moment later. Where the browser has no such transition, or the sheet is out of
-// view, the page simply changes.
-let turning = false;
-const sheetRect = lid => {
-  const b = lists.sheetButton(lid), r = b && b.getBoundingClientRect();
-  return r && r.width && r.bottom > 0 && r.top < innerHeight ? r : null;
-};
-// Where the page stands when it's the sheet: scaled whole to cover the sheet from its top
-// left corner, never stretched, and cut to the sheet's shape, corners included.
-function aim(r) {
-  const s = Math.max(r.width / innerWidth, r.height / innerHeight), st = document.documentElement.style;
-  st.setProperty("--turn-at", `translate(${r.left}px, ${r.top}px) scale(${s})`);
-  st.setProperty("--turn-cut", `inset(0 ${innerWidth - r.width / s}px ${innerHeight - r.height / s}px 0 round ${12 / s}px)`);
-}
-function turn(lid, open, update) {
-  const from = open && sheetRect(lid);
-  if (!document.startViewTransition || reduceMotion.matches || turning || (open && !from)) return update();
-  turning = true;
-  const root = document.documentElement;
-  if (open) aim(from);
-  root.dataset.turn = open ? "open" : "close";
-  const vt = document.startViewTransition(() => {
-    update();
-    if (open) return;
-    const to = sheetRect(lid);
-    if (to) aim(to); else vt.skipTransition();
-  });
-  vt.finished.finally(() => {
-    delete root.dataset.turn;
-    root.style.removeProperty("--turn-at");
-    root.style.removeProperty("--turn-cut");
-    turning = false;
-  });
-}
-nav.openSheet = lid => turn(lid, true, () => showList(lid));
 
 function showList(lid) {
   const from = document.activeElement;

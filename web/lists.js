@@ -34,7 +34,7 @@ function cardOf(e) {
     const btn = h("button", { type: "button", class: "sheet-open", dataset: { fk: "sheet-" + e.lid } },
       h("span", { class: "sheet-in", "aria-hidden": "true" }, name, who, first, count));
     const li = h("li", { class: "sheet-card", "data-lid": e.lid }, btn);
-    btn.addEventListener("click", () => { if (state.suppressClick) { state.suppressClick = false; return; } nav.openSheet(e.lid); });
+    btn.addEventListener("click", () => { if (state.suppressClick) { state.suppressClick = false; return; } nav.showList(e.lid); });
     btn.addEventListener("keydown", ev => {
       const dir = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[ev.key];
       if (ev.altKey && dir) { ev.preventDefault(); moveSheet(e.lid, dir); }
