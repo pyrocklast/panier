@@ -15,7 +15,9 @@ export const state = {
   pointerDown: false,
   removed: [], // lists deleted from this phone since the app opened, for undo
 };
-// app.js fills these in: showList(lid), showLists() and editName(), which starts naming the list on screen.
+// app.js fills these in: showList(lid), showLists(), editName(), which starts naming the
+// list on screen, and turn(into, update), which turns the page quietly between the lists
+// page and a list as update changes it.
 export const nav = {};
 
 // A closed list, or one from a newer Panier, is only read: what's done here could never be

@@ -381,6 +381,21 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sheet[open]::backdrop { animation: dim 0.24s ease-out; }
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
 @keyframes dim { from { opacity: 0; } }
+/* Between the lists page and a list, the page turns quietly (app.js). Beneath, the paper's
+   colour changes into the other's; on it, the words fade out, then the new ones fade in, a
+   touch nearer going into a list and a touch further coming back out. They fade through
+   rather than across, so two pages of words never show at once. */
+:root[data-turn] #lists { view-transition-name: lists; }
+:root[data-turn] #app { view-transition-name: list; }
+:root[data-turn] :is(.dock, .status) { opacity: 0; animation: none; } /* undo rises once the page has turned */
+:root[data-turn]::view-transition-group(*) { animation-duration: 0.3s; }
+:root[data-turn]::view-transition-old(lists), :root[data-turn]::view-transition-old(list) { animation: words-out 0.1s cubic-bezier(0.4, 0, 1, 1) both; transform-origin: 50% var(--turn-was); }
+:root[data-turn]::view-transition-new(lists), :root[data-turn]::view-transition-new(list) { animation: words-in 0.22s var(--ease-rise) 0.08s both; transform-origin: 50% var(--turn-now); }
+:root[data-turn="in"] { --turn-out: 1.02; --turn-in: 0.98; }
+:root[data-turn="out"] { --turn-out: 0.98; --turn-in: 1.02; }
+@keyframes words-out { to { opacity: 0; transform: scale(var(--turn-out)); } }
+@keyframes words-in { from { opacity: 0; transform: scale(var(--turn-in)); } }
+
 /* Motion: items glide from motion.js; this only turns the rest off when asked */
 @media (prefers-reduced-motion: reduce) {
   .item.flash, .sheet[open], .sheet[open]::backdrop, .dock:not([hidden]), .status:not([hidden]) { animation: none; }

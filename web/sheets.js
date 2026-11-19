@@ -30,9 +30,17 @@ export function openSheet(dlg) {
   follow();
 }
 for (const dlg of document.querySelectorAll("dialog")) dlg.addEventListener("close", follow);
-addEventListener("popstate", () => {
+addEventListener("popstate", e => {
   if (stepping) { stepping = false; return follow(); }
-  // The back gesture, or forward: what's shown follows history.
+  // The back gesture, or forward: what's shown follows history. Between the lists page and
+  // a list, the page turns as it does for a tap, unless the browser has already shown a
+  // move of its own; history is read again as it turns, so a later step still wins.
+  const s = history.state || {};
+  const between = !s.sheet && !document.querySelector("dialog[open]") && (s.list ? state.view !== "list" : state.view === "list");
+  if (between && !e.hasUAVisualTransition) nav.turn(!!s.list, showHistory);
+  else showHistory();
+});
+function showHistory() {
   const s = history.state || {};
   syncing = true;
   try {
@@ -45,7 +53,7 @@ addEventListener("popstate", () => {
     syncing = false;
   }
   follow();
-});
+}
 export function closeThen(dlg, fn) {
   if (dlg.open) dlg.close();
   fn();
