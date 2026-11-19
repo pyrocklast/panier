@@ -7,7 +7,7 @@ import { state, readOnly, listName, listColor, draftsKey } from "./state.js";
 import { DEFAULTS, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, RECENT_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout, sheetOfList } from "./model.js";
 import { $, h, icon, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, download, reduceMotion } from "./dom.js";
 import { whenTapEnds, bindPress, beginDrag } from "./press.js";
-import { float, landAll, snapshot, glide, fly, MOTION } from "./motion.js";
+import { float, landAll, snapshot, glide, fly, shift, shuffle, MOTION } from "./motion.js";
 import { editInPlace, palette } from "./edit.js";
 import { noteUndo, paintDock, paintStatus } from "./bar.js";
 
@@ -670,7 +670,7 @@ function place(y, x) {
       state.drag.li.classList.toggle("away", toTick); // its slot empties, nothing moves
       $("#tick-drop").classList.toggle("over", toTick);
     } else if (toTick) {
-      state.drag.home.ul.insertBefore(state.drag.li, state.drag.home.next);
+      shift(() => state.drag.home.ul.insertBefore(state.drag.li, state.drag.home.next));
       setSec(state.drag.home.sec);
     }
   }
@@ -686,7 +686,7 @@ function place(y, x) {
     if (y < r.top + r.height / 2) { before = n; break; }
   }
   if (state.drag.li.parentElement === ul && state.drag.li.nextElementSibling === before) return;
-  ul.insertBefore(state.drag.li, before);
+  shift(() => ul.insertBefore(state.drag.li, before)); // what's in the way glides aside
   setSec("var(--" + colorOf(ul.dataset.sec) + ")");
 }
 function endDrag() {
@@ -744,7 +744,7 @@ function placeSection(y) {
     const r = c.getBoundingClientRect();
     if (y < r.top + r.height / 2) { before = c; break; }
   }
-  if (state.drag.el.nextElementSibling !== before) list.insertBefore(state.drag.el, before);
+  if (state.drag.el.nextElementSibling !== before) shuffle("#list > .sec", () => list.insertBefore(state.drag.el, before));
 }
 // Let go, the section stays where it was dropped, as far as the page allows: the sections
 // above it unfold at once, upwards, out of the way, and it unfolds downwards with those

@@ -8,9 +8,9 @@ import { t, plural, q, lang } from "./i18n.js";
 import { fromMarkdown } from "./md.js";
 import { state, nav, draftsKey } from "./state.js";
 import { clean, MAX_SECTION, listColorOk, importOps, startOps } from "./model.js";
-import { $, h, fillText, addRow, emptyField, announce, activeFk, buzz, setRows } from "./dom.js";
+import { $, h, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, reduceMotion } from "./dom.js";
 import { bindPress, beginDrag } from "./press.js";
-import { float } from "./motion.js";
+import { float, fly, shuffle } from "./motion.js";
 import { noteUndo, paintDock } from "./bar.js";
 import { confirmSheet } from "./sheets.js";
 import { keepList } from "./settings.js";
@@ -34,7 +34,7 @@ function cardOf(e) {
     const btn = h("button", { type: "button", class: "sheet-open", dataset: { fk: "sheet-" + e.lid } },
       h("span", { class: "sheet-in", "aria-hidden": "true" }, name, who, first, count));
     const li = h("li", { class: "sheet-card", "data-lid": e.lid }, btn);
-    btn.addEventListener("click", () => { if (state.suppressClick) { state.suppressClick = false; return; } nav.showList(e.lid); });
+    btn.addEventListener("click", () => { if (state.suppressClick) { state.suppressClick = false; return; } nav.openSheet(e.lid); });
     btn.addEventListener("keydown", ev => {
       const dir = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[ev.key];
       if (ev.altKey && dir) { ev.preventDefault(); moveSheet(e.lid, dir); }
@@ -80,6 +80,7 @@ export function renderLists() {
 }
 export const say = msg => { notice = msg; renderLists(); announce(msg); };
 
+const SHEETS = "#sheets > .sheet-card";
 // Sheets lie side by side, so a dragged one follows the finger both ways, and goes before
 // the first sheet it's left of, on its row, or above.
 function startSheetDrag(li, lid, offY, y, offX, x) {
@@ -109,28 +110,29 @@ function placeSheet(y, x) {
     const r = c.getBoundingClientRect();
     if (y < r.top - gap || (y <= r.bottom + gap && x < r.left + r.width / 2)) { before = c; break; }
   }
-  if (state.drag.li.nextElementSibling !== before) ul.insertBefore(state.drag.li, before);
+  if (state.drag.li.nextElementSibling !== before) shuffle(SHEETS, () => ul.insertBefore(state.drag.li, before)); // the others glide aside
 }
 function endSheetDrag() {
   const { lid, li, toRemove, ghost, before } = state.drag;
   const order = [...$("#sheets").children].map(c => c.dataset.lid);
-  ghost.remove();
+  const from = ghost.getBoundingClientRect();
   li.classList.remove("placeholder", "away"); // the same sheet stays on the page
   $("#remove-drop").classList.remove("over");
   document.documentElement.classList.remove("dragging-sheet");
   state.drag = null;
   if (!toRemove && order.join() !== before) store.reorder(order);
   renderLists();
+  if (toRemove || reduceMotion.matches) ghost.remove();
+  else fly({ li: ghost, rect: from, part: null }, li.getBoundingClientRect(), li); // it settles into its place
   if (toRemove) askDelete(lid);
 }
 function moveSheet(lid, dir) {
   const order = store.lists().map(e => e.lid), i = order.indexOf(lid), j = i + dir;
   if (j < 0 || j >= order.length) return;
   [order[i], order[j]] = [order[j], order[i]];
-  store.reorder(order);
+  shuffle(SHEETS, () => { store.reorder(order); renderLists(); }); // the store redraws the page as it changes
   const e = store.lists().find(x => x.lid === lid);
   announce(t(dir < 0 ? "{x} moved earlier" : "{x} moved later", { x: e.name || t("Untitled list") }));
-  renderLists();
   const el = document.querySelector('[data-fk="sheet-' + lid + '"]');
   if (el) el.focus();
 }
@@ -173,20 +175,18 @@ function removeList(lid) {
   const name = e.name || t("Untitled list"), dk = draftsKey(lid);
   let drafts = null;
   try { drafts = localStorage.getItem(dk); localStorage.removeItem(dk); } catch (_) {}
-  state.removed.push({ label: t("deleting {x}", { x: q(name) }), r: store.remove(lid), drafts, dk });
   noteUndo(name);
+  shuffle(SHEETS, () => { state.removed.push({ label: t("deleting {x}", { x: q(name) }), r: store.remove(lid), drafts, dk }); renderLists(); });
   announce(t("Deleted {x} from this phone", { x: name }));
-  renderLists();
   lostFocus($("#undo")); // which would bring it back
 }
 export function undoRemove() {
   const u = state.removed.pop();
   if (!u) return;
-  store.restore(u.r);
   try { if (u.drafts) localStorage.setItem(u.dk, u.drafts); } catch (_) {}
   noteUndo(null);
+  shuffle(SHEETS, () => { store.restore(u.r); renderLists(); });
   announce(t("Undid {x}", { x: u.label }));
-  renderLists();
 }
 
 // A new list starts from a name, typed on the blank strip. The server makes it on the

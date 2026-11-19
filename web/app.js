@@ -4,7 +4,7 @@
 import * as store from "./store.js";
 import { translatePage } from "./i18n.js";
 import { state, nav } from "./state.js";
-import { $ } from "./dom.js";
+import { $, reduceMotion } from "./dom.js";
 import * as list from "./list.js";
 import * as lists from "./lists.js";
 import { paintStatus } from "./bar.js";
@@ -13,7 +13,7 @@ import { peopleChanged } from "./share.js";
 import { keepList } from "./settings.js";
 import { startOps } from "./model.js";
 
-$("#lists-open").addEventListener("click", showLists);
+$("#lists-open").addEventListener("click", () => turn(state.lid, false, showLists));
 $("#delete-open").addEventListener("click", () => lists.askDelete(state.lid)); // which shows the lists page once it's gone
 // Undo is the list's on a list, and on the lists page brings back a list deleted from this phone.
 const undo = () => (state.view === "lists" ? lists.undoRemove() : list.undo());
@@ -50,6 +50,32 @@ store.subscribe(kind => {
     if (list.readOnlyChanged()) list.refreshFromStore();
   }
 });
+
+// Opening a list from its sheet on the lists page, the sheet grows into the page; Lists,
+// at the top of the list, shrinks the page back into its sheet (app.css). Only these taps
+// turn the page: everything else that changes the view, such as the back gesture, needs
+// it changed at once, which the browser's transition can't do, as it changes the page a
+// moment later. Where the browser has no such transition, the page simply changes.
+let turning = false;
+const cardOf = lid => { const b = lists.sheetButton(lid); return b ? b.closest(".sheet-card") : null; };
+function turn(lid, open, update) {
+  if (!document.startViewTransition || reduceMotion.matches || turning || (open && !cardOf(lid))) return update();
+  turning = true;
+  const root = document.documentElement;
+  root.dataset.turn = open ? "open" : "close";
+  if (open) cardOf(lid).style.viewTransitionName = "paper"; // the list's page is "paper" too, once shown
+  document.startViewTransition(() => {
+    update();
+    const c = cardOf(lid);
+    if (c) c.style.viewTransitionName = open ? "" : "paper";
+  }).finished.finally(() => {
+    const c = cardOf(lid);
+    if (c) c.style.viewTransitionName = "";
+    delete root.dataset.turn;
+    turning = false;
+  });
+}
+nav.openSheet = lid => turn(lid, true, () => showList(lid));
 
 function showList(lid) {
   const from = document.activeElement;

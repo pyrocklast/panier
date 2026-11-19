@@ -51,6 +51,10 @@
   --float: 0 14px 34px -10px light-dark(rgb(20 30 25 / 0.28), rgb(0 0 0 / 0.6)), 0 0 0 1px light-dark(rgb(20 30 25 / 0.06), #2f3733);
   --ff: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
   --page: 34rem; /* the page's width, wider on a wide screen */
+  /* Motion: what moves starts gently and lands gently, as in motion.js; what rises into
+     place arrives quickly and settles */
+  --ease-move: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-rise: cubic-bezier(0.2, 0, 0, 1);
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
@@ -175,7 +179,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .item.lifted .grip, .ghost .grip { opacity: 1; }
 .ghost.done .box { opacity: 1; } /* over the ticked group: shown as it will be */
 .ghost.done .grip { opacity: 0; }
-.ghost .grip { transition: color 0.15s; }
+.ghost .grip { transition: color 0.15s, opacity 0.15s; }
+.ghost.landing .box { opacity: 1; } /* let go, the grip turns back into the box */
+.ghost.landing .grip { opacity: 0; }
 .chk { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
 .box {
   width: 21px; height: 21px; box-sizing: border-box; border-radius: 5px; border: 2px solid var(--sec);
@@ -195,8 +201,15 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 :is(.list-name, .sec-name, .text):focus-visible:not(.editing) { box-shadow: inset 0 0 0 2px var(--ink); border-radius: 8px; padding-inline: 8px; margin-inline: -8px; }
 .qty { margin-right: 0.15em; font-weight: 700; font-variant-numeric: tabular-nums; } /* a quantity, a little apart */
 .text.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 var(--sec); border-radius: 0; }
-.item.done .text { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
-.item.done .text.editing { color: var(--ink); text-decoration: none; }
+.item.done .text { color: var(--muted); }
+.item.done .text.editing { color: var(--ink); }
+/* Ticked, the words are struck through as with a pen, from left to right, line by line */
+.words {
+  background: linear-gradient(currentColor, currentColor) no-repeat 0 57% / 0 1px;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone; transition: background-size 0.24s var(--ease-move);
+}
+.item.done .words { background-size: 100% 1px; }
+@media (forced-colors: active) { .item.done .text { text-decoration: line-through; } } /* where colours are the system's, the line is the browser's own */
 .item.editing { grid-template-columns: 38px minmax(0, 1fr) 48px; }
 .item.editing .text { padding-right: 4px; }
 .bin { display: grid; place-items: center; align-self: stretch; padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; }
@@ -247,9 +260,10 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .basket-list:empty { display: none; }
 /* Five days of ticked items can make a long list: the phone skips drawing those off screen. */
 #basket-list .item { content-visibility: auto; contain-intrinsic-size: auto 44px; }
-#basket-list .text { font-size: 0.875rem; padding-block: 12px; }
-:is(#basket-list, .drop) .box { width: 18px; height: 18px; margin-left: 1.5px; border-radius: 4px; }
-:is(#basket-list, .drop) .box::after { width: 11px; height: 11px; }
+/* Ticked rows are smaller; so is an item on its way there (.small, motion.js) */
+:is(#basket-list, .small) .text { font-size: 0.875rem; padding-block: 12px; }
+:is(#basket-list, .drop, .small) .box { width: 18px; height: 18px; margin-left: 1.5px; border-radius: 4px; }
+:is(#basket-list, .drop, .small) .box::after { width: 11px; height: 11px; }
 #basket-toggle {
   display: grid; grid-template-columns: 38px auto auto; align-items: center; min-height: 44px; padding: 0 8px 0 0;
   border: 0; border-radius: 12px; background: none; color: var(--muted); font-weight: 700; cursor: pointer;
@@ -291,13 +305,14 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 #undo.named { width: auto; grid-auto-flow: column; gap: 8px; padding: 0 16px 0 12px; border-radius: 999px; }
 #undo.named .undo-what { display: block; }
 
-/* Floating copies, a dragged item's ghost or an item on its way, placed exactly over the
-   row, room included */
-:is(.ghost, .flying) {
+/* Floating copies, a dragged item's ghost, an item on its way or one fading as it goes,
+   placed exactly over the row, room included */
+:is(.ghost, .flying, .fading) {
   position: fixed; z-index: 20; margin: 0; box-sizing: border-box; pointer-events: none;
   background-color: var(--surface); background-image: none !important;
 }
 .ghost { border-radius: 12px; box-shadow: var(--float); }
+.fading { background-color: var(--bg); } /* still on the page */
 /* Where a dragged item or section will land: a slot in its colour, a shade darker than
    the page in the dark theme, so it reads as a space rather than something raised */
 :is(.item.placeholder, .sec.placeholder, .drop.over) {
@@ -318,12 +333,19 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .drop.over { border-color: transparent; background-color: var(--slot); }
 .drop.over .box { background: var(--muted); color: var(--surface); }
 
-/* An item on its way to its new place lifts off, travels and lands; a dragged one lands
-   where it was let go. motion.js sets the duration to match the trip. */
+/* An item on its way to its new place rises off the page, travels and settles into the
+   page again; a dragged one settles where it was let go. On the way, it takes the size of
+   the row it becomes. motion.js sets the duration to match the trip. */
 .flying { animation: lift ease-in-out both; }
 .ghost.landing { animation: land ease-in both; }
-@keyframes lift { 0%, 100% { box-shadow: none; } 25%, 75% { box-shadow: var(--float); } }
-@keyframes land { 0%, 40% { box-shadow: var(--float); } 100% { box-shadow: none; } }
+.sec.ghost.landing { animation-name: land-sec; }
+:is(.flying, .ghost.landing) { transition: width var(--trip) var(--ease); }
+:is(.flying, .ghost.landing) .text { transition: font-size var(--trip) var(--ease), padding var(--trip) var(--ease); }
+:is(.flying, .ghost.landing) .box { transition: width var(--trip) var(--ease), height var(--trip) var(--ease), margin var(--trip) var(--ease), border-radius var(--trip) var(--ease), opacity 0.15s; }
+:is(.flying, .ghost.landing) .box::after { transition: width var(--trip) var(--ease), height var(--trip) var(--ease); }
+@keyframes lift { 0%, 100% { box-shadow: none; background-color: var(--bg); } 25%, 75% { box-shadow: var(--float); background-color: var(--surface); } }
+@keyframes land { 0%, 40% { box-shadow: var(--float); background-color: var(--surface); } 100% { box-shadow: none; background-color: var(--bg); } }
+@keyframes land-sec { 0%, 40% { box-shadow: 0 0 0 12px var(--surface), var(--float); background-color: var(--surface); } 100% { box-shadow: 0 0 0 12px var(--bg); background-color: var(--bg); } }
 
 /* Adding a section */
 .add-sec { display: flex; align-items: center; min-height: 48px; color: var(--muted); }
@@ -353,10 +375,25 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 #app.readonly .box { border-color: color-mix(in oklab, var(--sec) 30%, var(--bg)); }
 #app.readonly .chk:checked + .box { opacity: 0.5; }
 
+/* Sheets rise onto the page as it dims behind them; undo and the connection's status rise
+   into place when they appear */
+.sheet[open], .dock:not([hidden]), .status:not([hidden]) { animation: rise 0.24s var(--ease-rise); }
+.sheet[open]::backdrop { animation: dim 0.24s ease-out; }
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } }
+@keyframes dim { from { opacity: 0; } }
+/* Opening a list from the lists page, its sheet grows into the page; Lists, at the top of
+   the list, shrinks the page back into its sheet (app.js). The sheet keeps its own size
+   while the page grows from it or shrinks into it, so neither is stretched. */
+:root:not([data-view]) { view-transition-name: paper; }
+::view-transition-group(*) { animation-duration: 0.32s; animation-timing-function: var(--ease-move); }
+::view-transition-group(paper) { z-index: 1; overflow: hidden; border-radius: 12px; } /* above the page fading in behind it */
+::view-transition-old(paper), ::view-transition-new(paper) { height: 100%; object-fit: cover; object-position: left top; animation-duration: 0.16s; }
+:root[data-turn="open"]::view-transition-old(paper), :root[data-turn="close"]::view-transition-new(paper) { object-fit: none; }
+
 /* Motion: items glide from motion.js; this only turns the rest off when asked */
 @media (prefers-reduced-motion: reduce) {
-  .item.flash { animation: none; }
-  .item, .box, #basket-toggle .chev { transition: none; }
+  .item.flash, .sheet[open], .sheet[open]::backdrop, .dock:not([hidden]), .status:not([hidden]) { animation: none; }
+  .item, .box, .words, #basket-toggle .chev { transition: none; }
 }
 
 /* The lists page: a desk a shade deeper than paper, not paper itself, with each list
@@ -400,6 +437,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sheet-card.pressing .sheet-open { background-color: color-mix(in oklab, var(--paper) 92%, var(--ink)); transition: background-color 0.3s 0.12s; }
 .sheet-card.lifted { position: relative; z-index: 2; transform: scale(1.02); box-shadow: var(--float); transition: transform 0.15s, box-shadow 0.15s; }
 .sheet-card.ghost { background: none !important; box-shadow: var(--float); transition: opacity 0.15s, transform 0.15s; }
+.sheet-card.fading { background: none !important; }
 .sheet-card.ghost.leaving { opacity: 0.5; transform: scale(0.96); } /* over the zone that deletes it */
 .sheet-card.placeholder { background-color: var(--slot); }
 .sheet-card.placeholder > * { visibility: hidden; }

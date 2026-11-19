@@ -15,15 +15,15 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 A phone holds any number of lists, each shared with its own people. The app opens on the list last used.
 
 - **The lists page** is reached with *Lists*, at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to tick, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
-- **Open** a list with a tap.
+- **Open** a list with a tap: its sheet grows into the page. *Lists*, at the top of the list, shrinks the page back into its sheet.
 - **New list:** type a name on the blank strip under the sheets; the new list opens ready to write on. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
-- **Move** a list: hold it, then drag it to its new place. From a keyboard, Alt and an arrow move it one place earlier or later.
+- **Move** a list: hold it, then drag it to its new place; the others glide aside. From a keyboard, Alt and an arrow move it one place earlier or later.
 - **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, at the foot of the list itself. It always asks first. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
 - **Settings** is at the top right of the lists page.
 
 ## The page
 
-The list is written on the page itself, like paper: one left edge, ruled lines between items and under section names, and an underline where you type. Only what is lifted off the page has a shadow: something being dragged, the undo button, the sheets.
+The list is written on the page itself, like paper: one left edge, ruled lines between items and under section names, and an underline where you type. Only what is lifted off the page has a shadow: something being dragged, the undo button, the sheets, which rise onto the page as it dims behind them.
 
 - **The list's name** is the title at the top. A new list is named as it's made; one without a name says *Name this list* there, and is *Untitled list* elsewhere. Tap it to rename it. It also names the exported file. At its right, *Lists* leads to the lists page.
 - **The list's colour.** While you rename the list, colours show under its name: white and eight hues. The paper is warm paper dyed with the colour, the ruled lines a deeper dye, the title a deep shade of it, and the writing leans its way. The browser's bars follow, and the app opens in the colour without a flash of white.
@@ -58,9 +58,9 @@ A new list is a plain sheet: its items sit under its name, with no heading. *Add
 
 ## Ticking
 
-- **Tap the square** to tick an item: it fills with its section's colour. A short vibration confirms it in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
+- **Tap the square** to tick an item: it fills with its section's colour, and the words are struck through, as with a pen. A short vibration confirms it in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row leave together and the list doesn't move under your thumb.
-- They then slide into **the ticked group**, below the sections, after a dashed tear line. Its boxes fill with the colours of what's been ticked. It shows what was ticked in the last five days, latest first, so you can check what was done lately. Its heading, such as *3 ticked*, folds it away.
+- They then rise off the page, travel to **the ticked group**, taking the size of its smaller rows on the way, and settle into the page there. It lies below the sections, after a dashed tear line. Its boxes fill with the colours of what's been ticked. It shows what was ticked in the last five days, latest first, so you can check what was done lately. Its heading, such as *3 ticked*, folds it away.
 - Older ticked items are hidden, but still suggested when you type.
 - **Untick** an item by tapping its square: it goes back to the end of its section, or of the first section if its own was deleted.
 - **Drag** an item onto the drop zone under the ticked group's heading to tick it, or drag a ticked item into a section to put it back exactly where you drop it.
@@ -77,7 +77,7 @@ A new list is a plain sheet: its items sit under its name, with no heading. *Add
 
 - **Hold an item** for about half a second: it lifts and its tick box turns into a grip. Drag it anywhere, including into another section; the grip takes the colour of the section it's over. Letting go without moving does nothing. With a mouse, dragging starts as soon as you move.
 - **Hold a section's name** to move the section. While it moves, every section folds down to its name, so long ones are easy to reorder; they unfold when you let go, and the one you moved stays where you dropped it.
-- What you let go of glides into its place, and anything else that moves after a change glides too, without getting in the way of a tap.
+- While you drag, what's in the way glides aside. What you let go of glides into its place and settles into the page, and anything else that moves after a change glides too, without getting in the way of a tap. What you add stays where you typed it, and what you delete fades where it was.
 
 ## Undo and redo
 
@@ -154,7 +154,7 @@ In suggestions, ↓ and ↑ choose one, → moves to its ×, Enter picks it and 
 
 On the lists page, Alt and an arrow move a list, and Delete deletes it, once asked.
 
-Changes are announced to screen readers. Light and dark follow the phone unless chosen in Settings, and reduced motion is respected. Text, tick boxes and buttons keep WCAG AA contrast on every list and section colour, in both themes, on a list and on the lists page.
+Changes are announced to screen readers. Light and dark follow the phone unless chosen in Settings, and when the phone asks for reduced motion, nothing moves. Text, tick boxes and buttons keep WCAG AA contrast on every list and section colour, in both themes, on a list and on the lists page.
 
 ## Languages
 

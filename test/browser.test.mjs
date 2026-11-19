@@ -157,6 +157,9 @@ async function sendAs(pg, key, changes) {
 
 // Waits until nothing is gliding (see motion.js), so positions measured next are final.
 const still = pg => pg.waitForFunction(() => !document.getAnimations().some(a => (a.id === "glide" || a.id === "fly") && a.playState === "running"));
+// Waits until the page has turned between a list and its sheet (app.js), which changes
+// what's shown a moment after the tap.
+const turned = pg => pg.waitForFunction(() => !document.documentElement.dataset.turn);
 
 // Drags an item with the mouse to a point; returns before releasing if hold is set.
 async function dragTo(pg, from, toY, { hold = false } = {}) {
@@ -284,10 +287,10 @@ test("a link to another list adds it beside this one, and keeps what this one ha
   assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Garden hose", 10000), "the other list opens");
   assert.equal(await openKey(a), key2);
   assert.equal((await index(a)).lists.length, 2, "beside the first");
-  await a.click("#lists-open");
+  await toLists(a);
   await a.locator("#lists").waitFor();
   assert.ok(await eventually(async () => (await a.locator(".sheet-name").allInnerTexts()).length === 2));
-  await a.locator(".sheet-open").first().click();
+  await a.locator("#sheets .sheet-open").first().click(); await turned(a);
   assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Bread", 10000), "and the first still has what it hadn't sent");
   assert.ok(await eventually(async () => (await texts(t.b, "Essentials")).join() === "Milk,Bread", 10000), "which it now sends");
   await t.close();
@@ -495,7 +498,7 @@ test("the list's colour, chosen under its name, tints the paper on both phones",
   await a.reload();
   await a.locator("#app").waitFor();
   assert.equal(await a.evaluate(() => window.firstList), "teal");
-  await a.click("#lists-open");
+  await toLists(a);
   await a.fill("#new-list", "Market");
   await a.press("#new-list", "Enter");
   await a.locator("#app").waitFor();
@@ -577,7 +580,7 @@ test("unticking an item from a deleted section puts it in the first section", as
   await sleep(1900);
   await section(a, "Fruit & Veg").locator(".sec-name").click();
   await a.locator(".sec-head .bin").click();
-  await a.locator('#basket-list .item:has(.text:text-is("Apples")) .boxcell').click();
+  await a.locator('#basket-list .item:has(.words:text-is("Apples")) .boxcell').click();
   await sleep(400);
   assert.ok((await texts(a, "Essentials")).includes("Apples"));
   assert.ok(!(await names(a)).includes("Fruit & Veg"));
@@ -905,7 +908,7 @@ test("a ticked item dragged into a section goes back on the list there", async (
   await item(a, "Bread").locator(".boxcell").click();
   await sleep(1900);
   assert.deepEqual(await ticked(a), ["Bread"]);
-  const bread = () => a.locator('#basket-list .item:has(.text:text-is("Bread"))');
+  const bread = () => a.locator('#basket-list .item:has(.words:text-is("Bread"))');
   const belowMilk = async () => { const m = await item(a, "Milk").boundingBox(); return m.y + m.height - 4; };
 
   await dragTo(a, bread(), belowMilk, { hold: true });
@@ -1035,7 +1038,7 @@ test("out of sight, the app stops listening; back on screen, it catches up and l
   await t.close();
 });
 
-test("a ticked item travels at the same pace however long the list, and only as far as the screen", async () => {
+test("a ticked item takes longer the further it goes, but less than in proportion, and only goes as far as the screen", async () => {
   const t = await pair();
   const { a } = t;
   // The trip of the item now flying to the ticked group: its length, duration and end.
@@ -1063,7 +1066,8 @@ test("a ticked item travels at the same pace however long the list, and only as 
   assert.ok(long.end <= long.screen + 8, "in a long list, it goes no further than the screen's edge");
   assert.equal(long.easing, "cubic-bezier(0.4, 0, 1, 1)", "and leaves the screen without slowing down");
   assert.equal(short.easing, "cubic-bezier(0.4, 0, 0.2, 1)", "while one landing on screen slows into place");
-  assert.ok(Math.abs(long.d / long.ms - short.d / short.ms) < 0.05, `the same pace: ${(short.d / short.ms).toFixed(2)} and ${(long.d / long.ms).toFixed(2)} px/ms`);
+  assert.ok(long.d > short.d && long.ms > short.ms, `a longer trip takes longer: ${short.ms} and ${long.ms} ms`);
+  assert.ok(long.d / long.ms > short.d / short.ms, `but goes faster: ${(short.d / short.ms).toFixed(2)} and ${(long.d / long.ms).toFixed(2)} px/ms`);
   await t.close();
 });
 
@@ -1085,6 +1089,30 @@ test("an item on the move stays in line with the list", async () => {
   await a.mouse.up();
   await still(a);
   await t.close();
+});
+
+test("with reduced motion asked for, nothing moves", async () => {
+  const p = await alone({ reducedMotion: "reduce" });
+  const a = p.page;
+  const moving = () => a.evaluate(() => document.getAnimations().length);
+  for (const x of ["Milk", "Bread"]) {
+    await add(a, "ess", x);
+    assert.equal(await moving(), 0, "adding an item");
+  }
+  await blur(a);
+  await item(a, "Milk").locator(".boxcell").click();
+  assert.equal(await moving(), 0, "ticking it");
+  assert.ok(await eventually(async () => (await ticked(a)).join() === "Milk"));
+  assert.equal(await moving(), 0, "and when it goes to the ticked group");
+  await a.click("#pair-open");
+  assert.equal(await moving(), 0, "a sheet");
+  await a.click("#pair-close");
+  await a.click("#lists-open");
+  assert.equal(await a.locator("#lists").isVisible(), true, "the lists page shows at once");
+  await a.locator("#sheets .sheet-open").click();
+  assert.equal(await a.locator("#app").isVisible(), true, "and so does the list");
+  assert.equal(await moving(), 0);
+  await p.close();
 });
 
 test("a section's colour is chosen from a palette while renaming it", async () => {
@@ -1258,7 +1286,7 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
     "# Shopping list", "", "## Essentials <!-- ink -->", "- [ ] 2 eggs", "- [x] Milk", "", "## Look out for <!-- amber -->", "- [ ] Ripe avocados", "", "## Long term <!-- indigo -->", "",
   ].join("\n"));
   assert.equal(await a.locator("#settings-open").isVisible(), false, "Settings is on the lists page only");
-  await a.click("#lists-open");
+  await toLists(a);
   await a.click("#settings-open");
   assert.ok(await a.locator("#settings").isVisible());
 
@@ -1270,14 +1298,14 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   assert.ok(Math.max(...night) < 30, "dark colours when Dark is chosen: " + night);
   assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), rgbText(night), "the browser's bars follow");
   await a.click("#settings-close");
-  await a.locator(".sheet-open").first().click();
+  await a.locator("#sheets .sheet-open").first().click(); await turned(a);
   await a.locator("#app").waitFor();
   const dark = await paperOf(a);
   assert.ok(Math.max(...dark) < 45 && dark.join() !== night.join(), "and the list is dark paper, lighter than the desk: " + dark);
   await a.reload();
   await a.locator("#app").waitFor();
   assert.equal(await a.evaluate(() => document.documentElement.dataset.theme), "dark", "the choice is kept on this phone");
-  await a.click("#lists-open");
+  await toLists(a);
   await a.click("#settings-open");
   assert.ok(await a.locator('input[name="theme"][value="dark"]').isChecked());
 
@@ -1286,13 +1314,13 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   await a.locator("#settings .switch").click();
   assert.ok(await sheet() < roomy - 40, "the compact layout: each list in one line");
   await a.click("#settings-close");
-  await a.locator(".sheet-open").first().click();
+  await a.locator("#sheets .sheet-open").first().click(); await turned(a);
   const row = () => a.evaluate(() => Math.round(document.querySelector("#list .item").getBoundingClientRect().height));
   assert.equal(await row(), 44, "and rows of 44 px");
   await a.reload();
   await a.locator("#app").waitFor();
   assert.equal(await row(), 44, "kept on this phone");
-  await a.click("#lists-open");
+  await toLists(a);
   await a.click("#settings-open");
   assert.ok(await a.locator("#compact-layout").isChecked());
   await a.locator("#settings .switch").click();
@@ -1330,12 +1358,12 @@ test("in French when the phone is in French", async () => {
   await blur(a);
   assert.equal(await a.getAttribute("#undo", "aria-label"), `Annuler${nb}: ajouter «${nb}2 lait${nb}»`);
 
-  await a.click("#lists-open");
+  await toLists(a);
   assert.equal(await a.locator(".sheet-count").innerText(), "1 à cocher");
   await a.click("#settings-open");
   assert.equal(await a.locator("#settings-title").innerText(), "Paramètres");
   await a.click("#settings-close");
-  await a.locator(".sheet-open").click();
+  await a.locator("#sheets .sheet-open").click(); await turned(a);
   await a.locator("#app").waitFor();
 
   assert.ok(await eventually(async () => (await texts(b, "Essentiels")).join() === "2 lait"), "sent before going offline");
@@ -1452,10 +1480,11 @@ async function alone(options) {
   await started(P.page);
   return { ...P, errors, async close() { await P.ctx.close(); assert.deepEqual(errors, [], "no errors in the page"); } };
 }
-const sheets = pg => pg.locator(".sheet-name").evaluateAll(els => els.map(e => (e.firstChild ? e.firstChild.textContent : ""))); // the name, without who else has it
-const counts = pg => pg.locator(".sheet-count").allInnerTexts();
+const sheets = pg => pg.locator("#sheets .sheet-name").evaluateAll(els => els.map(e => (e.firstChild ? e.firstChild.textContent : ""))); // the name, without who else has it
+const counts = pg => pg.locator("#sheets .sheet-count").allInnerTexts();
 async function toLists(pg) {
   await pg.click("#lists-open");
+  await turned(pg);
   await pg.locator("#lists").waitFor();
 }
 async function newList(pg, name) {
@@ -1486,7 +1515,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   assert.deepEqual(await sheets(a), ["Shopping list"]);
   assert.deepEqual(await counts(a), ["3 to tick"]);
   assert.deepEqual(await a.locator(".sheet-item").allInnerTexts(), ["2 milk", "Bread", "Ripe avocados"], "and the first three of them");
-  assert.equal(await a.locator(".sheet-open").getAttribute("aria-label"), "Shopping list, with 1 other phone, 3 to tick");
+  assert.equal(await a.locator("#sheets .sheet-open").getAttribute("aria-label"), "Shopping list, with 1 other phone, 3 to tick");
   assert.equal(await a.locator(".sheet-with").innerText(), "with 1 other phone", "who else has it, quietly");
 
   await newList(a, "Hardware store");
@@ -1500,7 +1529,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await a.locator("#lists").waitFor();
   assert.ok(await eventually(async () => (await sheets(a)).join() === "Shopping list,Hardware store"));
   assert.deepEqual(await counts(a), ["3 to tick", "1 to tick"]);
-  const [one, two] = await a.locator(".sheet-card").evaluateAll(els => els.map(el => el.getBoundingClientRect()));
+  const [one, two] = await a.locator("#sheets .sheet-card").evaluateAll(els => els.map(el => el.getBoundingClientRect()));
   assert.ok(Math.abs(one.top - two.top) < 1 && two.left > one.right && Math.abs(one.height - two.height) < 1, "side by side, the same size");
 
   await sleep(500);
@@ -1509,7 +1538,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await add(b, "ess", "Eggs");
   await blur(b);
   assert.ok(await eventually(async () => { const st = await stored(b); return !st.outbox.length && Object.values(st.items).some(f => f.text && f.text[0] === "Eggs"); }), "sent, and saved");
-  await a.locator(".sheet-open").nth(1).click();
+  await a.locator("#sheets .sheet-open").nth(1).click(); await turned(a);
   await a.locator("#app").waitFor();
   await a.goBack();
   assert.ok(await eventually(async () => (await counts(a))[0] === "4 to tick"), "a list not on screen catches up as the lists page shows");
@@ -1524,7 +1553,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await online(t.A, a);
   assert.ok(await eventually(async () => !(await a.locator("#status").isVisible())));
 
-  await a.locator(".sheet-open").nth(1).click();
+  await a.locator("#sheets .sheet-open").nth(1).click(); await turned(a);
   await a.reload();
   await a.locator("#app").waitFor();
   assert.equal(await a.locator("#list-name").innerText(), "Hardware store", "the app opens on the list last used");
@@ -1536,9 +1565,9 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   const tab = await t.A.newPage();
   await tab.goto(BASE + "/");
   await toLists(tab);
-  await a.locator(".sheet-open").nth(1).click();
+  await a.locator("#sheets .sheet-open").nth(1).click(); await turned(a);
   await a.locator("#app").waitFor();
-  await tab.locator(".sheet-open").nth(1).focus();
+  await tab.locator("#sheets .sheet-open").nth(1).focus();
   await tab.keyboard.press("Delete");
   await tab.click("#confirm-ok");
   await a.locator("#lists").waitFor();
@@ -1560,7 +1589,7 @@ test("a new list is a plain sheet, named first; sections come when added, and li
   assert.equal(await a.locator("#list-name").getAttribute("data-placeholder"), "Name this list", "left without a name, it asks for one");
   await toLists(a);
   assert.deepEqual(await sheets(a), ["Untitled list"]);
-  await a.locator(".sheet-open").click();
+  await a.locator("#sheets .sheet-open").click(); await turned(a);
   await a.click("#list-name");
   await a.keyboard.type("Hardware store");
   await a.keyboard.press("Enter");
@@ -1585,7 +1614,7 @@ test("a new list is a plain sheet, named first; sections come when added, and li
   // A list made before plain sheets, which wrote no start into itself, keeps its three.
   await toLists(a);
   await a.evaluate(async () => (await import("/store.js")).createList({}));
-  await a.locator(".sheet-open", { hasText: "Untitled list" }).click();
+  await a.locator("#sheets .sheet-open", { hasText: "Untitled list" }).click(); await turned(a);
   assert.deepEqual(await names(a), ["Essentials", "Look out for", "Long term"]);
   await ctx.close();
   assert.deepEqual(errors, []);
@@ -1620,7 +1649,7 @@ test("on a phone on its side, what's ticked lies beside the list, and an item dr
   await a.click("#pair-close");
   await toLists(a);
   assert.equal(await a.locator(".sheet-first").first().isVisible(), !LAYOUT, "the lists page shows each list's first things, unless compact");
-  const sheets = await a.locator(".sheet-card").evaluateAll(els => els.map(e => e.getBoundingClientRect().width));
+  const sheets = await a.locator("#sheets .sheet-card").evaluateAll(els => els.map(e => e.getBoundingClientRect().width));
   assert.ok(sheets[0] < 892 / 3, "with more sheets to a row");
   await a.click("#settings-open");
   const you = await a.locator("#set-you").boundingBox(), name = await a.locator("#my-name").boundingBox();
@@ -1636,31 +1665,31 @@ test("lists are reordered by dragging, and deleted once asked, on the lists page
   for (const n of ["Hardware store", "Market"]) { await newList(a, n); await toLists(a); }
   assert.deepEqual(await sheets(a), ["Shopping list", "Hardware store", "Market"]);
 
-  await a.locator(".sheet-open").nth(2).focus();
+  await a.locator("#sheets .sheet-open").nth(2).focus();
   await a.keyboard.press("Alt+ArrowUp");
   assert.deepEqual(await sheets(a), ["Shopping list", "Market", "Hardware store"], "Alt+↑ moves a list up");
   assert.equal(await a.evaluate(() => document.activeElement.innerText.split("\n")[0]), "Market", "and keeps the cursor on it");
 
-  const top = (await a.locator(".sheet-card").first().boundingBox()).y;
-  await dragTo(a, a.locator(".sheet-card").nth(2), top + 5);
+  const top = (await a.locator("#sheets .sheet-card").first().boundingBox()).y;
+  await dragTo(a, a.locator("#sheets .sheet-card").nth(2), top + 5);
   assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "dragged to the top");
   assert.deepEqual((await index(a)).lists.map(e => e.name || "Shopping list"), ["Hardware store", "Shopping list", "Market"], "and kept in that order");
 
   const toZone = async () => (await a.locator("#remove-drop").boundingBox()).y + 20;
-  await dragTo(a, a.locator(".sheet-card").nth(1), toZone);
+  await dragTo(a, a.locator("#sheets .sheet-card").nth(1), toZone);
   await a.locator("#confirm").waitFor();
   assert.equal(await a.locator("#confirm-title").innerText(), "Delete “Shopping list”?", "dropped at the foot, it asks first");
   assert.equal(await a.locator("#confirm-text").innerText(), "It goes from this phone. Its link brings it back, if you kept one.");
   await a.click("#confirm-cancel");
   assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "and nothing goes until it's answered");
-  await dragTo(a, a.locator(".sheet-card").nth(1), toZone);
+  await dragTo(a, a.locator("#sheets .sheet-card").nth(1), toZone);
   await a.click("#confirm-ok");
   assert.deepEqual(await sheets(a), ["Hardware store", "Market"], "deleted from this phone");
   assert.equal(await a.locator("#undo-what").innerText(), "Shopping list", "undo names what it would bring back");
   await a.click("#undo");
   assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "back where it was");
 
-  await a.locator(".sheet-open").nth(2).click();
+  await a.locator("#sheets .sheet-open").nth(2).click(); await turned(a);
   await a.click("#pair-open");
   assert.equal(await a.locator("#members").innerText(), "Only you, so far.");
   assert.equal(await a.locator("#rekey-open").isVisible(), false, "no one to remove");
@@ -1677,7 +1706,7 @@ test("lists are reordered by dragging, and deleted once asked, on the lists page
   assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list"], "and the lists page shows, without it");
   await a.click("#undo");
   assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"]);
-  await a.locator(".sheet-open").nth(2).focus();
+  await a.locator("#sheets .sheet-open").nth(2).focus();
   await a.keyboard.press("Delete");
   assert.equal(await a.locator("#confirm-title").innerText(), "Delete “Market”?", "the Delete key asks too");
   await a.click("#confirm-ok");
@@ -1742,7 +1771,7 @@ test("the people on a list: names on the share sheet, undo says who; three phone
   await b.fill("#my-name", "Alex");
   await b.press("#my-name", "Enter");
   await b.click("#settings-close");
-  await b.locator(".sheet-open").click();
+  await b.locator("#sheets .sheet-open").click(); await turned(b);
   await a.click("#pair-open");
   assert.ok(await eventually(async () => (await a.locator("#members").innerText()) === "On this list: you and Alex."));
   assert.ok(await a.locator("#pair-name").isVisible(), "a phone without a name is asked for one where names matter");
@@ -1762,8 +1791,8 @@ test("the people on a list: names on the share sheet, undo says who; three phone
   await a.click("#pair-close");
   await toLists(a);
   assert.equal(await a.locator(".sheet-with").innerText(), "with Alex and 1 other", "the lists page says who else has a list, quietly");
-  assert.match(await a.locator(".sheet-open").getAttribute("aria-label"), /^Shopping list, with Alex and 1 other, /);
-  await a.locator(".sheet-open").click();
+  assert.match(await a.locator("#sheets .sheet-open").getAttribute("aria-label"), /^Shopping list, with Alex and 1 other, /);
+  await a.locator("#sheets .sheet-open").click(); await turned(a);
   await a.locator("#app").waitFor();
 
   await add(a, "ess", "Bread");
@@ -1838,8 +1867,8 @@ test("changing a list's key leaves everyone else with it closed, until they open
   await toLists(b);
   assert.ok(await eventually(async () => (await counts(b)).join() === "Closed,2 to tick"), "beside the closed one");
 
-  assert.ok(await eventually(async () => (await b.locator(".sheet-card").nth(1).locator(".sheet-with").innerText()) === "with 1 other phone"));
-  await dragTo(b, b.locator(".sheet-card").nth(1), async () => (await b.locator("#remove-drop").boundingBox()).y + 20);
+  assert.ok(await eventually(async () => (await b.locator("#sheets .sheet-card").nth(1).locator(".sheet-with").innerText()) === "with 1 other phone"));
+  await dragTo(b, b.locator("#sheets .sheet-card").nth(1), async () => (await b.locator("#remove-drop").boundingBox()).y + 20);
   await b.locator("#confirm").waitFor();
   assert.equal(await b.locator("#confirm-text").innerText(), "It goes from this phone only: the others keep it.");
   await b.click("#confirm-more");
@@ -1851,7 +1880,7 @@ test("changing a list's key leaves everyone else with it closed, until they open
   await a.click("#status-pill");
   assert.equal(await a.locator("#status-detail button").count(), 0, "nor deleted from the list itself");
   await toLists(a);
-  await a.locator(".sheet-open").focus();
+  await a.locator("#sheets .sheet-open").focus();
   await a.keyboard.press("Delete");
   assert.equal(await a.locator("#confirm-text").innerText(), "It's closed already: this takes what's left of it off this phone.");
   assert.equal(await a.locator("#confirm-more").isVisible(), false, "there's no one left to delete it for");
@@ -1945,7 +1974,7 @@ test("opening a list leaves it still, and from the keyboard the cursor follows b
   await blur(a);
   await toLists(a);
   const lid = (await index(a)).open;
-  await a.locator(".sheet-open").focus();
+  await a.locator("#sheets .sheet-open").focus();
   await a.keyboard.press("Enter");
   await a.locator("#app").waitFor();
   assert.equal(await a.evaluate(() => document.activeElement.id), "list-name", "the cursor moves to the list's name");
@@ -1975,8 +2004,8 @@ test("on a slow phone, a step back in history that lands late undoes nothing tha
   await blur(a);
   // Each step back lands most of a second late, as on a busy phone.
   await a.evaluate(() => { const back = history.back.bind(history); history.back = () => setTimeout(back, 800); });
-  await a.click("#lists-open");
-  await a.locator(".sheet-open").click();
+  await toLists(a);
+  await a.locator("#sheets .sheet-open").click(); await turned(a);
   await sleep(1500);
   assert.equal(await a.locator("#app").isVisible(), true, "the list opened at once stays open");
   await a.goBack();
@@ -1987,10 +2016,10 @@ test("on a slow phone, a step back in history that lands late undoes nothing tha
   assert.equal(await a.locator("#pair").isVisible(), true, "a sheet opened from another stays open");
   await a.goBack();
   assert.ok(await eventually(async () => !(await a.locator("#pair").isVisible()) && (await a.locator("#lists").isVisible())), "back closes it, onto the lists page");
-  await a.locator(".sheet-open").click();
+  await a.locator("#sheets .sheet-open").click(); await turned(a);
   await a.click("#pair-open");
   await a.click("#pair-close");
-  await a.click("#lists-open");
+  await toLists(a);
   await sleep(1500);
   assert.equal(await a.locator("#lists").isVisible(), true, "two steps back, one after the other, land on the lists page");
   assert.ok(await eventually(() => a.evaluate(() => JSON.stringify(history.state) === "{}")), "and history follows, one step after the other");

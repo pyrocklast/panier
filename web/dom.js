@@ -7,10 +7,11 @@ export const $ = s => document.querySelector(s);
 
 export const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
-// Fills an item's text: the quantity in its own span, the name after it.
+// Fills an item's text: the quantity in its own span, the name after it, both in the
+// words that ticking strikes through (app.css).
 export function fillText(el, text) {
   const { qty, sep, name } = splitQty(text);
-  el.replaceChildren(...(qty ? [h("span", { class: "qty" }, qty.replace(/^([\d.,½¼¾⅓⅔]+\s*)x$/i, "$1×")), sep] : []), name);
+  el.replaceChildren(h("span", { class: "words" }, ...(qty ? [h("span", { class: "qty" }, qty.replace(/^([\d.,½¼¾⅓⅔]+\s*)x$/i, "$1×")), sep] : []), name));
 }
 
 export const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} };
