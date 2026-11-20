@@ -505,6 +505,15 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .people .field { margin-bottom: 12px; }
 .more { display: flex; flex-wrap: wrap; gap: 0 4px; margin-left: -8px; }
 #confirm-more { display: block; margin: 8px auto -12px; color: var(--danger); } /* Delete for everyone, under Delete */
+/* Choosing what comes in from Google Keep: a note to a line, scrolling between the title
+   and the buttons, which stay in view */
+.pick { list-style: none; margin: 0 -24px; padding: 4px 24px; max-height: min(26rem, 55dvh); overflow-y: auto; overscroll-behavior: contain; border-block: 1px solid var(--line); }
+.pick label { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 0; cursor: pointer; --sec: var(--muted); }
+.pick .box { flex: none; }
+.pick-in { display: flex; flex-direction: column; min-width: 0; }
+.pick-name { overflow-wrap: anywhere; }
+.pick-about { font-size: 0.875rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#pick-ok:disabled { opacity: 0.4; cursor: default; }
 
 /* Settings: a page of its own over the list, its parts between ruled lines */
 .sheet.page {
@@ -533,7 +542,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .choices input:checked { border-color: var(--ink); background: radial-gradient(circle, var(--ink) 0 4.5px, transparent 5px); }
 .choices input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .switch { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; margin: 12px 0 -6px; padding-top: 6px; border-top: 1px solid var(--line); cursor: pointer; --sec: var(--muted); }
-.switch .chk:checked + .box { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+:is(.switch, .pick) .chk:checked + .box { background: var(--ink); border-color: var(--ink); color: var(--surface); }
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 12px; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }

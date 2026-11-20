@@ -13,6 +13,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { zip } from "./zip.mjs";
 
 const require = createRequire(import.meta.url);
 const ENGINE = process.env.BROWSER || "chromium";
@@ -1781,6 +1782,53 @@ test("lists come in from Markdown, from plain text, and from several pasted line
   await blur(a);
   await a.click("#undo");
   assert.deepEqual(await texts(a, "Essentials"), ["2 eggs"], "in one step to undo");
+  await ctx.close();
+  assert.deepEqual(errors, []);
+});
+
+test("lists come in from Google Keep, chosen first", async () => {
+  const errors = [];
+  const { ctx, page: a } = await phone(errors);
+  await a.goto(BASE + "/");
+  await a.locator("#lists").waitFor();
+  const note = (title, items, more = {}) => JSON.stringify({ color: "DEFAULT", isTrashed: false, isArchived: false, title, listContent: items.map(([text, isChecked]) => ({ text, isChecked })), userEditedTimestampUsec: 1700000000000000, ...more });
+  const takeout = zip([
+    { name: "Takeout/Keep/Groceries.json", data: note("Groceries", [["Milk", false], ["Eggs", true], ["2 loaves", false]], { color: "GREEN", userEditedTimestampUsec: 1760000000000000 }) },
+    { name: "Takeout/Keep/Garden.json", data: note("Garden", [["Hose", false]], { isArchived: true }) },
+    { name: "Takeout/Keep/Idea.json", data: JSON.stringify({ title: "Idea", textContent: "A note, not a list", isTrashed: false }) },
+    { name: "Takeout/Keep/Party.json", data: note("", [["Balloons", false]], { userEditedTimestampUsec: 1750000000000000 }) },
+  ]);
+  await a.setInputFiles("#import-file", { name: "takeout-20261120T101010Z-001.zip", mimeType: "application/zip", buffer: takeout });
+  await a.locator("#pick[open]").waitFor();
+  assert.deepEqual(await a.locator("#pick-list .pick-name").allInnerTexts(), ["Groceries", "Untitled list", "Garden"], "the checklists, last edited first");
+  assert.deepEqual(await a.locator("#pick-list .pick-about").allInnerTexts(), ["2 to tick · Milk, 2 loaves", "1 to tick · Balloons", "Archived · 1 to tick · Hose"]);
+  assert.deepEqual(await a.locator("#pick-list .chk").evaluateAll(els => els.map(e => e.checked)), [true, true, false], "all ticked to come in but the archived one");
+  await a.locator("#pick-list label", { hasText: "Balloons" }).click();
+  await a.locator("#pick-list label", { hasText: "Groceries" }).click();
+  assert.ok(await a.locator("#pick-ok").isDisabled(), "nothing to bring in");
+  await a.locator("#pick-list label", { hasText: "Groceries" }).click();
+  await a.locator("#pick-list label", { hasText: "Garden" }).click();
+  await a.click("#pick-ok");
+  assert.ok(!(await a.locator("#pick").isVisible()));
+  await a.fill("#setup-code", SETUP); // the first list on a server needs its setup code
+  await a.click("#setup-form button[type=submit]");
+  assert.ok(await eventually(async () => (await sheets(a)).length === 2));
+  assert.deepEqual(await sheets(a), ["Groceries", "Garden"]);
+  assert.equal(await live(a), "Brought in 2 lists");
+  await a.locator("#sheets .sheet-open").first().click(); await turned(a);
+  assert.equal(await a.locator("#list-name").innerText(), "Groceries");
+  assert.equal(await a.evaluate(() => document.documentElement.dataset.list), "green", "in Keep's colour");
+  assert.deepEqual(await a.locator("#list .item .text").allInnerTexts(), ["Milk", "2 loaves"], "in one section");
+  assert.deepEqual(await names(a), [""], "without a name");
+  assert.deepEqual(await ticked(a), [], "what was ticked in Keep isn't shown as ticked");
+  await a.fill("#add-ess", "eg");
+  assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Eggs"], "but suggested");
+  await a.fill("#add-ess", "");
+  await blur(a);
+
+  await toLists(a);
+  await a.setInputFiles("#import-file", { name: "Idea.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify({ title: "Idea", textContent: "Words" })) });
+  assert.ok(await eventually(async () => (await a.locator("#lists-msg").innerText()) === "There's no list to bring in from Idea.json."), "a text note isn't a list");
   await ctx.close();
   assert.deepEqual(errors, []);
 });
