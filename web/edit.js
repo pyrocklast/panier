@@ -4,6 +4,7 @@ import { t } from "./i18n.js";
 import { state } from "./state.js";
 import { clean } from "./model.js";
 import { h, icon } from "./dom.js";
+import { shift } from "./motion.js";
 
 const PLAIN = (() => { try { const d = document.createElement("div"); d.contentEditable = "plaintext-only"; return d.contentEditable === "plaintext-only"; } catch (_) { return false; } })();
 
@@ -77,7 +78,7 @@ export function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSa
   }, icon("cross"));
   row.classList.add("editing");
   if (bin) row.append(bin);
-  if (below) row.after(below); // more tools while editing, such as a section's colours
+  if (below) shift(() => row.after(below)); // more tools while editing, such as a section's colours: what follows glides down
   const tools = [bin, below].filter(Boolean);
   const inTools = el => !!el && tools.some(t => t.contains(el));
   const enter = () => {

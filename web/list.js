@@ -7,7 +7,7 @@ import { state, readOnly, listName, listColor, draftsKey } from "./state.js";
 import { DEFAULTS, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, RECENT_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout, sheetOfList } from "./model.js";
 import { $, h, icon, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, download, reduceMotion } from "./dom.js";
 import { whenTapEnds, bindPress, beginDrag } from "./press.js";
-import { float, landAll, snapshot, glide, fly, shift, shuffle, MOTION } from "./motion.js";
+import { float, landAll, snapshot, glide, fly, shift, shuffle, foldAway, dye, MOTION } from "./motion.js";
 import { editInPlace, palette } from "./edit.js";
 import { noteUndo, paintDock, paintStatus } from "./bar.js";
 
@@ -382,7 +382,7 @@ function editListName(span, x, y) {
     key: LIST, row: span.closest(".list-top"), orig, max: MAX_SECTION, x, y,
     below: palette(listName(), LIST_COLORS, listColor(), (c, label) => {
       announce(t("{x} is now {y}", { x: listName(), y: t(label).toLowerCase() }));
-      act(t("changing the colour of {x}", { x: q(listName()) }), [[LIST, "color", c, ""]], { animate: false });
+      dye(() => act(t("changing the colour of {x}", { x: q(listName()) }), [[LIST, "color", c, ""]], { animate: false }));
     }),
     onSave: (name, entered) => {
       announce(t("Renamed the list to {x}", { x: name }));
@@ -396,7 +396,7 @@ export const editName = () => editListName($("#list-name"));
 function recolour(id, color, label) {
   const fallback = (DEFAULTS.find(d => d.id === id) || {}).color;
   announce(t("{x} is now {y}", { x: nameOf(id), y: t(label).toLowerCase() }));
-  act(t("changing the colour of {x}", { x: q(nameOf(id)) }), [["#" + id, "color", color, fallback]], { animate: false });
+  dye(() => act(t("changing the colour of {x}", { x: q(nameOf(id)) }), [["#" + id, "color", color, fallback]], { animate: false }));
 }
 
 /* ---------- Suggestions from everything ticked before ---------- */
@@ -453,14 +453,16 @@ function paintSug(sec, list) {
   if (list.length && active >= 0) sh.input.setAttribute("aria-activedescendant", sugCellId(sec, active, ui.sugCol));
   else sh.input.removeAttribute("aria-activedescendant");
 }
+// As you type, suggestions come and go above the field, which glides to make room for them.
 function updateSug(sec) {
   if (ui.sugSec && ui.sugSec !== sec) paintSug(ui.sugSec, []);
-  const list = suggestions(shells[sec].input.value);
+  const list = suggestions(shells[sec].input.value), more = list.length !== shells[sec].sug.children.length;
   ui.sugSec = list.length ? sec : null;
   ui.sug = list;
   ui.sugIndex = -1;
   ui.sugCol = 0;
-  paintSug(sec, list);
+  if (more) shift(() => paintSug(sec, list));
+  else paintSug(sec, list);
 }
 export function closeSug() {
   if (ui.sugSec) paintSug(ui.sugSec, []);
@@ -643,8 +645,10 @@ function startDrag(li, id, offY, y, offX, x) {
   li.classList.add("placeholder");
   // A ticked item can go back into a section; over the ticked group, it returns to its place there.
   const ticked = li.parentElement.id === "basket-list";
-  document.documentElement.classList.add("dragging"); // which shows the ticked group, to drop on
-  document.documentElement.classList.toggle("drag-ticked", ticked);
+  shift(() => { // which shows the ticked group, to drop on: what follows glides down to make room
+    document.documentElement.classList.add("dragging");
+    document.documentElement.classList.toggle("drag-ticked", ticked);
+  });
   const home = { ul: li.parentElement, next: li.nextElementSibling, sec: li.style.getPropertyValue("--sec") };
   // On a wide screen, the ticked group lies beside the list (app.css): the item then
   // follows the finger sideways too, and goes there to be ticked.
@@ -727,8 +731,12 @@ function startSectionDrag(id, y) {
   landAll();
   const el = shells[id].el;
   const before = el.getBoundingClientRect().top;
-  document.documentElement.classList.add("sorting");
-  window.scrollBy(0, el.getBoundingClientRect().top - before); // its heading stays under your finger
+  // Every section folds to its heading: what each held fades where it was, as the
+  // headings glide together, the one held staying under your finger.
+  shuffle("#list > .sec", () => {
+    document.documentElement.classList.add("sorting");
+    window.scrollBy(0, el.getBoundingClientRect().top - before);
+  }, { fold: true });
   const r = el.getBoundingClientRect(), offY = Math.min(Math.max(y - r.top, 0), r.height);
   const copy = el.cloneNode(true);
   copy.replaceChildren(copy.querySelector(".sec-head"));
@@ -841,10 +849,15 @@ $("#list-name").addEventListener("keydown", e => {
   if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editListName(e.currentTarget); }
 });
 
+// The ticked group folds away, its rows fading as it closes and what follows moving up;
+// unfolding, it opens as the list glides, its rows fading in.
 $("#basket-toggle").addEventListener("click", () => {
   ui.basketOpen = !ui.basketOpen;
   store.setFolded(state.lid, !ui.basketOpen);
-  paint(null, false);
+  const bl = $("#basket-list");
+  for (const a of bl.getAnimations()) a.cancel(); // folding a moment ago: it opens from where it is
+  if (ui.basketOpen) paint(null);
+  else foldAway(bl, () => paint(null, false));
 });
 
 /* ---------- For app.js ---------- */
@@ -852,7 +865,7 @@ $("#basket-toggle").addEventListener("click", () => {
 // Another list takes the screen: nothing of the last one stays.
 export function reset() {
   closeSug();
-  landAll();
+  landAll(true);
   clearTimeout(settleTimer);
   for (const id of Object.keys(shells)) { shells[id].el.remove(); delete shells[id]; }
   rows.clear();

@@ -35,7 +35,7 @@ The list is written on the page itself, like paper: one left edge, ruled lines b
 A new list is a plain sheet: its items sit under its name, with no heading. *Add a section* adds headings when they help: the items without one stay first, above them. Lists made before plain sheets keep the three sections they started with, *Essentials*, *Look out for* and *Long term*.
 
 - **Rename** a section by tapping its heading. Every phone sees the new name. Emptying the name and leaving puts the old one back.
-- **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it at once. Its name is written in a deep shade of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
+- **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it, the new colour spreading over it, as it does over the list's paper. Its name is written in a deep shade of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
 - **Add a section** with *Add a section*, below the last one. It gets the first colour not used yet. Enter or `+` adds it, the cross clears what you typed, and the cursor then moves to its *Add item* row.
 - **Delete** a section once nothing is left to tick in it: while you rename it, a cross appears. The items without a heading, at the top, always have their place. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 
@@ -140,6 +140,18 @@ On a phone turned on its side, or a tablet or computer, the page uses the width:
   - How much space each list takes on this phone.
   - *Export all lists* and *Set up another phone*, above.
 - **About:** the version, the server, and what the server can and can't see.
+
+## Motion
+
+Panier is paper, and what moves says where it happens:
+
+- **On the page**, what's written fades in or out where it is: an item added or deleted, a box filling, the pen stroke, suggestions, colours under a name, what others change, tinted a moment.
+- **Along the page**, rows and sections glide to their new places, the ticked group folds and unfolds, and what's in the way glides aside during a drag.
+- **Off the page**, what you hold lifts, with a shadow; a ticked item travels to the ticked group and settles there.
+- **On top**, the sheets, undo and the connection's status rise into place.
+- **The page itself** turns, between the lists page and a list, and takes a new colour.
+
+Each takes 0.15 s to give feedback, 0.24 s to arrive or 0.32 s to move, a little longer for a long trip. When the phone asks for reduced motion, nothing moves.
 
 ## Keyboard and screen readers
 

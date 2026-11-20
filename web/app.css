@@ -51,10 +51,13 @@
   --float: 0 14px 34px -10px light-dark(rgb(20 30 25 / 0.28), rgb(0 0 0 / 0.6)), 0 0 0 1px light-dark(rgb(20 30 25 / 0.06), #2f3733);
   --ff: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
   --page: 34rem; /* the page's width, wider on a wide screen */
-  /* Motion: what moves starts gently and lands gently, as in motion.js; what rises into
-     place arrives quickly and settles */
-  --ease-move: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-rise: cubic-bezier(0.2, 0, 0, 1);
+  /* Motion, as motion.js describes it: three lengths and three curves */
+  --quick: 150ms;  /* feedback, and what leaves */
+  --arrive: 240ms; /* what arrives */
+  --move: 320ms;   /* what moves, and turning the page */
+  --ease-move: cubic-bezier(0.4, 0, 0.2, 1); /* starts and ends gently */
+  --ease-arrive: cubic-bezier(0.2, 0, 0, 1); /* comes quickly and settles */
+  --ease-leave: cubic-bezier(0.4, 0, 1, 1);  /* starts gently and goes */
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
@@ -160,17 +163,17 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
    room around its text; the ruled lines still run from the text to the right edge. */
 :is(.item, .add, .sugopt) { margin-inline: -12px; padding-inline: 12px; background-origin: content-box; border-radius: 12px; }
 .items { list-style: none; margin: 0; padding: 0; }
-.item { display: grid; grid-template-columns: 38px minmax(0, 1fr); list-style: none; transition: background-color 0.2s; }
+.item { display: grid; grid-template-columns: 38px minmax(0, 1fr); list-style: none; transition: background-color var(--quick) var(--ease-move); }
 .item + .item, .items:not(:empty) ~ .add, .sug:not([hidden]) + .add {
   background-image: linear-gradient(var(--line), var(--line));
   background-size: calc(100% - 38px) 1px; background-position: right top; background-repeat: no-repeat;
 }
-.item.pressing { background-color: var(--press); transition: background-color 0.3s 0.12s; }
+.item.pressing { background-color: var(--press); transition: background-color var(--arrive) var(--ease-arrive) 120ms; } /* not for a tap */
 /* Lifted: a slip of paper above the page */
-.item.lifted { position: relative; z-index: 2; background-color: var(--surface); box-shadow: var(--float); transform: scale(1.02); transition: transform 0.15s, box-shadow 0.15s; }
+.item.lifted { position: relative; z-index: 2; background-color: var(--surface); box-shadow: var(--float); transform: scale(1.02); transition: transform var(--quick) var(--ease-arrive), box-shadow var(--quick) var(--ease-arrive); }
 .boxcell { position: relative; display: grid; place-items: center start; margin-left: -12px; padding-left: 12px; cursor: pointer; } /* the margin ticks too */
 .boxcell > .box, .boxcell > .grip { grid-area: 1 / 1; }
-.grip { display: grid; place-items: center; color: var(--sec); opacity: 0; transition: opacity 0.15s; }
+.grip { display: grid; place-items: center; color: var(--sec); opacity: 0; transition: opacity var(--quick) var(--ease-move); }
 /* The tick and the grip's dots are drawn here rather than in each item, in the current colour */
 .box::after, .grip::after { content: ""; background: currentColor; mask: var(--icon) center / contain no-repeat; }
 .box::after { width: 13px; height: 13px; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.5 10.5l3.7 3.7 7.3-8.7' fill='none' stroke='%23000' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
@@ -179,13 +182,13 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .item.lifted .grip, .ghost .grip { opacity: 1; }
 .ghost.done .box { opacity: 1; } /* over the ticked group: shown as it will be */
 .ghost.done .grip { opacity: 0; }
-.ghost .grip { transition: color 0.15s, opacity 0.15s; }
+.ghost .grip { transition: color var(--quick) var(--ease-move), opacity var(--quick) var(--ease-move); }
 .ghost.landing .box { opacity: 1; } /* let go, the grip turns back into the box */
 .ghost.landing .grip { opacity: 0; }
 .chk { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
 .box {
   width: 21px; height: 21px; box-sizing: border-box; border-radius: 5px; border: 2px solid var(--sec);
-  display: grid; place-items: center; color: transparent; transition: background-color 0.15s, border-color 0.15s, opacity 0.15s;
+  display: grid; place-items: center; color: transparent; transition: background-color var(--quick) var(--ease-move), border-color var(--quick) var(--ease-move), opacity var(--quick) var(--ease-move);
 }
 /* Ticked, the box fills with its section's colour: the ticked group fills with the
    colours of what's been got */
@@ -206,7 +209,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* Ticked, the words are struck through as with a pen, from left to right, line by line */
 .words {
   background: linear-gradient(currentColor, currentColor) no-repeat 0 57% / 0 1px;
-  -webkit-box-decoration-break: clone; box-decoration-break: clone; transition: background-size 0.24s var(--ease-move);
+  -webkit-box-decoration-break: clone; box-decoration-break: clone; transition: background-size var(--arrive) var(--ease-arrive);
 }
 .item.done .words { background-size: 100% 1px; }
 @media (forced-colors: active) { .item.done .text { text-decoration: line-through; } } /* where colours are the system's, the line is the browser's own */
@@ -254,7 +257,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   background: repeating-linear-gradient(90deg, var(--tear) 0 6px, transparent 6px 12px) left top / 100% 2px no-repeat;
 }
 .basket.empty { display: none; }
-:root.dragging .basket.empty { display: flex; } /* its heading shows during a drag, to drop under */
+:root.dragging .basket.empty { display: flex; animation: appear var(--arrive) var(--ease-arrive); } /* its heading shows during a drag, to drop under */
 .basket.empty #basket-count, .basket.empty .chev { display: none; }
 .basket-head { margin: 0; font-size: inherit; }
 .basket-list:empty { display: none; }
@@ -268,7 +271,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   display: grid; grid-template-columns: 38px auto auto; align-items: center; min-height: 44px; padding: 0 8px 0 0;
   border: 0; border-radius: 12px; background: none; color: var(--muted); font-weight: 700; cursor: pointer;
 }
-#basket-toggle .chev { margin-left: 6px; transition: transform 0.15s; }
+#basket-toggle .chev { margin-left: 6px; transition: transform var(--quick) var(--ease-move); }
 #basket-count { font-variant-numeric: tabular-nums; }
 .tickmark { width: 21px; height: 21px; border-radius: 5px; background: var(--title); color: var(--bg); display: grid; place-items: center; }
 #basket-toggle[aria-expanded="false"] .chev { transform: rotate(-90deg); }
@@ -327,21 +330,21 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* Dropping an item here, under the ticked group's heading, ticks it: an empty ticked row */
 .drop {
   display: none; align-items: center; min-height: 44px; box-sizing: border-box; margin-inline: -12px; padding-inline: 10px;
-  border: 2px dashed var(--line); border-radius: 12px; --sec: var(--muted); transition: background-color 0.15s, border-color 0.15s;
+  border: 2px dashed var(--line); border-radius: 12px; --sec: var(--muted); transition: background-color var(--quick) var(--ease-move), border-color var(--quick) var(--ease-move);
 }
-:root.dragging:not(.drag-ticked) .drop { display: flex; }
+:root.dragging:not(.drag-ticked) .drop { display: flex; animation: appear var(--arrive) var(--ease-arrive); }
 .drop.over { border-color: transparent; background-color: var(--slot); }
 .drop.over .box { background: var(--muted); color: var(--surface); }
 
 /* An item on its way to its new place rises off the page, travels and settles into the
    page again; a dragged one settles where it was let go. On the way, it takes the size of
    the row it becomes. motion.js sets the duration to match the trip. */
-.flying { animation: lift ease-in-out both; }
-.ghost.landing { animation: land ease-in both; }
+.flying { animation: lift var(--ease-move) both; }
+.ghost.landing { animation: land var(--ease-leave) both; }
 .sec.ghost.landing { animation-name: land-sec; }
 :is(.flying, .ghost.landing) { transition: width var(--trip) var(--ease); }
 :is(.flying, .ghost.landing) .text { transition: font-size var(--trip) var(--ease), padding var(--trip) var(--ease); }
-:is(.flying, .ghost.landing) .box { transition: width var(--trip) var(--ease), height var(--trip) var(--ease), margin var(--trip) var(--ease), border-radius var(--trip) var(--ease), opacity 0.15s; }
+:is(.flying, .ghost.landing) .box { transition: width var(--trip) var(--ease), height var(--trip) var(--ease), margin var(--trip) var(--ease), border-radius var(--trip) var(--ease), opacity var(--quick) var(--ease-move); }
 :is(.flying, .ghost.landing) .box::after { transition: width var(--trip) var(--ease), height var(--trip) var(--ease); }
 @keyframes lift { 0%, 100% { box-shadow: none; background-color: var(--bg); } 25%, 75% { box-shadow: var(--float); background-color: var(--surface); } }
 @keyframes land { 0%, 40% { box-shadow: var(--float); background-color: var(--surface); } 100% { box-shadow: none; background-color: var(--bg); } }
@@ -360,12 +363,12 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 :root.sorting #list > .sec > :not(.sec-head) { display: none; }
 :root.sorting #list > .sec > .sec-head { padding-bottom: 4px; }
 /* Held, then lifted: the whole section, in the shape it has above the page */
-.sec.pressing { background-color: var(--press); border-radius: 4px; box-shadow: 0 0 0 12px var(--press); transition: background-color 0.3s 0.12s, box-shadow 0.3s 0.12s; }
+.sec.pressing { background-color: var(--press); border-radius: 4px; box-shadow: 0 0 0 12px var(--press); transition: background-color var(--arrive) var(--ease-arrive) 120ms, box-shadow var(--arrive) var(--ease-arrive) 120ms; }
 .sec.lifted, .sec.ghost { background: var(--surface); border-radius: 4px; box-shadow: 0 0 0 12px var(--surface), var(--float); }
-.sec.lifted { position: relative; z-index: 2; transform: scale(1.01); transition: transform 0.15s, box-shadow 0.15s; }
+.sec.lifted { position: relative; z-index: 2; transform: scale(1.01); transition: transform var(--quick) var(--ease-arrive), box-shadow var(--quick) var(--ease-arrive); }
 .sec.placeholder { background-color: var(--slot); border-radius: 4px; box-shadow: 0 0 0 12px var(--slot); }
 .sec.placeholder > * { visibility: hidden; }
-.item.flash { animation: flash 1.4s ease-out; }
+.item.flash { animation: flash 1.4s var(--ease-arrive); } /* longer than the rest, to be noticed */
 @keyframes flash { 0%, 35% { background-color: color-mix(in oklab, var(--sec) 16%, var(--bg)); } 100% { background-color: transparent; } }
 
 /* A closed list, or one from a newer Panier, is only read: nothing to add, edit, move or
@@ -377,20 +380,29 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 
 /* Sheets rise onto the page as it dims behind them; undo and the connection's status rise
    into place when they appear */
-.sheet[open], .dock:not([hidden]), .status:not([hidden]) { animation: rise 0.24s var(--ease-rise); }
-.sheet[open]::backdrop { animation: dim 0.24s ease-out; }
+.sheet[open], .dock:not([hidden]), .status:not([hidden]) { animation: rise var(--arrive) var(--ease-arrive); }
+.sheet[open]::backdrop { animation: appear var(--arrive) var(--ease-arrive); }
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
-@keyframes dim { from { opacity: 0; } }
+@keyframes appear { from { opacity: 0; } }
+/* What shows on the page while you work is ink: suggestions above the field, colours
+   under a name, the name undo brings back. It appears once the page has begun to make
+   room for it, so it doesn't land on what's moving out of its way. */
+:is(.sug:not([hidden]), .palette, .undo-what) { animation: appear var(--arrive) var(--ease-arrive) 100ms backwards; }
+.palette { overflow: clip; } /* it opens like a drawer, under the list's name (motion.js) */
+#undo { overflow: hidden; } /* growing to fit the name */
+/* A colour spreads over what it dyes (motion.js) */
+:root[data-dye]::view-transition-group(root) { animation-duration: var(--move); animation-timing-function: var(--ease-move); }
 /* Between the lists page and a list, the page turns quietly (app.js). Beneath, the paper's
    colour changes into the other's; on it, the words fade out, then the new ones fade in, a
    touch nearer going into a list and a touch further coming back out. They fade through
-   rather than across, so two pages of words never show at once. */
+   rather than across: the old words go in 100 ms, quicker than anything else leaves, and
+   the new arrive over the 240 ms after, so two pages of words never show at once. */
 :root[data-turn] #lists { view-transition-name: lists; }
 :root[data-turn] #app { view-transition-name: list; }
 :root[data-turn] :is(.dock, .status) { opacity: 0; animation: none; } /* undo rises once the page has turned */
-:root[data-turn]::view-transition-group(*) { animation-duration: 0.3s; }
-:root[data-turn]::view-transition-old(lists), :root[data-turn]::view-transition-old(list) { animation: words-out 0.1s cubic-bezier(0.4, 0, 1, 1) both; transform-origin: 50% var(--turn-was); }
-:root[data-turn]::view-transition-new(lists), :root[data-turn]::view-transition-new(list) { animation: words-in 0.22s var(--ease-rise) 0.08s both; transform-origin: 50% var(--turn-now); }
+:root[data-turn]::view-transition-group(*) { animation-duration: var(--move); }
+:root[data-turn]::view-transition-old(lists), :root[data-turn]::view-transition-old(list) { animation: words-out 100ms var(--ease-leave) both; transform-origin: 50% var(--turn-was); }
+:root[data-turn]::view-transition-new(lists), :root[data-turn]::view-transition-new(list) { animation: words-in var(--arrive) var(--ease-arrive) 80ms both; transform-origin: 50% var(--turn-now); }
 :root[data-turn="in"] { --turn-out: 1.02; --turn-in: 0.98; }
 :root[data-turn="out"] { --turn-out: 0.98; --turn-in: 1.02; }
 @keyframes words-out { to { opacity: 0; transform: scale(var(--turn-out)); } }
@@ -398,8 +410,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 
 /* Motion: items glide from motion.js; this only turns the rest off when asked */
 @media (prefers-reduced-motion: reduce) {
-  .item.flash, .sheet[open], .sheet[open]::backdrop, .dock:not([hidden]), .status:not([hidden]) { animation: none; }
+  *, *::before, *::after, ::backdrop { animation: none !important; }
   .item, .box, .words, #basket-toggle .chev { transition: none; }
+  :is(.item, .sec, .sheet-card).lifted, .sheet-card.ghost.leaving { transform: none; } /* lifted, nothing grows */
 }
 
 /* The lists page: a desk a shade deeper than paper, not paper itself, with each list
@@ -422,7 +435,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sheet-card.gone .sheet-name { color: var(--quiet); } /* closed, or from a newer Panier: there, but not in use */
 .sheet-open {
   display: flex; flex: 1; min-width: 0; box-sizing: border-box; padding: 12px 14px 10px; border: 0; border-radius: 12px;
-  background: var(--paper); color: var(--hued); text-align: left; cursor: pointer; transition: background-color 0.2s;
+  background: var(--paper); color: var(--hued); text-align: left; cursor: pointer; transition: background-color var(--quick) var(--ease-move);
   box-shadow: 0 1px 1px light-dark(oklch(0.35 0.03 85 / 0.10), oklch(0 0 0 / 0.5)), 0 3px 10px -4px light-dark(oklch(0.35 0.03 85 / 0.12), oklch(0 0 0 / 0.5)); /* paper lying on the desk */
 }
 .sheet-open:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -440,9 +453,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sheet-item::before { content: ""; flex: none; width: 11px; height: 11px; box-sizing: border-box; border: 1.5px solid var(--quiet); border-radius: 3px; }
 .sheet-item > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sheet-count { margin-top: auto; padding-top: 8px; font-variant-numeric: tabular-nums; }
-.sheet-card.pressing .sheet-open { background-color: color-mix(in oklab, var(--paper) 92%, var(--ink)); transition: background-color 0.3s 0.12s; }
-.sheet-card.lifted { position: relative; z-index: 2; transform: scale(1.02); box-shadow: var(--float); transition: transform 0.15s, box-shadow 0.15s; }
-.sheet-card.ghost { background: none !important; box-shadow: var(--float); transition: opacity 0.15s, transform 0.15s; }
+.sheet-card.pressing .sheet-open { background-color: color-mix(in oklab, var(--paper) 92%, var(--ink)); transition: background-color var(--arrive) var(--ease-arrive) 120ms; }
+.sheet-card.lifted { position: relative; z-index: 2; transform: scale(1.02); box-shadow: var(--float); transition: transform var(--quick) var(--ease-arrive), box-shadow var(--quick) var(--ease-arrive); }
+.sheet-card.ghost { background: none !important; box-shadow: var(--float); transition: opacity var(--quick) var(--ease-move), transform var(--quick) var(--ease-move); }
 .sheet-card.fading { background: none !important; }
 .sheet-card.ghost.leaving { opacity: 0.5; transform: scale(0.96); } /* over the zone that deletes it */
 .sheet-card.placeholder { background-color: var(--slot); }
@@ -461,9 +474,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   display: none; position: fixed; z-index: 21; left: max(16px, (100vw - var(--page)) / 2 + 16px); right: max(16px, (100vw - var(--page)) / 2 + 16px);
   bottom: calc(16px + env(safe-area-inset-bottom, 0px)); min-height: 64px; place-items: center; box-sizing: border-box;
   border: 2px dashed var(--danger); border-radius: 12px; background: var(--bg); color: var(--danger); font-weight: 700;
-  transition: background-color 0.15s;
+  transition: background-color var(--quick) var(--ease-move);
 }
-:root.dragging-sheet .remove-drop { display: grid; }
+:root.dragging-sheet .remove-drop { display: grid; animation: appear var(--arrive) var(--ease-arrive); }
 .remove-drop.over { background: color-mix(in oklab, var(--danger) 14%, var(--bg)); } /* the sheet slips under it */
 
 .setup { display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: 0.875rem; }
@@ -537,7 +550,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .choices label { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; }
 .choices input {
   appearance: none; width: 21px; height: 21px; margin: 0; flex: none; box-sizing: border-box;
-  border: 2px solid var(--muted); border-radius: 50%; background: none; cursor: pointer; transition: border-color 0.15s;
+  border: 2px solid var(--muted); border-radius: 50%; background: none; cursor: pointer; transition: border-color var(--quick) var(--ease-move);
 }
 .choices input:checked { border-color: var(--ink); background: radial-gradient(circle, var(--ink) 0 4.5px, transparent 5px); }
 .choices input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }

@@ -161,6 +161,8 @@ const still = pg => pg.waitForFunction(() => !document.getAnimations().some(a =>
 // Waits until the page has turned between the lists page and a list (app.js), which
 // changes what's shown a moment after the tap or the back gesture.
 const turned = pg => pg.waitForFunction(() => !document.documentElement.dataset.turn);
+// Waits until a new colour has spread over the page (motion.js), which it does a moment after the tap.
+const dyed = pg => pg.waitForFunction(() => !("dye" in document.documentElement.dataset));
 
 // Drags an item with the mouse to a point; returns before releasing if hold is set.
 async function dragTo(pg, from, toY, { hold = false } = {}) {
@@ -480,7 +482,7 @@ test("the list's colour, chosen under its name, tints the paper on both phones",
   const swatches = a.locator(".list-top + .palette .swatch");
   assert.deepEqual(await swatches.evaluateAll(s => s.map(x => x.getAttribute("aria-label"))), ["White", "Green", "Teal", "Blue", "Indigo", "Plum", "Rose", "Amber", "Olive"], "white, then the section colours but ink");
   assert.equal(await swatches.first().getAttribute("aria-pressed"), "true");
-  await swatches.nth(2).click();
+  await swatches.nth(2).click(); await dyed(a);
   const [list, bg] = await page(a);
   assert.equal(list, "teal");
   assert.ok(spread(bg) > 10 && bg[2] > bg[0], "the paper is dyed with it at once: " + bg);
@@ -1153,7 +1155,7 @@ test("a section's colour is chosen from a palette while renaming it", async () =
   assert.equal(await a.getAttribute(ess + ' .swatch[aria-pressed="true"]', "aria-label"), "Ink");
   const tops = await a.locator(ess + " .swatch").evaluateAll(els => new Set(els.map(e => Math.round(e.getBoundingClientRect().top))).size);
   assert.equal(tops, 1, "on one row");
-  await a.locator(ess + ' .swatch[aria-label="Plum"]').click();
+  await a.locator(ess + ' .swatch[aria-label="Plum"]').click(); await dyed(a);
   assert.equal(await colour(a, ess), "var(--plum)");
   assert.equal(await colour(a, ess + " .item"), "var(--plum)", "its tick boxes follow");
   assert.equal(await a.evaluate(() => document.activeElement.classList.contains("editing")), true, "the name is still being edited");
@@ -1279,6 +1281,7 @@ test("a section let go stays where it was dropped, and unfolds from there", asyn
   await a.mouse.move(x, y);
   await a.mouse.down();
   await a.mouse.move(x, y - 10);
+  await still(a); // the sections glide as they fold
   const ess = await section(a, "Essentials").boundingBox(); // folded
   const to = ess.y + ess.height + 8; // just under Essentials
   for (let i = 1; i <= 10; i++) { await a.mouse.move(x, y - 10 + (to - (y - 10)) * i / 10); await sleep(20); }
