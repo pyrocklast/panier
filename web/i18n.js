@@ -100,6 +100,9 @@ const FR = {
   "This server wants its setup code for this.": "Ce serveur demande son code d’installation pour cela.",
   "There's no list to bring in from {x}.": "Aucune liste à importer depuis {x}.",
   "Brought in {x}": "Importé" + nb + ": {x}",
+  "Bring in from Google Keep": "Importer depuis Google Keep",
+  "Bring in": "Importer",
+  "Archived": "Archivée",
   "{n} lists": ["{n} liste", "{n} listes"],
 
   // Sections

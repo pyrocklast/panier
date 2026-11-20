@@ -28,6 +28,7 @@
 <link rel="modulepreload" href="settings.js">
 <link rel="modulepreload" href="store.js">
 <link rel="modulepreload" href="md.js">
+<link rel="modulepreload" href="googlekeep.js">
 <link rel="modulepreload" href="i18n.js">
 </head>
 <body>
@@ -92,7 +93,7 @@
   </form>
   <div class="lists-foot">
     <button type="button" class="linkbtn" id="import-open">From a file</button>
-    <input type="file" id="import-file" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
+    <input type="file" id="import-file" accept=".md,.markdown,.txt,.zip,.json,text/markdown,text/plain,application/zip,application/json" multiple hidden>
   </div>
   <div class="drop remove-drop" id="remove-drop" aria-hidden="true"><span>Delete</span></div>
 </main>
@@ -180,6 +181,16 @@
   <button type="button" class="ib close" id="pair-close" aria-label="Close">
     <svg class="icon" width="20" height="20" aria-hidden="true"><use href="#i-cross"/></svg>
   </button>
+</dialog>
+
+<!-- Lists from Google Keep, chosen before they come in: Takeout brings every note -->
+<dialog class="sheet" id="pick" aria-labelledby="pick-title" tabindex="-1" autofocus>
+  <h2 id="pick-title">Bring in from Google Keep</h2>
+  <ul class="pick" id="pick-list"></ul>
+  <div class="actions">
+    <button type="button" class="btn" id="pick-cancel">Cancel</button>
+    <button type="button" class="btn primary" id="pick-ok">Bring in</button>
+  </div>
 </dialog>
 
 <!-- The things that ask first: deleting a list, and changing its key -->

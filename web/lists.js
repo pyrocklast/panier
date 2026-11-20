@@ -6,13 +6,14 @@
 import * as store from "./store.js";
 import { t, plural, q, lang } from "./i18n.js";
 import { fromMarkdown } from "./md.js";
+import { readKeep } from "./googlekeep.js";
 import { state, nav, draftsKey } from "./state.js";
 import { clean, MAX_SECTION, listColorOk, importOps, startOps } from "./model.js";
 import { $, h, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, reduceMotion } from "./dom.js";
 import { bindPress, beginDrag } from "./press.js";
 import { float, fly, shuffle } from "./motion.js";
 import { noteUndo, paintDock } from "./bar.js";
-import { confirmSheet } from "./sheets.js";
+import { confirmSheet, openSheet } from "./sheets.js";
 import { keepList } from "./settings.js";
 
 // Who else has a list, in a few quiet words under its name: two names at most, then a count.
@@ -249,15 +250,22 @@ $("#setup-form").addEventListener("submit", async e => {
   }
 });
 
+// From a file: Markdown and plain text come straight in. Notes from Google Keep are
+// chosen first, as Takeout brings every note there is.
 $("#import-open").addEventListener("click", () => $("#import-file").click());
 $("#import-file").addEventListener("change", async e => {
-  const f = e.target.files && e.target.files[0];
+  const files = [...(e.target.files || [])];
   e.target.value = "";
-  if (!f) return;
-  let text = "";
-  try { text = await f.text(); } catch (_) {}
-  const lists = fromMarkdown(text);
-  if (!lists.length) return say(t("There's no list to bring in from {x}.", { x: f.name }));
+  if (!files.length) return;
+  const keep = files.filter(f => /\.(zip|json)$/i.test(f.name));
+  const lists = [];
+  for (const f of files.filter(f => !keep.includes(f))) lists.push(...fromMarkdown(await f.text().catch(() => "")));
+  if (keep.length) lists.push(...(await readKeep(keep).catch(() => [])));
+  if (!lists.length) return say(t("There's no list to bring in from {x}.", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(files.map(f => f.name)) }));
+  if (keep.length) pick(lists);
+  else bringIn(lists);
+});
+function bringIn(lists) {
   const made = lists.map(importOps);
   create(async code => {
     const lids = [];
@@ -269,7 +277,26 @@ $("#import-file").addEventListener("change", async e => {
     if (lids.length === 1) nav.showList(lids[0]);
     else renderLists();
   });
-});
+}
+// Each note as its sheet will show: its name, what there is to tick and the first three
+// of them. All are ticked to come in but those archived, which are mostly done with;
+// Bring in waits for one at least.
+function pick(lists) {
+  const ok = $("#pick-ok");
+  const boxes = lists.map(l => h("input", { type: "checkbox", class: "chk", checked: !l.archived }));
+  const ready = () => { ok.disabled = !boxes.some(b => b.checked); };
+  $("#pick-list").replaceChildren(...lists.map((l, i) => {
+    const toGet = l.sections.flatMap(s => s.items).filter(it => !it.checked).map(it => clean(it.text));
+    const about = [l.archived && t("Archived"), toGet.length ? plural(toGet.length, "{n} to tick", "{n} to tick") : t("Nothing to tick"), toGet.slice(0, 3).join(", ")];
+    boxes[i].addEventListener("change", ready);
+    return h("li", null, h("label", null, boxes[i], h("span", { class: "box", "aria-hidden": "true" }),
+      h("span", { class: "pick-in" }, h("span", { class: "pick-name" }, clean(l.name || "", MAX_SECTION) || t("Untitled list")), h("span", { class: "pick-about" }, about.filter(Boolean).join(" · ")))));
+  }));
+  ready();
+  ok.onclick = () => { $("#pick").close(); bringIn(lists.filter((_, i) => boxes[i].checked)); };
+  openSheet($("#pick"));
+}
+$("#pick-cancel").addEventListener("click", () => $("#pick").close());
 // Opening a list clears what was last said here; coming back from one, the cursor returns
 // to its sheet.
 export const clearNotice = () => { notice = ""; };

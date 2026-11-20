@@ -102,6 +102,7 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 - **Export the list**, at the bottom of a list, saves it as a `.md` file named after it.
 - **Export all lists**, in Settings, saves every list in one file, each under its own `#`.
 - **From a file**, on the lists page, brings in a list, or several from one file. It reads any Markdown checklist: other bullets, numbered lines, headings of any level, plain lines, where a line followed by items names a section. Items ticked before come in as suggestions, not in the ticked group.
+- **From Google Keep:** in [Google Takeout](https://takeout.google.com), choose only Keep and export, then pick the `.zip` it gives with *From a file*, or the `.json` files inside it. Panier lists the checklists it finds, last edited first, each as its sheet will show; all are ticked to come in but archived ones. Each becomes a list with the note's title and colour, its items in one section, ticked as they were. Text notes and notes in the bin stay behind. Everything is read on the phone.
 - **Pasting several lines** into *Add item* adds one item per line, in that section, in one step to undo. Names already on the list are left as they are.
 
 ## People

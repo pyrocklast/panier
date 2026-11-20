@@ -13,7 +13,7 @@ Private lists, shared between phones: end-to-end encrypted, with no accounts. It
 - **Offline.** It works without signal and catches up when the connection returns.
 - **An app from the browser.** It installs from Firefox, Chrome or Safari, with no app store.
 - **Made for everyday lists.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, the last five days of ticked items, drag to reorder, and undo for everything.
-- **Markdown in and out.** A list exports as a Markdown checklist, and any Markdown checklist, or a few pasted lines, comes in.
+- **Markdown in and out.** A list exports as a Markdown checklist, and any Markdown checklist, a few pasted lines, or checklists from Google Keep come in.
 - **In English and French**, light and dark.
 
 ## What it isn't, yet
@@ -57,7 +57,7 @@ Then, on the phones:
 - **Sections:** a new list is a plain sheet. *Add a section*, below the items, adds a heading when it helps; tap a heading to rename it or change its colour.
 - **The list:** tap its name to rename it or choose its paper's colour.
 - **Lists:** *Lists*, at the top right of a list, or the back gesture, leads to the lists page: tap a list to open it, *New list* to start one, hold one to move it, or drop it at the foot to delete it, which asks first. *Delete the list*, at the foot of a list, does the same.
-- **Import:** *From a file* on the lists page brings in a Markdown or text list; several lines pasted into *Add item* become several items.
+- **Import:** *From a file* on the lists page brings in a Markdown or text list, or the checklists in a Google Keep export, chosen first; several lines pasted into *Add item* become several items.
 - **Undo and redo:** the buttons at the bottom right.
 - **Settings**, on the lists page: your name, light or dark, a compact layout, exporting every list, and setting up another phone.
 
@@ -87,7 +87,7 @@ Then, on the phones:
 
 | Folder | What's in it |
 | --- | --- |
-| [`web/`](web/) | the app, in plain modules: `app.js` starts it and moves between the lists page (`lists.js`) and a list (`list.js`); `store.js` is storage, encryption and sync; `model.js` what a list is made of; `md.js` Markdown; `i18n.js` the words; the rest, one part of the screen each |
+| [`web/`](web/) | the app, in plain modules: `app.js` starts it and moves between the lists page (`lists.js`) and a list (`list.js`); `store.js` is storage, encryption and sync; `model.js` what a list is made of; `md.js` Markdown; `googlekeep.js` Google Keep exports; `i18n.js` the words; the rest, one part of the screen each |
 | [`worker/`](worker/) | the Cloudflare server |
 | `*.go` | the Go server |
 | [`deploy/install.sh`](deploy/install.sh) | the Raspberry Pi installer |
