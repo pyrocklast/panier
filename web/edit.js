@@ -153,8 +153,8 @@ export function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSa
   for (const t of tools) t.addEventListener("focusout", onToolsOut);
 }
 
-// Colours to choose from while a name is edited: a tap recolours at once, and the name
-// stays in editing.
+// Colours to choose from, under a name being edited or in the list's settings: a tap
+// recolours at once, and leaves the cursor where it was, so a name stays in editing.
 export function palette(name, colors, current, pick) {
   const keep = e => e.preventDefault();
   const el = h("div", { class: "palette", role: "group", "aria-label": t("Colour of {x}", { x: name }) },

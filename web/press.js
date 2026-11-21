@@ -92,7 +92,7 @@ function onDragMove(e) {
   state.drag.y = e.clientY;
   state.drag.x = e.clientX;
   state.drag.ghost.style.top = (e.clientY - state.drag.offY) + "px";
-  if (state.drag.offX != null) state.drag.ghost.style.left = (e.clientX - state.drag.offX) + "px"; // a sheet, side by side with others
+  if (state.drag.offX != null) state.drag.ghost.style.left = (e.clientX - state.drag.offX) + "px"; // a sheet, or an item with the ticked group beside it
   state.drag.place(e.clientY, e.clientX);
 }
 function dragTick() {

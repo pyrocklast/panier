@@ -114,10 +114,10 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 }
 
 main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16px; }
-/* The list's name, a page title: in the same place as Settings' own, renamed with a tap */
 /* Names and rows are tapped, held and dragged rather than selected */
 :is(.list-head, .sec-head, .item) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-.list-top { display: flex; align-items: flex-start; gap: 4px; margin: -4px 0 0; }
+/* A page's top row, a list's as the lists page's: the way back, the title, Settings */
+:is(.list-top, .lists-top) { display: flex; align-items: flex-start; gap: 4px; margin: -4px 0 0; }
 .list-head { flex: 1; min-width: 0; margin: 0; display: flex; font-size: 1.625rem; line-height: 1.4; color: var(--title); }
 /* At the left of a page's title, the way back up: an arrow, as the phone draws it */
 .head-back {
@@ -132,10 +132,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 }
 /* While a new list is named, its name has the whole row */
 .list-top.editing :is(.head-btn, .head-back) { display: none; }
-.list-name { flex: 1; min-width: 0; padding: 4px 0; overflow-wrap: anywhere; outline: none; border-radius: 5px; }
-.list-name.editing { cursor: text; -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 currentColor; border-radius: 0; }
-/* A list without a name says so, quietly, where its name goes; a new one asks for one */
-.list-name:empty::before { content: attr(data-placeholder); color: var(--muted); font-weight: 400; }
+.list-name { flex: 1; min-width: 0; padding: 4px 0; overflow-wrap: anywhere; outline: none; }
 #list { display: flex; flex-direction: column; gap: 28px; }
 /* clip: never scrolled from inside, even while a section changes height; the margin
    leaves room around a lifted row */
@@ -145,18 +142,30 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   background: linear-gradient(var(--line), var(--line)) left bottom / 100% 1px no-repeat;
 }
 .sec-name {
-  flex: 1; min-width: 0; padding: 12px 0; font-weight: 700; overflow-wrap: anywhere; cursor: text; outline: none; border-radius: 5px;
+  flex: 1; min-width: 0; padding: 12px 0; font-weight: 700; overflow-wrap: anywhere; cursor: text; outline: none;
 }
-.sec-name.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 var(--sec); border-radius: 0; }
 /* A section's name is written in a deep tone of its colour, so its boxes belong to it */
 .sec[data-color]:not([data-color="ess"]) .sec-name { color: light-dark(oklch(0.42 0.090 var(--h)), oklch(0.85 0.075 var(--h))); }
 .sec-head .bin { width: 44px; height: 44px; margin-right: -12px; }
+/* Folded on this phone: the heading, and under it what's left, in a line to tap open */
+.fold-sec {
+  flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin-right: -12px; padding: 0;
+  border: 0; border-radius: 12px; background: none; color: var(--muted); cursor: pointer;
+}
+.fold-sec:focus-visible { outline-offset: -6px; }
+.sec-head.editing > .fold-sec { display: none; } /* renaming: the delete button takes its place */
+.sec.folded:not(.folding) > :is(.items, .sug, .add) { display: none; }
+.sec-left { display: none; margin: 0; padding-top: 8px; color: var(--muted); font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.sec.folded > .sec-left:not(:empty) { display: block; animation: appear var(--arrive) var(--ease-arrive); }
+.sec.folded.folding > .sec-left { display: none; } /* closing over its rows (list.js) */
 /* A section without a name has no heading: its items sit under the list's name, first */
 .sec.plain > .sec-head { display: none; }
-/* Beside others, it has a heading that says it has no name, quietly, as a list without one does */
-.sec-name:empty::before { content: attr(data-placeholder); color: var(--muted); font-weight: 400; }
-/* Colours to choose from, under a section's name or the list's while it is renamed */
-.palette { display: flex; padding: 2px 0 8px; margin-left: -10px; }
+/* A name not given says so, quietly, where it goes: a list's, and a section's beside
+   others; a new list asks for one */
+:is(.list-name, .sec-name):empty::before { content: attr(data-placeholder); color: var(--muted); font-weight: 400; }
+/* Colours to choose from: under a name being edited, opening like a drawer (motion.js),
+   or in a list's settings */
+.palette { display: flex; padding: 2px 0 8px; margin-left: -10px; overflow: clip; }
 .swatch { flex: 0 1 44px; min-width: 32px; height: 44px; padding: 0; border: 0; background: none; display: grid; place-items: center; cursor: pointer; }
 .swatch::before { content: ""; width: 22px; height: 22px; border-radius: 50%; background: var(--c); }
 .swatch[aria-pressed="true"]::before { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--c); }
@@ -202,15 +211,16 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .chk:checked + .box { background: var(--sec); border-color: var(--sec); color: var(--bg); }
 .chk:focus-visible + .box { outline: 2px solid var(--ink); outline-offset: 3px; }
 .text {
-  min-width: 0; padding: 14px 0; overflow-wrap: anywhere; cursor: text;
-  border-radius: 5px; outline: none;
+  min-width: 0; padding: 14px 0; overflow-wrap: anywhere; cursor: text; outline: none;
   color: light-dark(color-mix(in oklab, var(--sec) 28%, var(--ink)), color-mix(in oklab, var(--sec) 40%, var(--ink))); /* the ink leans to its section's colour */
 }
 :is(.add-input, .text.editing) { caret-color: var(--sec); }
 /* A name reached with the keyboard: a ring with room around the text, rounded like a row */
 :is(.list-name, .sec-name, .text):focus-visible:not(.editing) { box-shadow: inset 0 0 0 2px var(--ink); border-radius: 8px; padding-inline: 8px; margin-inline: -8px; }
+/* Edited, a name or an item is written on a line, as Add item is: in its section's
+   colour, the list's name in its own */
+:is(.list-name, .sec-name, .text).editing { cursor: text; -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 var(--sec, currentColor); }
 .qty { margin-right: 0.15em; font-weight: 700; font-variant-numeric: tabular-nums; } /* a quantity, a little apart */
-.text.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 var(--sec); border-radius: 0; }
 .item.done .text { color: var(--muted); }
 .item.done .text.editing { color: var(--ink); }
 /* Ticked, the words are struck through as with a pen, from left to right, line by line */
@@ -254,7 +264,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sug-x-cell { display: flex; flex: none; }
 .sug-x { width: 48px; padding: 0; border: 0; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .sug-x-cell[aria-selected="true"] .sug-x { color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); border-radius: 12px; }
-@media (hover: hover) { .sugopt:hover, .ib:hover, .head-btn:hover, .head-back:hover, .row:hover, .fold:hover { background-color: var(--press); } .bin:hover, .sug-x:hover { color: var(--danger); } }
+@media (hover: hover) { .sugopt:hover, .ib:hover, .head-btn:hover, .head-back:hover, .row:hover, .fold:hover, .fold-sec:hover { background-color: var(--press); } .bin:hover, .sug-x:hover { color: var(--danger); } }
 .sugopt .t { color: var(--ink); overflow-wrap: anywhere; }
 .sugopt mark { background: none; color: inherit; font-weight: 700; }
 
@@ -268,7 +278,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .basket.empty #basket-count, .basket.empty .chev { display: none; }
 .basket-head { margin: 0; font-size: inherit; }
 .basket-list:empty { display: none; }
-/* Five days of ticked items can make a long list: the phone skips drawing those off screen. */
+/* A month of ticked items, or all of them, can make a long list: the phone skips drawing those off screen. */
 #basket-list .item { content-visibility: auto; contain-intrinsic-size: auto 44px; }
 /* Ticked rows are smaller; so is an item on its way there (.small, motion.js) */
 :is(#basket-list, .small) .text { font-size: 0.875rem; padding-block: 12px; }
@@ -282,10 +292,12 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   display: grid; grid-template-columns: 38px auto auto; align-items: center; min-height: 44px; padding: 0 8px 0 0;
   border: 0; border-radius: 12px; background: none; color: var(--muted); font-weight: 700; cursor: pointer;
 }
-#basket-toggle .chev { margin-left: 6px; transition: transform var(--quick) var(--ease-move); }
+#basket-toggle .chev { margin-left: 6px; }
+/* A chevron points down at what it opens, and turns aside once it's folded */
+.chev { flex: none; transition: transform var(--quick) var(--ease-move); }
+[aria-expanded="false"] > .chev { transform: rotate(-90deg); }
 #basket-count { font-variant-numeric: tabular-nums; }
 .tickmark { width: 21px; height: 21px; border-radius: 5px; background: var(--title); color: var(--bg); display: grid; place-items: center; }
-#basket-toggle[aria-expanded="false"] .chev { transform: rotate(-90deg); }
 
 .linkbtn { min-height: 44px; border: 0; background: none; padding: 0 8px; color: var(--muted); font-size: 0.875rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
@@ -309,7 +321,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   position: fixed; z-index: 30; right: max(16px, env(safe-area-inset-right, 0px), (100vw - var(--page)) / 2 + 16px); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--surface); box-shadow: var(--float);
 }
-:root:has(.add-input:focus, .text.editing, .sec-name.editing, .list-name.editing) :is(.dock, .status) { visibility: hidden; }
+:root:has(.add-input:focus, .editing) :is(.dock, .status) { visibility: hidden; } /* out of the way while you write */
 .ib { width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; display: grid; place-items: center; cursor: pointer; }
 .ib[aria-disabled="true"] { opacity: 0.3; cursor: default; background: none; }
 /* For a few seconds after a delete, undo names what it would bring back */
@@ -383,7 +395,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* A closed list, or one from a newer Panier, is only read: nothing to add, edit, move or
    tick, and its boxes say so, faint */
 #app.readonly :is(.add, .add-sec) { display: none; }
-#app.readonly :is(.text, .sec-name, .list-name, .boxcell) { cursor: default; }
+#app.readonly :is(.text, .sec-name, .boxcell) { cursor: default; }
 #app.readonly .box { border-color: color-mix(in oklab, var(--sec) 30%, var(--bg)); }
 #app.readonly .chk:checked + .box { opacity: 0.5; }
 
@@ -391,16 +403,15 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
    into place when they appear. Each leaves as it came, but quicker: a sheet sinks a little
    and fades as the dimming lifts, undo and the status fade; leaving, they take no taps.
    A sheet stays where it is as it goes, even where the browser takes it off the top of the
-   page at once. Settings is a page, not a sheet: it turns (app.js). */
-.sheet[open], .dock:not([hidden]), .status:not([hidden]) { animation: rise var(--arrive) var(--ease-arrive); }
-.sheet[open]::backdrop { animation: appear var(--arrive) var(--ease-arrive); }
+   page at once. Settings, the app's and a list's, are pages, not sheets: they turn (app.js). */
+.sheet:not(.page)[open], .dock:not([hidden]), .status:not([hidden]) { animation: rise var(--arrive) var(--ease-arrive); }
+.sheet:not(.page)[open]::backdrop { animation: appear var(--arrive) var(--ease-arrive); }
 .sheet:not(.page) { position: fixed; inset: 0; z-index: 40; margin: auto; height: fit-content; max-height: calc(100% - 6px - 2em); overflow: auto; }
 .sheet:not(.page), .sheet:not(.page)::backdrop, .dock, .status {
   transition: opacity var(--quick) var(--ease-leave), transform var(--quick) var(--ease-leave), display var(--quick) allow-discrete, overlay var(--quick) allow-discrete;
 }
 :is(.sheet:not(.page):not([open]), .dock[hidden], .status[hidden]) { opacity: 0; transform: translateY(8px); pointer-events: none; }
 .sheet:not(.page):not([open])::backdrop { opacity: 0; }
-.sheet.page[open], .sheet.page[open]::backdrop { animation: none; }
 .sheet.page::backdrop { display: none; } /* nothing dims under a page */
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
 @keyframes appear { from { opacity: 0; } }
@@ -408,7 +419,6 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
    under a name, the name undo brings back. It appears once the page has begun to make
    room for it, so it doesn't land on what's moving out of its way. */
 :is(.sug:not([hidden]), .palette, .undo-what) { animation: appear var(--arrive) var(--ease-arrive) 100ms backwards; }
-.palette { overflow: clip; } /* it opens like a drawer, under the list's name (motion.js) */
 #undo { overflow: hidden; } /* growing to fit the name */
 /* A colour spreads over what it dyes (motion.js) */
 :root[data-dye]::view-transition-group(root) { animation-duration: var(--move); animation-timing-function: var(--ease-move); }
@@ -434,7 +444,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* Motion: items glide from motion.js; this only turns the rest off when asked */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, ::backdrop { animation: none !important; }
-  .item, .box, .words, :is(#basket-toggle, .fold) .chev, .sheet:not(.page), .sheet:not(.page)::backdrop, .dock, .status { transition: none; }
+  .item, .box, .words, .chev, .sheet:not(.page), .sheet:not(.page)::backdrop, .dock, .status { transition: none; }
   :is(.item, .sec, .sheet-card).lifted, .sheet-card.ghost.leaving { transform: none; } /* lifted, nothing grows */
 }
 
@@ -445,8 +455,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
    sheet being dragged lifts. */
 :root[data-view="lists"] { --bg: light-dark(oklch(0.90 0.009 85), oklch(0.135 0.004 150)); --slot: light-dark(oklch(0.87 0.010 85), oklch(0.11 0.004 150)); }
 .lists { --press: light-dark(oklch(0.86 0.010 85), oklch(0.21 0.006 150)); } /* pressed into the desk, not lighter than it */
-/* The same header as a list's: the title on the left, at the right the way to what's around it */
-.lists-top { display: flex; align-items: flex-start; gap: 4px; margin: -4px 0 0; }
+/* The same top row as a list's: the title on the left, at the right its Settings */
 .lists-top h1 { flex: 1; min-width: 0; margin: 0; padding: 4px 0; font-size: 1.625rem; line-height: 1.4; }
 .lists-msg { margin: 0; }
 .sheets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
@@ -501,13 +510,15 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 :root.dragging-sheet .remove-drop { display: grid; animation: appear var(--arrive) var(--ease-arrive); }
 .remove-drop.over { background: color-mix(in oklab, var(--danger) 14%, var(--bg)); } /* the sheet slips under it */
 
-.setup { display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: 0.875rem; }
-.setup-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.setup input {
-  flex: 1 1 12.5rem; min-width: 0; height: 48px; padding: 0 14px; box-sizing: border-box; border: 0; border-radius: 12px; /* wide enough for the code: on a narrow phone, Start goes under it */
-  background: var(--press); color: var(--ink); font: inherit; font-size: 1.0625rem; letter-spacing: 0.04em;
+/* A field, under the words saying what it's for: the setup code, a name */
+:is(.setup, .field) { display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: 0.875rem; }
+:is(.setup, .field) input {
+  height: 48px; padding: 0 14px; box-sizing: border-box; border: 0; border-radius: 12px;
+  background: var(--press); color: var(--ink); font: inherit; font-size: 1.0625rem;
 }
-.setup input:focus { outline: 2px solid var(--ess); outline-offset: 0; }
+:is(.setup, .field) input:focus { outline: 2px solid var(--ess); outline-offset: 0; }
+.setup-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.setup input { flex: 1 1 12.5rem; min-width: 0; letter-spacing: 0.04em; } /* wide enough for the code: on a narrow phone, Start goes under it */
 .lists .setup input { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); } /* on the lists page's grey, a white field */
 
 /* Buttons */
@@ -518,7 +529,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .btn.primary { background: var(--ess); color: var(--surface); }
 .btn.danger { background: var(--danger); color: light-dark(#ffffff, #1b201e); }
 
-/* Pairing sheet */
+/* Sheets: adding someone, asking first, choosing from Google Keep */
 .sheet {
   width: min(360px, calc(100vw - 32px)); box-sizing: border-box; padding: 24px; border: 0; border-radius: 16px;
   background: var(--surface); color: var(--ink); box-shadow: var(--float);
@@ -538,7 +549,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .people { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 .people p { margin: 0 0 4px; }
 .people .field { margin-bottom: 12px; }
-.more { display: flex; flex-wrap: wrap; gap: 0 4px; margin-left: -8px; }
+.more { display: flex; margin-left: -8px; }
 #confirm-more { display: block; margin: 8px auto -12px; color: var(--danger); } /* Delete for everyone, under Delete */
 /* Choosing what comes in from Google Keep: a note to a line, scrolling between the title
    and the buttons, which stay in view */
@@ -550,7 +561,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .pick-about { font-size: 0.875rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #pick-ok:disabled { opacity: 0.4; cursor: default; }
 
-/* Settings: a page of its own over the list, its parts between ruled lines */
+/* Settings, the app's over the lists page and each list's over the list: a page of its
+   own, its parts between ruled lines */
 .sheet.page {
   width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border-radius: 0;
   background: var(--white); box-shadow: none; /* a page of its own, plain paper over the lists page's desk */
@@ -583,13 +595,11 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .row:active { background-color: var(--press); }
 .row:focus-visible { outline-offset: -2px; }
 .row-d { color: var(--muted); font-size: 0.875rem; }
-/* A line that opens what it sums up, the chevron turning as the ticked group's does */
+/* A line that opens what it sums up */
 .fold {
   display: flex; align-items: center; gap: 6px; min-height: 44px; margin: -10px -12px 2px; padding: 0 12px; border: 0; border-radius: 12px;
   background: none; color: var(--muted); font: inherit; text-align: left; cursor: pointer;
 }
-.fold .chev { flex: none; transition: transform var(--quick) var(--ease-move); }
-.fold[aria-expanded="false"] .chev { transform: rotate(-90deg); }
 #data-lists { margin-bottom: 12px; }
 #data-lists:not([hidden]) { animation: appear var(--arrive) var(--ease-arrive); }
 .row.danger > :first-child { color: var(--danger); }
@@ -608,12 +618,6 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 12px; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.field { display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: 0.875rem; }
-.field input {
-  height: 48px; padding: 0 14px; box-sizing: border-box; border: 0; border-radius: 12px;
-  background: var(--press); color: var(--ink); font: inherit; font-size: 1.0625rem;
-}
-.field input:focus { outline: 2px solid var(--ess); outline-offset: 0; }
 
 /* A wide screen, a phone on its side or a tablet: what's ticked lies beside the list
    rather than under it, torn off to the side and always in view, so a ticked item crosses
@@ -631,10 +635,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
     margin: 0; padding: 0 0 0 28px; background: repeating-linear-gradient(180deg, var(--tear) 0 6px, transparent 6px 12px) left top / 2px 100% no-repeat;
   }
   .sheets { grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); }
-}
-/* Settings on a wide screen: each part in a row, its heading on the left, what it holds
-   on the right */
-@media (min-width: 44rem) {
+  /* Settings: each part in a row, its heading on the left, what it holds on the right */
   .page-in { max-width: 52rem; }
   .set { display: grid; grid-template-columns: 13rem minmax(0, 1fr); column-gap: 32px; align-items: start; }
   .set > * { grid-column: 2; }
@@ -650,14 +651,13 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
    Everything you tap stays at least 44 px tall. */
 [data-layout="compact"] main.wrap { padding-top: 12px; gap: 12px; }
 [data-layout="compact"] #list { gap: 20px; }
-[data-layout="compact"] .list-top { margin: 0; }
-[data-layout="compact"] .list-head, [data-layout="compact"] .lists-top h1 { font-size: 1.25rem; }
+[data-layout="compact"] :is(.list-top, .lists-top) { margin: 0; }
+[data-layout="compact"] :is(.list-head, .lists-top h1, .page-head h2) { font-size: 1.25rem; } /* every page's title */
 [data-layout="compact"] .sheets { gap: 8px; }
 [data-layout="compact"] .sheet-open { padding-block: 10px 8px; }
 [data-layout="compact"] .sheet-first { display: none; } /* the name and the count */
 [data-layout="compact"] .new-list { min-height: 48px; }
 [data-layout="compact"] :is(.list-name, .lists-top h1) { padding: 8px 0; } /* 44 px, in line with what's beside it */
-[data-layout="compact"] .page-head h2 { font-size: 1.25rem; }
 [data-layout="compact"] .sec-head { min-height: 44px; }
 [data-layout="compact"] .sec-name { padding: 10px 0; }
 [data-layout="compact"] .text { padding-block: 10px; }

@@ -4,7 +4,7 @@
 import * as store from "./store.js";
 import { t, plural, lang } from "./i18n.js";
 import { toMarkdown } from "./md.js";
-import { clean, MAX_SECTION, LIST_COLORS, sheetOfList } from "./model.js";
+import { clean, MAX_SECTION, LIST_COLORS, sheetOfList, listTitle } from "./model.js";
 import { $, h, download } from "./dom.js";
 import { openSheet } from "./sheets.js";
 import { state, nav, readOnly, listName, listColor, tickedDays } from "./state.js";
@@ -35,7 +35,7 @@ async function paintSettings() {
   $("#data-open").hidden = $("#export-all").hidden = $("#phone-open").hidden = $("#keep-text").hidden = !all.length;
   $("#data-sum").textContent = t("{n}, {x} on this phone", { n: plural(all.length, "{n} list", "{n} lists"), x: size(room) });
   $("#data-lists").replaceChildren(...all.map((e, k) => {
-    const name = e.name || t("Untitled list");
+    const name = listTitle(e.name);
     return h("li", null, h("button", { type: "button", class: "row", "aria-label": t("Export {x}, {y}", { x: name, y: size(sizes[k]) }), onclick: () => exportOne(e.lid) },
       h("span", null, name), h("span", { class: "row-d" }, size(sizes[k])), h("span", { class: "row-end" }, t("Export"))));
   }));
@@ -48,12 +48,16 @@ async function paintSettings() {
   const k = keys.find(k => k.startsWith("panier-") && !k.startsWith("panier-static-"));
   $("#about-version").textContent = k ? k.slice(7) : "dev";
 }
-// Settings is a page of its own: the page turns into it from its button, and back.
-const fromButton = () => $("#settings-open");
-const closeSettings = () => nav.turn(false, () => $("#settings").close(), fromButton);
-$("#settings-open").addEventListener("click", () => nav.turn(true, () => { paintSettings(); openSheet($("#settings")); }, fromButton));
-$("#settings-close").addEventListener("click", closeSettings);
-$("#settings").addEventListener("cancel", e => { e.preventDefault(); closeSettings(); }); // Escape
+// Each settings is a page of its own: the page turns into it from its button, and back
+// from its arrow, or with Escape.
+function page(id, paint) {
+  const dlg = $("#" + id), from = () => $("#" + id + "-open");
+  const close = () => nav.turn(false, () => dlg.close(), from);
+  from().addEventListener("click", () => nav.turn(true, () => { paint(); openSheet(dlg); }, from));
+  $("#" + id + "-close").addEventListener("click", close);
+  dlg.addEventListener("cancel", e => { e.preventDefault(); close(); });
+}
+page("settings", paintSettings);
 // Compact: every row 44 px, with smaller gaps and titles, on this phone only.
 $("#compact-layout").addEventListener("change", e => {
   const l = e.target.checked ? "compact" : "";
@@ -71,17 +75,19 @@ $("#my-name").addEventListener("keydown", e => { if (e.key === "Enter") e.target
 $("#keep-btn").addEventListener("click", async () => { await keepList(); paintSettings(); });
 $("#phone-open").addEventListener("click", () => openPair(true)); // over Settings, which it closes back onto
 
+// Every list in one file, or one list on its own, from Data or from its settings.
 function exportAll() {
   download("Panier", toMarkdown(store.lists().map(e => sheetOfList(store.peek(e.lid)))));
 }
 function exportOne(lid) {
-  const l = store.peek(lid);
-  download(l.name || t("Untitled list"), toMarkdown([sheetOfList(l)]));
+  const sheet = sheetOfList(store.peek(lid));
+  download(sheet.name, toMarkdown([sheet]));
 }
 const unfold = open => { $("#data-open").setAttribute("aria-expanded", String(open)); $("#data-lists").hidden = !open; };
 $("#data-open").addEventListener("click", () => unfold($("#data-lists").hidden));
 
 $("#export-all").addEventListener("click", exportAll);
+$("#export-list").addEventListener("click", () => exportOne(state.lid));
 
 /* ---------- A list's settings ---------- */
 
@@ -92,18 +98,21 @@ export function paintListSettings() {
   $("#list-settings-close").setAttribute("aria-label", listName());
   if (document.activeElement !== rename) rename.value = store.listName() || "";
   rename.disabled = ro;
-  $("#list-colours").replaceChildren(...(ro ? [] : [palette(listName(), LIST_COLORS, listColor(), list.recolourList)]));
+  // The colours are drawn again only when what they show changes, so what the other
+  // phones do meanwhile leaves the cursor on them.
+  const colours = $("#list-colours"), drawn = ro ? "" : listName() + "\n" + listColor();
+  if (colours.dataset.drawn !== drawn) {
+    colours.dataset.drawn = drawn;
+    colours.replaceChildren(...(ro ? [] : [palette(listName(), LIST_COLORS, listColor(), list.recolourList)]));
+  }
   const days = tickedDays();
   for (const r of document.querySelectorAll('input[name="ticked"]')) { r.checked = +r.value === days; r.disabled = ro; }
   $("#list-people").textContent = people();
+  $("#pair-open").hidden = ro; // a closed list's link opens nothing
   $("#list-size").textContent = t("{x} on this phone.", { x: size(store.storedSize(state.lid)) });
   $("#delete-what").textContent = store.status().closed ? t("From this phone") : t("From this phone, or for everyone");
 }
-const fromListButton = () => $("#list-settings-open");
-const closeListSettings = () => nav.turn(false, () => $("#list-settings").close(), fromListButton);
-$("#list-settings-open").addEventListener("click", () => nav.turn(true, () => { paintListSettings(); openSheet($("#list-settings")); }, fromListButton));
-$("#list-settings-close").addEventListener("click", closeListSettings);
-$("#list-settings").addEventListener("cancel", e => { e.preventDefault(); closeListSettings(); }); // Escape
+page("list-settings", paintListSettings);
 // A name left empty goes back to what it was.
 $("#list-rename").addEventListener("change", e => {
   const name = clean(e.target.value, MAX_SECTION);

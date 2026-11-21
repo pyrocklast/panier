@@ -523,6 +523,20 @@ test("the list's colour, chosen in its settings, tints the paper on both phones"
   await a.click("#redo");
   assert.ok(await eventually(async () => (await page(b))[0] === "teal"));
 
+  // In the list's settings, what the other phone does leaves the cursor on the colours,
+  // which change when the colour does.
+  await listSettings(a);
+  await swatches.nth(3).focus();
+  await add(b, "ess", "Eggs");
+  await a.locator("#list .item", { hasText: "Eggs" }).waitFor({ state: "attached" });
+  assert.equal(await a.evaluate(() => document.activeElement.getAttribute("aria-label")), "Blue", "the cursor stays where it was");
+  await listSettings(b);
+  await b.locator("#list-colours .swatch").nth(6).click();
+  assert.ok(await eventually(async () => (await swatches.nth(6).getAttribute("aria-pressed")) === "true"), "Rose, chosen on the other phone");
+  await backToList(b);
+  await swatches.nth(2).click(); await dyed(a);
+  await backToList(a);
+
   // Opening the app again, the paper is tinted before anything is drawn.
   await t.A.addInitScript(() => document.addEventListener("DOMContentLoaded", () => { window.firstList = document.documentElement.dataset.list; }));
   await a.reload();
@@ -1190,7 +1204,7 @@ test("a section's colour is chosen from a palette while renaming it", async () =
   await blur(a);
   const ess = '.sec[data-sec="ess"]';
   const colour = (pg, sel) => pg.evaluate(s => document.querySelector(s).style.getPropertyValue("--sec"), sel);
-  assert.equal(await a.locator(".sec-head svg").count(), 0, "sections have no icons");
+  assert.equal(await a.locator(".sec-head svg:not(.chev)").count(), 0, "sections have no icons, only the chevron that folds them");
   assert.equal(await a.locator(ess + " .palette").count(), 0, "the colours show only while renaming");
 
   await section(a, "Essentials").locator(".sec-name").click();
@@ -1275,6 +1289,65 @@ test("Enter adds just what was typed; a suggestion comes back when tapped, witho
   await t.close();
 });
 
+test("a section folds on this phone only, to its heading and a line of what's left, and stays folded", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  for (const w of ["Milk", "Bread"]) await add(a, "ess", w);
+  await add(a, "look", "Torch");
+  await blur(a);
+  const ess = a.locator('#list .sec[data-sec="ess"]'), fold = ess.locator(".fold-sec");
+  assert.equal(await fold.getAttribute("aria-label"), "Essentials", "its chevron is named after it");
+  assert.equal(await fold.getAttribute("aria-expanded"), "true");
+  assert.equal(await ess.locator(".sec-left").isVisible(), false, "open, no line under its heading");
+  await fold.click();
+  assert.ok(await eventually(async () => !(await ess.locator(".items").isVisible()) && !(await ess.locator(".add").isVisible())), "its items and Add item row fold away");
+  assert.equal(await fold.getAttribute("aria-expanded"), "false");
+  assert.equal(await ess.locator(".sec-left").innerText(), "Milk, Bread", "a line under its heading says what's left");
+  await add(b, "ess", "Eggs");
+  assert.ok(await eventually(async () => (await ess.locator(".sec-left").innerText()) === "Milk, Bread, Eggs"), "what another phone adds shows in the line");
+  assert.equal(await b.locator('#list .sec[data-sec="ess"] .items').isVisible(), true, "on the other phone, it stays open");
+  await a.reload();
+  await a.locator("#app:not([hidden])").waitFor();
+  assert.equal(await ess.locator(".items").isVisible(), false, "it stays folded when the app opens again");
+  await ess.locator(".sec-left").click();
+  assert.ok(await eventually(() => ess.locator(".items").isVisible()), "a tap on the line opens it");
+  assert.equal(await fold.getAttribute("aria-expanded"), "true");
+  await fold.focus();
+  await a.keyboard.press("Enter");
+  assert.ok(await eventually(async () => (await fold.getAttribute("aria-expanded")) === "false"), "the chevron folds it from the keyboard too");
+  await item(a, "Torch").locator(".chk").focus();
+  await a.keyboard.press("Alt+ArrowUp");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Bread,Eggs,Torch"), "Alt+↑ moves an item into a folded section");
+  assert.equal(await fold.getAttribute("aria-expanded"), "true", "which opens, so the item stays in view");
+  assert.equal(await a.evaluate(() => document.activeElement.id), await item(a, "Torch").locator(".chk").getAttribute("id"), "and the cursor stays on it");
+  await t.close();
+});
+
+test("items go into a folded section without opening it, and drags pass over it", async () => {
+  const p = await alone();
+  const a = p.page;
+  for (const w of ["Milk", "Bread"]) await add(a, "ess", w);
+  await add(a, "look", "Torch");
+  await add(a, "long", "Tent");
+  await blur(a);
+  await item(a, "Bread").locator(".boxcell").click();
+  assert.ok(await eventually(async () => (await ticked(a)).join() === "Bread"));
+  const ess = a.locator('#list .sec[data-sec="ess"]'), look = a.locator('#list .sec[data-sec="look"]');
+  await ess.locator(".fold-sec").click();
+  await still(a);
+  await a.locator("#basket-list .item").filter({ hasText: "Bread" }).locator(".boxcell").click();
+  assert.ok(await eventually(async () => (await ess.locator(".sec-left").innerText()) === "Milk, Bread"), "unticked, it goes back into its folded section's line");
+  assert.equal(await ess.locator(".items").isVisible(), false, "which stays folded");
+  assert.ok(await eventually(async () => (await a.locator(".flying").count()) === 0));
+  await ess.locator(".fold-sec").click();
+  await look.locator(".fold-sec").click();
+  await still(a);
+  await dragTo(a, item(a, "Milk"), async () => { const r = await a.locator('#list .sec[data-sec="long"] .add').boundingBox(); return r.y + r.height / 2; });
+  assert.ok(await eventually(async () => (await texts(a, "Long term")).join() === "Tent,Milk"), "dragged past a folded section, it lands in the next open one");
+  assert.equal(await look.locator(".sec-left").innerText(), "Torch", "and the folded one keeps what it had");
+  await p.close();
+});
+
 test("sections are reordered by dragging their names, folded meanwhile", async () => {
   const t = await pair();
   const { a, b } = t;
@@ -1350,7 +1423,7 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   await item(a, "Milk").locator(".boxcell").click();
   await sleep(1900);
   await listSettings(a);
-  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
+  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-list")]);
   await backToList(a);
   assert.match(dl.suggestedFilename(), /^shopping-list-\d{4}-\d{2}-\d{2}\.md$/, "the list exports from its settings, named after it");
   assert.equal(readFileSync(await dl.path(), "utf8"), [
@@ -1751,7 +1824,7 @@ test("a new list is a plain sheet, named first; sections come when added, and li
   await a.keyboard.press("Alt+ArrowUp");
   assert.equal(await a.locator("#list > .sec").first().getAttribute("data-sec"), "ess", "and stay first");
   await listSettings(a);
-  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
+  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-list")]);
   await backToList(a);
   assert.equal(readFileSync(await dl.path(), "utf8"), "# Hardware store\n\n- [ ] Screws\n- [ ] Sandpaper\n\n## Garden <!-- teal -->\n- [ ] Hose\n", "and in Markdown, before any heading");
   // Emptied, it goes, so nothing new is added outside a section; an item put back brings it back.
@@ -1761,6 +1834,9 @@ test("a new list is a plain sheet, named first; sections come when added, and li
   await a.locator("#basket-list .item").filter({ hasText: "Screws" }).locator(".boxcell").click();
   assert.ok(await eventually(async () => (await a.locator('#list .sec[data-sec="ess"] .items .text').allInnerTexts()).join() === "Screws"), "unticked, an item goes back to it");
   assert.deepEqual(await heads(), ["Untitled section", "Garden"]);
+  await item(a, "Hose").locator(".chk").focus();
+  await a.keyboard.press("Alt+ArrowUp");
+  assert.ok(await eventually(async () => (await live(a)) === "Hose moved to Untitled section"), "moved into it with the keyboard, it's called that");
   await a.click("#h-ess");
   assert.equal(await a.locator("#h-ess").innerText(), "", "named from empty, not from the list's name");
   await a.keyboard.type("Tools");
@@ -1817,7 +1893,7 @@ test("on a phone on its side, what's ticked lies beside the list, and an item dr
   await p.close();
 });
 
-test("lists are reordered by dragging, and deleted once asked, on the lists page or at the foot of the list; undo brings them back", async () => {
+test("lists are reordered by dragging, and deleted once asked, on the lists page or in the list's settings; undo brings them back", async () => {
   const p = await alone();
   const a = p.page;
   await toLists(a);
@@ -1898,7 +1974,7 @@ test("lists come in from Markdown, from plain text, and from several pasted line
   await section(a, "Garden").locator(".add-input").fill("");
   await blur(a);
   await listSettings(a);
-  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
+  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-list")]);
   await backToList(a);
   assert.equal(readFileSync(await dl.path(), "utf8"), md.replace("## Essentials\n", "## Essentials <!-- ink -->\n"), "and exports as it came in");
 
@@ -2091,7 +2167,7 @@ test("changing a list's key leaves everyone else with it closed, until they open
   assert.ok(await a.locator("#list-rename").isDisabled(), "nor renamed");
   assert.equal(await a.locator("#list-colours .swatch").count(), 0, "nor recoloured");
   assert.ok(await a.locator('input[name="ticked"]').first().isDisabled(), "nor its ticked items kept longer");
-  assert.equal(await a.locator("#export-btn").isVisible(), true, "but it can still be exported");
+  assert.equal(await a.locator("#export-list").isVisible(), true, "but it can still be exported");
   assert.equal(await a.locator("#delete-what").innerText(), "From this phone", "and deleted from this phone");
   await backToList(a);
   await a.click("#status-pill");

@@ -8,9 +8,9 @@
     "directory": "web",
     "run_worker_first": ["/api/*"]
   },
-  // ListV2 holds the lists since the clean start of several lists (see docs/roadmap.md).
-  // List held the lists from before; once every one had come back by import, v3 deleted
-  // it, with their data.
+  // ListV2 holds the lists since the clean start of several lists. List held the lists
+  // from before; once every one had come back by import, v3 deleted it, with their data.
+  // Cloudflare keeps the migrations as a history, so they stay.
   "durable_objects": {
     "bindings": [{ "name": "LISTS", "class_name": "ListV2" }]
   },

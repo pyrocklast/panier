@@ -4,17 +4,18 @@
 // onto the zone at the foot to delete it. The blank strip under them starts a new list.
 
 import * as store from "./store.js";
-import { t, plural, q, lang } from "./i18n.js";
+import { t, plural, q, and } from "./i18n.js";
 import { fromMarkdown } from "./md.js";
 import { readKeep } from "./googlekeep.js";
 import { state, nav, draftsKey } from "./state.js";
-import { clean, MAX_SECTION, listColorOk, importOps, startOps } from "./model.js";
+import { clean, MAX_SECTION, listColorOk, importOps, startOps, listTitle } from "./model.js";
 import { $, h, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, reduceMotion } from "./dom.js";
 import { bindPress, beginDrag } from "./press.js";
 import { float, fly, shuffle } from "./motion.js";
 import { noteUndo, paintDock } from "./bar.js";
 import { confirmSheet, openSheet } from "./sheets.js";
 import { keepList } from "./settings.js";
+import { editName } from "./list.js";
 
 // Who else has a list, in a few quiet words under its name: two names at most, then a count.
 function withOf(e) {
@@ -22,7 +23,7 @@ function withOf(e) {
   if (!w || (!w.names.length && !w.nameless)) return "";
   const names = w.names.slice(0, 2), more = w.names.length - names.length + w.nameless;
   const who = names.length ? [...names, ...(more ? [plural(more, "{n} other", "{n} others")] : [])] : [plural(more, "{n} other phone", "{n} other phones")];
-  return t("with {x}", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(who) });
+  return t("with {x}", { x: and(who) });
 }
 const countOf = e => (e.closed ? t("Closed") : e.newer ? t("Update Panier to open it") : e.toGet ? plural(e.toGet, "{n} to tick", "{n} to tick") : t("Nothing to tick"));
 // Each sheet keeps its element from one drawing to the next, and only what changed is
@@ -44,7 +45,7 @@ function cardOf(e) {
     bindPress(li, { can: () => true, start: (offY, y, offX, x) => startSheetDrag(li, e.lid, offY, y, offX, x) });
     cards.set(e.lid, (c = { li, btn, name, who, first, count, shown: "" }));
   }
-  const nm = e.name || t("Untitled list"), cnt = countOf(e), gone = !!(e.closed || e.newer), first = gone ? [] : e.first || [];
+  const nm = listTitle(e.name), cnt = countOf(e), gone = !!(e.closed || e.newer), first = gone ? [] : e.first || [];
   const w = gone ? "" : withOf(e);
   const shown = JSON.stringify([nm, cnt, first, e.color, gone, w]);
   if (c.shown !== shown) {
@@ -132,8 +133,7 @@ function moveSheet(lid, dir) {
   if (j < 0 || j >= order.length) return;
   [order[i], order[j]] = [order[j], order[i]];
   shuffle(SHEETS, () => { store.reorder(order); renderLists(); }); // the store redraws the page as it changes
-  const e = store.lists().find(x => x.lid === lid);
-  announce(t(dir < 0 ? "{x} moved earlier" : "{x} moved later", { x: e.name || t("Untitled list") }));
+  announce(t(dir < 0 ? "{x} moved earlier" : "{x} moved later", { x: listTitle(store.entryOf(lid).name) }));
   const el = document.querySelector('[data-fk="sheet-' + lid + '"]');
   if (el) el.focus();
 }
@@ -144,9 +144,9 @@ function moveSheet(lid, dir) {
 // brings it back, and undo does too, until the app closes. For everyone, it asks again,
 // as nothing brings it back.
 export function askDelete(lid) {
-  const e = store.lists().find(x => x.lid === lid);
+  const e = store.entryOf(lid);
   if (!e) return;
-  const name = e.name || t("Untitled list"), w = e.with, others = !!(w && (w.names.length || w.nameless));
+  const name = listTitle(e.name), w = e.with, others = !!(w && (w.names.length || w.nameless));
   confirmSheet({
     title: t("Delete {x}?", { x: q(name) }),
     text: e.closed ? t("It's already closed: this removes what's left of it from this phone.")
@@ -171,9 +171,9 @@ export function askDelete(lid) {
 // The sheet that had the cursor is gone: it goes to el.
 const lostFocus = el => { if (!document.activeElement || document.activeElement === document.body) el.focus({ preventScroll: true }); };
 function removeList(lid) {
-  const e = store.lists().find(x => x.lid === lid);
+  const e = store.entryOf(lid);
   if (!e) return;
-  const name = e.name || t("Untitled list"), dk = draftsKey(lid);
+  const name = listTitle(e.name), dk = draftsKey(lid);
   let drafts = null;
   try { drafts = localStorage.getItem(dk); localStorage.removeItem(dk); } catch (_) {}
   noteUndo(name);
@@ -235,7 +235,7 @@ $("#setup-form").addEventListener("submit", async e => {
   const code = $("#setup-code").value;
   if (!code.trim() || creating) return;
   creating = true;
-  const p = pending || { make: c => store.createList({ code: c, ops: startOps() }), done: lid => { nav.showList(lid); keepList(); nav.editName(); } };
+  const p = pending || { make: c => store.createList({ code: c, ops: startOps() }), done: lid => { nav.showList(lid); keepList(); editName(); } };
   try {
     const r = await p.make(code);
     pending = null;
@@ -258,12 +258,12 @@ $("#import-file").addEventListener("change", async e => {
   const files = [...(e.target.files || [])];
   e.target.value = "";
   if (!files.length) return;
-  if ($("#settings").open) $("#settings").close();
+  $("#settings").close();
   const keep = files.filter(f => /\.(zip|json)$/i.test(f.name));
   const lists = [];
   for (const f of files.filter(f => !keep.includes(f))) lists.push(...fromMarkdown(await f.text().catch(() => "")));
   if (keep.length) lists.push(...(await readKeep(keep).catch(() => [])));
-  if (!lists.length) return say(t("There's no list to bring in from {x}.", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(files.map(f => f.name)) }));
+  if (!lists.length) return say(t("There's no list to bring in from {x}.", { x: and(files.map(f => f.name)) }));
   if (keep.length) pick(lists);
   else bringIn(lists);
 });
@@ -292,7 +292,7 @@ function pick(lists) {
     const about = [l.archived && t("Archived"), toGet.length ? plural(toGet.length, "{n} to tick", "{n} to tick") : t("Nothing to tick"), toGet.slice(0, 3).join(", ")];
     boxes[i].addEventListener("change", ready);
     return h("li", null, h("label", null, boxes[i], h("span", { class: "box", "aria-hidden": "true" }),
-      h("span", { class: "pick-in" }, h("span", { class: "pick-name" }, clean(l.name || "", MAX_SECTION) || t("Untitled list")), h("span", { class: "pick-about" }, about.filter(Boolean).join(" · ")))));
+      h("span", { class: "pick-in" }, h("span", { class: "pick-name" }, listTitle(clean(l.name || "", MAX_SECTION))), h("span", { class: "pick-about" }, about.filter(Boolean).join(" · ")))));
   }));
   ready();
   ok.onclick = () => { $("#pick").close(); bringIn(lists.filter((_, i) => boxes[i].checked)); };

@@ -94,7 +94,7 @@ export function fromMarkdown(text) {
     if (it) { add(it); continue; }
     if (NOISE.test(line)) continue;
     const plain = one(line), after = next(i);
-    if (after && itemOf(after) && plain.length <= 60) { newSection(named(plain).name, named(plain).color); continue; }
+    if (after && itemOf(after) && plain.length <= 60) { const s = named(plain); newSection(s.name, s.color); continue; }
     add({ text: plain, checked: false });
   }
   return lists.filter(l => l.name || l.sections.some(s => s.items.length || s.name));

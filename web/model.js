@@ -26,6 +26,7 @@ export const listColorOk = c => (LIST_COLORS.some(([id]) => id === c) ? c : "");
 export const MAX_ITEM = 300; // a few sentences, about eight lines on a phone
 export const MAX_SECTION = 40; // and the list's name
 export const LIST = "@list"; // where the list's own name is kept, among items and sections
+export const listTitle = name => name || t("Untitled list"); // what a list is called on screen
 
 // A new list is a plain sheet: one section without a name, which shows no heading, and
 // the other two the old start had, deleted. Each new list writes this into itself, so
@@ -125,7 +126,7 @@ export function sheetOfList({ name, color, sections: stored, items: its }) {
   const secs = shown.map(s => ({ name: s.name, color: s.color, items: [] }));
   for (const i of its.filter(i => !i.checked).sort((a, b) => a.pos - b.pos)) secs[at.get(i.section) ?? 0].items.push({ text: i.text, checked: false });
   for (const i of its.filter(i => i.checked).sort((a, b) => b.checkedAt - a.checkedAt)) secs[at.get(i.section) ?? 0].items.push({ text: i.text, checked: true });
-  return { name: name || t("Untitled list"), color: color || "", sections: secs };
+  return { name: listTitle(name), color: color || "", sections: secs };
 }
 
 // The changes that make a list as read from Markdown, on top of a new list's start: its

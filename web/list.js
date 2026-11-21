@@ -2,12 +2,12 @@
 
 import * as store from "./store.js";
 import { t, plural, q, when } from "./i18n.js";
-import { toMarkdown, pastedItems } from "./md.js";
+import { pastedItems } from "./md.js";
 import { state, readOnly, listName, listColor, tickedDays, draftsKey } from "./state.js";
-import { DEFAULTS, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, BEFORE_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout, sheetOfList } from "./model.js";
-import { $, h, icon, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, download, reduceMotion } from "./dom.js";
+import { DEFAULTS, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, BEFORE_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout } from "./model.js";
+import { $, h, icon, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, reduceMotion } from "./dom.js";
 import { whenTapEnds, bindPress, beginDrag } from "./press.js";
-import { float, landAll, snapshot, glide, fly, shift, shuffle, foldAway, dye, MOTION } from "./motion.js";
+import { float, landAll, snapshot, glide, fly, shift, shuffle, foldAway, foldOver, dye, MOTION } from "./motion.js";
 import { editInPlace, palette } from "./edit.js";
 import { noteUndo, paintDock, paintStatus } from "./bar.js";
 
@@ -19,7 +19,7 @@ let sectionInfo = new Map(); // every section ever seen, for names and colours
 const settling = new Set();
 let settleTimer = null, renderPending = false;
 let flashId = null, flashQuiet = false; // the item to bring into view at the next redraw, tinted unless quiet
-const ui = { sugSec: null, sug: [], sugIndex: -1, sugCol: 0, basketOpen: true };
+const ui = { sugSec: null, sug: [], sugIndex: -1, sugCol: 0, basketOpen: true, folded: new Set() }; // folded: sections folded on this phone
 let wasReadOnly = false; // as the list on screen was last drawn
 
 const find = id => items.find(i => i.id === id);
@@ -249,9 +249,10 @@ function nudge(id, dir) {
   }
   const next = sections[sections.findIndex(s => s.id === it.section) + dir];
   if (!next) return;
+  setFold(next.id, false); // it opens, so the item and the cursor stay in view
   const l = shown(next.id);
   const pos = dir > 0 ? (l.length ? l[0].pos - 1 : 1) : maxPos(next.id) + 1;
-  announce(t("{x} moved to {y}", { x: it.text, y: next.name }));
+  announce(t("{x} moved to {y}", { x: it.text, y: nameOf(next.id) }));
   act(t("moving {x}", { x: q(it.text) }), [[id, "section", next.id], [id, "pos", pos]], { focusKey: "chk-" + id });
 }
 
@@ -383,7 +384,8 @@ function editSection(span, id, x, y) {
 // A new list without a name is named first, where its name goes, as a section's is
 // renamed, its colour chosen under it; named with Enter, the cursor goes on to its first
 // Add item, ready to write on. Later, it's renamed in its settings.
-function editListName(span) {
+export function editName() {
+  const span = $("#list-name");
   if (readOnly()) return;
   span.dataset.placeholder = t("Name this list");
   edit(span, {
@@ -396,7 +398,6 @@ function editListName(span) {
     onDone: () => { span.dataset.placeholder = t("Untitled list"); },
   });
 }
-export const editName = () => editListName($("#list-name"));
 // The list's own settings, from its settings page or as it's named.
 export function renameList(name) {
   const was = store.listName() || "";
@@ -501,7 +502,7 @@ function forget(id, sec, keyboard = false) {
 
 const shells = {};
 function buildShell(id) {
-  const ul = h("ul", { class: "items", "data-sec": id });
+  const ul = h("ul", { class: "items", id: "items-" + id, "data-sec": id });
   const input = h("input", {
     type: "text", class: "add-input", id: "add-" + id, placeholder: t("Add item"),
     maxlength: String(MAX_ITEM), enterkeyhint: "enter", autocomplete: "off", autocapitalize: "sentences", spellcheck: "false",
@@ -528,8 +529,18 @@ function buildShell(id) {
     if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editSection(name, id); }
     else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); moveSection(id, e.key === "ArrowUp" ? -1 : 1); }
   });
-  const head = h("h2", { class: "sec-head" }, name);
-  const el = h("section", { class: "sec", "data-sec": id, "aria-labelledby": "h-" + id }, head, ul, sug, form);
+  // Folded, on this phone, a section shows its heading and, under it, what's left in it:
+  // the chevron folds and unfolds it, and so does a tap on that line.
+  const chev = icon("chev");
+  chev.classList.add("chev");
+  const fold = h("button", { type: "button", class: "fold-sec", "aria-controls": "items-" + id }, chev);
+  fold.addEventListener("click", () => {
+    if (state.suppressClick) { state.suppressClick = false; return; }
+    foldSection(id, !ui.folded.has(id));
+  });
+  const left = h("p", { class: "sec-left", onclick: () => foldSection(id, false) });
+  const head = h("h2", { class: "sec-head" }, name, fold);
+  const el = h("section", { class: "sec", "data-sec": id, "aria-labelledby": "h-" + id }, head, left, ul, sug, form);
   bindPress(head, { look: el, can: () => !readOnly() && sections.length > 1 && !!sectionInfo.get(id).name, start: (offY, y) => startSectionDrag(id, y) });
   input.addEventListener("input", () => {
     saveDraft(id, input.value.trim() ? input.value : "");
@@ -562,7 +573,7 @@ function buildShell(id) {
     e.preventDefault();
     paintSug(id, ui.sug);
   });
-  const sh = { el, ul, input, form, sug, name };
+  const sh = { el, ul, input, form, sug, name, fold, left };
   return sh;
 }
 function syncShells() {
@@ -580,6 +591,10 @@ function syncShells() {
     const plain = !s.name && sections.length === 1, called = s.name || t("Untitled section");
     sh.el.classList.toggle("unnamed", !s.name);
     sh.el.classList.toggle("plain", plain);
+    const folded = !plain && ui.folded.has(s.id);
+    sh.el.classList.toggle("folded", folded);
+    sh.fold.setAttribute("aria-expanded", String(!folded));
+    sh.fold.setAttribute("aria-label", called);
     if (!plain) sh.el.setAttribute("aria-labelledby", "h-" + s.id); else sh.el.removeAttribute("aria-labelledby");
     sh.name.setAttribute("aria-label", readOnly() ? called : t("{x}, rename", { x: called }));
     sh.input.setAttribute("aria-label", s.name ? t("Add item to {x}", { x: s.name }) : t("Add item"));
@@ -689,7 +704,9 @@ function place(y, x) {
   // Over the ticked group, from its heading down, or beside the list on a wide screen: the
   // item will be ticked, or stay ticked.
   const b = $("#basket").getBoundingClientRect();
-  const toTick = state.drag.beside ? x > b.left - 8 : y > b.top - 8;
+  // Folded sections are passed over; with every one folded, a ticked item stays ticked.
+  const secs = [...document.querySelectorAll("#list .sec:not(.folded)")];
+  const toTick = !secs.length || (state.drag.beside ? x > b.left - 8 : y > b.top - 8);
   if (toTick !== state.drag.toTick) {
     if (toTick && state.drag.toTick === false) buzz(8);
     state.drag.toTick = toTick;
@@ -704,7 +721,6 @@ function place(y, x) {
     }
   }
   if (toTick) return;
-  const secs = [...document.querySelectorAll("#list .sec")];
   let target = secs[secs.length - 1];
   for (const s of secs) { if (y < s.getBoundingClientRect().bottom) { target = s; break; } }
   const ul = target.querySelector("ul.items");
@@ -833,7 +849,12 @@ function render() {
   flashQuiet = false;
   const kept = new Set();
   const fill = (ul, list, note) => { for (const i of list) kept.add(i.id); setRows(ul, list.map(i => rowOf(i, tint.has(i.id), note && note(i)))); };
-  for (const s of sections) fill(shells[s.id].ul, shown(s.id));
+  for (const s of sections) {
+    const sh = shells[s.id], list = shown(s.id);
+    fill(sh.ul, list);
+    const left = sh.el.classList.contains("folded") ? list.map(i => i.text).join(", ") : "";
+    if (sh.left.textContent !== left) sh.left.textContent = left;
+  }
   const from = since();
   const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= from).sort((a, b) => b.checkedAt - a.checkedAt);
   $("#basket").classList.toggle("empty", basket.length === 0);
@@ -866,11 +887,6 @@ function render() {
   }
 }
 
-function exportList() {
-  download(listName(), toMarkdown([sheetOfList({ name: listName(), color: listColor(), sections: store.sections(), items })]));
-}
-
-$("#export-btn").addEventListener("click", exportList);
 $("#list-name").dataset.placeholder = t("Untitled list");
 
 // Adding a section moves the cursor to its Add item field.
@@ -880,12 +896,29 @@ addRow($("#add-sec-form"), $("#add-sec"), { add: () => addSection($("#add-sec").
 // unfolding, it opens as the list glides, its rows fading in.
 $("#basket-toggle").addEventListener("click", () => {
   ui.basketOpen = !ui.basketOpen;
-  store.setFolded(state.lid, !ui.basketOpen);
+  store.setFolded(state.lid, { folded: !ui.basketOpen });
   const bl = $("#basket-list");
   for (const a of bl.getAnimations()) a.cancel(); // folding a moment ago: it opens from where it is
   if (ui.basketOpen) paint(null);
   else foldAway(bl, () => paint(null, false));
 });
+
+// A section folds as the ticked group does: closing over its rows, then its line of
+// what's left fades in (app.css); unfolding, it opens as the list glides.
+function foldSection(id, folded) {
+  const sh = shells[id];
+  for (const a of sh.el.getAnimations()) a.cancel(); // folding or opening a moment ago: it turns from where it is
+  setFold(id, folded);
+  if (folded) foldOver(sh.el, [sh.ul, sh.form], () => paint(null, false));
+  else paint(null);
+}
+// A section folded or not, kept with the list on this phone; sections since deleted are
+// left out.
+function setFold(id, folded) {
+  if (ui.folded.has(id) === folded) return;
+  if (folded) ui.folded.add(id); else ui.folded.delete(id);
+  store.setFolded(state.lid, { foldedSections: [...ui.folded].filter(isShown) });
+}
 
 /* ---------- For app.js ---------- */
 
@@ -904,10 +937,11 @@ export function reset() {
   lastSplit = null;
   noteUndo(null);
 }
-// Draws the list the store has just opened, lid, with its ticked group folded as it was left.
+// Draws the list the store has just opened, lid, folded as it was left on this phone.
 export function show(lid) {
-  const e = store.lists().find(x => x.lid === lid);
+  const e = store.entryOf(lid);
   ui.basketOpen = !(e && e.folded);
+  ui.folded = new Set(e && e.foldedSections);
   items = store.items();
   render();
   // Text left in an "Add item" field when the app was closed becomes an item now.

@@ -2,11 +2,11 @@
 // list, and removing someone.
 
 import * as store from "./store.js";
-import { t, plural, q, lang } from "./i18n.js";
+import { t, plural, q, and } from "./i18n.js";
 import { listName } from "./state.js";
 import { clean, MAX_SECTION } from "./model.js";
 import { $, h, announce } from "./dom.js";
-import { openSheet, closeThen, confirmSheet } from "./sheets.js";
+import { openSheet, confirmSheet } from "./sheets.js";
 
 function qrSvg(textToEncode) {
   const qr = window.qrcode(0, "M");
@@ -62,7 +62,7 @@ export function people() {
   const named = others.filter(m => m.name).map(m => m.name), nameless = others.length - named.length;
   const who = [t("you"), ...named];
   if (nameless) who.push(plural(nameless, "{n} phone without a name", "{n} phones without a name"));
-  return others.length ? t("On this list: {x}.", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(who) }) : t("Only you, so far.");
+  return others.length ? t("On this list: {x}.", { x: and(who) }) : t("Only you, so far.");
 }
 function paintPeople() {
   $("#members").textContent = people();
@@ -89,18 +89,19 @@ $("#copy-link").addEventListener("click", async e => {
 
 // Someone shouldn't have the list any more: it moves to a new key, and the old one is
 // closed, for everyone. The people who should keep it get the new link.
-$("#rekey-open").addEventListener("click", () => closeThen($("#pair"), () => confirmSheet({
-  title: t("Remove someone from {x}?", { x: q(listName()) }),
-  text: t("The list moves to a new key. Every other phone loses it, though each keeps what it had. Then send the new link to those who should keep it."),
-  ok: t("Give it a new key"),
-  run: async () => {
-    await store.changeKey();
-    announce(t("{x} has a new key", { x: listName() }));
-    closeThen($("#confirm"), () => openPair());
-  },
-})));
+$("#rekey-open").addEventListener("click", () => {
+  $("#pair").close();
+  confirmSheet({
+    title: t("Remove someone from {x}?", { x: q(listName()) }),
+    text: t("The list moves to a new key. Every other phone loses it, though each keeps what it had. Then send the new link to those who should keep it."),
+    ok: t("Give it a new key"),
+    run: async () => {
+      await store.changeKey();
+      announce(t("{x} has a new key", { x: listName() }));
+      $("#confirm").close();
+      openPair();
+    },
+  });
+});
 // Someone joined, or named themselves, while the sheet shows who's on the list.
-export const peopleChanged = () => {
-  if ($("#pair").open && !$("#people").hidden) paintPeople();
-  if ($("#list-settings").open) $("#list-people").textContent = people();
-};
+export const peopleChanged = () => { if ($("#pair").open && !$("#people").hidden) paintPeople(); };

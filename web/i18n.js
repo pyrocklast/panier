@@ -96,7 +96,6 @@ const FR = {
   "It goes from this phone. Its link brings it back, if you kept one.": "Elle disparaît de ce téléphone. Son lien la fait revenir, si vous l’avez gardé.",
   "It's already closed: this removes what's left of it from this phone.": "Elle est déjà fermée" + nb + ": ceci retire de ce téléphone ce qu’il en reste.",
   "Deleted {x} from this phone": "{x} supprimée de ce téléphone",
-  "deleting {x}": "supprimer {x}",
   "This server can't make another list from this one.": "Ce serveur ne peut pas créer d’autre liste à partir de celle-ci.",
   "someone else": "quelqu’un d’autre",
   "with {x}": "avec {x}",
@@ -260,9 +259,13 @@ export function when(ms) {
 }
 // Quotes around a name.
 export const q = s => (lang === "fr" ? "«" + nb + s + nb + "»" : "“" + s + "”");
+// Names in a sentence, joined as the language joins them: "Alex and Sam", "Alex, Sam and you".
+const joined = new Intl.ListFormat(lang, { type: "conjunction" });
+export const and = names => joined.format(names);
 
 // The page's own text and labels, translated once at start.
-export function translatePage(root = document.body) {
+export function translatePage() {
+  const root = document.body;
   document.documentElement.lang = lang;
   if (lang === "en") return;
   const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);

@@ -35,7 +35,7 @@ const KEY = /^[A-Za-z0-9_-]{43}$/; // a list key: 32 bytes, in base64url
 
 /* Listeners: kind is "local", "remote" or "status" for the list on screen, "lists" for the index */
 const listeners = new Set();
-export const subscribe = fn => { listeners.add(fn); return () => listeners.delete(fn); };
+export const subscribe = fn => { listeners.add(fn); };
 const emit = kind => listeners.forEach(fn => fn(kind));
 
 /* ---------- The index ---------- */
@@ -55,11 +55,11 @@ function saveIndexNow() {
   try { localStorage.setItem(INDEX, JSON.stringify(index)); } catch (_) {}
 }
 const saveIndex = () => { if (!indexTimer) indexTimer = setTimeout(saveIndexNow, 400); };
-const entryOf = lid => index.lists.find(e => e.lid === lid);
 
-// The lists, in order: { lid, key, name, color, toGet, first, with, closed, newer, folded },
-// as last seen.
+// The lists, in order: { lid, key, name, color, toGet, first, with, closed, newer, folded,
+// foldedSections }, as last seen; and one of them, by its id.
 export const lists = () => index.lists;
+export const entryOf = lid => index.lists.find(e => e.lid === lid);
 export const openId = () => index.open;
 
 /* ---------- One list ---------- */
@@ -68,7 +68,8 @@ export const openId = () => index.open;
 // them back, but only for about six months.
 const FORGET_MS = 183 * 24 * 3600 * 1000;
 const blank = key => ({ key, clock: 0, seq: 0, items: {}, devs: [], outbox: [] });
-// The three sections a list starts with, as model.js names them, in their first order.
+// The three sections lists started with before plain sheets, as model.js names them, in
+// their first order.
 const DEFAULT_POS = { ess: 1, look: 2, long: 3 };
 const isItem = id => id[0] !== "#" && id[0] !== "@";
 const MEMBER = "@m/"; // a phone on the list: "@m/" + its id, with "on" and, if given, "name"
@@ -271,10 +272,9 @@ class List {
   /* Local changes and undo */
 
   // change applies [[id, field, value, fallback?], ...] as one step, unless the list is
-  // closed. fallback is the value
-  // to assume when the field was never stored, such as a default section's name, so undo
-  // can restore it. With a label, the step can be undone. Returns what changed as
-  // [id, field, newValue, previousValue] records.
+  // closed. fallback is the value to assume when the field was never stored, such as a
+  // default section's name, so undo can restore it. With a label, the step can be undone.
+  // Returns what changed as [id, field, newValue, previousValue] records.
   change(label, ops) {
     if (this.s.closed) return null; // a closed list takes nothing more
     const t = this.tick();
@@ -753,9 +753,11 @@ export function reorder(lids) {
   saveIndexNow();
   emit("lists");
 }
-export function setFolded(lid, folded) {
+// What's folded on a list, on this phone only: { folded } for its ticked group,
+// { foldedSections } for the ids of its sections.
+export function setFolded(lid, change) {
   const e = entryOf(lid);
-  if (e && !!e.folded !== folded) { e.folded = folded; saveIndex(); }
+  if (e) { Object.assign(e, change); saveIndex(); }
 }
 
 // This phone's name, shown to the people its lists are shared with, on every list it has.
@@ -821,18 +823,19 @@ export async function deleteForEveryone(lid) {
 
 /* ---------- Coming and going ---------- */
 
-// Put away, the app stops listening, so it uses no network or battery in the background.
+// Put away or closed, the app writes what's waiting to be written; put away, it stops
+// listening, so it uses no network or battery in the background.
+const saveAll = () => {
+  for (const l of loaded.values()) if (l.saveTimer) l.saveNow();
+  if (indexTimer) saveIndexNow();
+};
 document.addEventListener("visibilitychange", () => {
-  for (const l of loaded.values()) if (document.hidden && l.saveTimer) l.saveNow();
-  if (document.hidden && indexTimer) saveIndexNow();
+  if (document.hidden) saveAll();
   if (!cur) return;
   if (!document.hidden) cur.resume();
   else if (cur.socket) { cur.reconnectNow = true; cur.socket.close(); }
 });
-addEventListener("pagehide", () => {
-  for (const l of loaded.values()) if (l.saveTimer) l.saveNow();
-  if (indexTimer) saveIndexNow();
-});
+addEventListener("pagehide", saveAll);
 addEventListener("online", () => {
   if (cur) cur.resume();
   for (const l of loaded.values()) if (l !== cur || !l.live) l.flush();

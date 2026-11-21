@@ -111,7 +111,10 @@ export function glide(snap) {
     const o = snap.items.get(n.li.dataset.id);
     kept.add(n.li.dataset.id);
     if (!o || !seen(o.rect)) { if (seen(n.rect) && near(n.rect) && !typed.has(n.li)) appear(n.li); }
-    else if (!seen(n.rect)) fly(o, head, null, true); // into the folded ticked group
+    else if (!seen(n.rect)) { // into the folded ticked group, or a folded section's line of what's left
+      const sec = n.li.closest(".sec");
+      fly(o, sec ? sec.querySelector(".sec-left").getBoundingClientRect() : head, null, !sec);
+    }
     else if (!near(o.rect) && !near(n.rect)) continue;
     else if (n.li.classList.contains("placeholder")) { if (Math.abs(o.rect.top - n.rect.top) > 0.5) opens(n.li); }
     else if (o.part === n.part) slide(n.li, inside(o.rect, n.rect, n.part));
@@ -160,6 +163,18 @@ export function foldAway(el, done) {
   const a = el.animate([{ height: h + "px", opacity: 1 }, { height: "0px", opacity: 0 }], { ...MOTION, id: "glide" });
   const end = () => { el.style.overflow = ""; done(); };
   a.finished.then(end, end);
+}
+// A section folding closes over its rows as they fade, and what follows moves up with it:
+// change folds it, and its rows show while it closes (app.css: .folding).
+export function foldOver(el, rows, change) {
+  if (reduceMotion.matches) return change();
+  const was = el.getBoundingClientRect().height;
+  change();
+  const now = el.getBoundingClientRect().height;
+  el.classList.add("folding");
+  const fading = rows.map(r => r.animate([{ opacity: 1 }, { opacity: 0 }], { ...LEAVING, fill: "forwards" }));
+  const end = () => { el.classList.remove("folding"); for (const f of fading) f.cancel(); };
+  el.animate([{ height: was + "px" }, { height: now + "px" }], { ...MOTION, id: "glide" }).finished.then(end, end);
 }
 // Something that grows or shrinks in place, such as undo naming what it brings back: its
 // width glides from what it was.

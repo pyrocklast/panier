@@ -40,14 +40,14 @@ store.subscribe(kind => {
   if (kind === "lists") {
     if (state.view === "list" && !store.current()) showLists(); // taken off this phone in another tab
     else lists.renderLists();
+    return;
   }
-  else if (state.view !== "list") return;
-  else if (kind === "remote") {
+  if (state.view !== "list") return;
+  if (kind === "remote") {
     list.refreshFromStore();
     peopleChanged();
     if ($("#list-settings").open) paintListSettings(); // renamed or recoloured on another phone
-  }
-  else if (kind === "status" || kind === "local") {
+  } else { // "status" or "local"
     paintStatus();
     if (list.readOnlyChanged()) { list.refreshFromStore(); if ($("#list-settings").open) paintListSettings(); }
   }
@@ -106,7 +106,7 @@ function showList(lid) {
 }
 function showLists() {
   const from = document.activeElement;
-  if ($("#list-settings").open) $("#list-settings").close(); // the list gone from under them
+  $("#list-settings").close(); // if open: the list has gone from under them
   if (state.view === "list") { list.closeSug(); store.leave(); }
   state.view = "lists";
   follow();
@@ -147,20 +147,19 @@ async function init() {
     }
   }
   const was = listInHistory(); // reloaded on a list
-  if (was && store.lists().some(e => e.lid === was)) { showList(was); store.refreshAll(); return; }
+  if (was && store.entryOf(was)) { showList(was); store.refreshAll(); return; }
   begin(null);
 }
 function begin(lid, toLists = false) {
   history.replaceState({}, "");
   const open = lid || (!toLists && store.openId());
-  if (open && store.lists().some(e => e.lid === open)) {
+  if (open && store.entryOf(open)) {
     showList(open);
     store.refreshAll(); // the others send what they have waiting
   } else showLists();
 }
 nav.showList = showList;
 nav.showLists = showLists;
-nav.editName = list.editName;
 translatePage();
 init();
 // A pairing or setup link opened in this tab, with the app already open: it starts afresh
@@ -170,7 +169,8 @@ addEventListener("hashchange", () => { if (/^#(k|setup)=/.test(location.hash)) l
 /* ---------- Updates ---------- */
 
 // A new version installs in the background. When it takes over, the app reloads into it,
-// waiting first for anything in progress: editing, typing, dragging or the pairing sheet.
+// waiting first for anything in progress: editing, typing, dragging, or a sheet or page
+// of settings open.
 function busy() {
   return !!(state.editing || state.drag || state.lifted || state.pointerDown || document.querySelector("dialog[open]") ||
     list.typing() || lists.typing());
