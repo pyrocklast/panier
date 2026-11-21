@@ -6,6 +6,7 @@ import { toMarkdown } from "./md.js";
 import { clean, MAX_SECTION, sheetOfList } from "./model.js";
 import { $, h, download } from "./dom.js";
 import { openSheet, closeThen } from "./sheets.js";
+import { nav } from "./state.js";
 import { openPair } from "./share.js";
 
 const THEME_KEY = "panier-theme", LAYOUT_KEY = "panier-layout";
@@ -37,8 +38,12 @@ async function paintSettings() {
   const k = keys.find(k => k.startsWith("panier-") && !k.startsWith("panier-static-"));
   $("#about-version").textContent = k ? k.slice(7) : "dev";
 }
-$("#settings-open").addEventListener("click", () => { paintSettings(); openSheet($("#settings")); });
-$("#settings-close").addEventListener("click", () => $("#settings").close());
+// Settings is a page of its own: the page turns into it from its button, and back.
+const fromButton = () => $("#settings-open");
+const closeSettings = () => nav.turn(false, () => $("#settings").close(), fromButton);
+$("#settings-open").addEventListener("click", () => nav.turn(true, () => { paintSettings(); openSheet($("#settings")); }, fromButton));
+$("#settings-close").addEventListener("click", closeSettings);
+$("#settings").addEventListener("cancel", e => { e.preventDefault(); closeSettings(); }); // Escape
 // Compact: every row 44 px, with smaller gaps and titles, on this phone only.
 $("#compact-layout").addEventListener("change", e => {
   const l = e.target.checked ? "compact" : "";

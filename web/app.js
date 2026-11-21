@@ -51,24 +51,30 @@ store.subscribe(kind => {
   }
 });
 
-// Between the lists page and a list, the page turns quietly (app.css): beneath, its
-// colour changes into the other's; on it, the words fade out and the new ones fade in, a
-// touch nearer going into a list and a touch further coming back out. It turns for a tap,
-// on a sheet or on Lists, and for the back gesture; anything else changes the page at
-// once, as the browser changes it a moment after it's asked, once it has a picture of
+// Between pages, the lists page and a list or Settings, the page turns quietly
+// (app.css): beneath, its colour changes into the other's; on it, the words fade out and
+// the new ones fade in. Going in, they come out of what was tapped, the list's sheet or
+// Settings, a touch nearer; coming back, the words leave into it and the page settles
+// around it. It turns for a tap and for the back gesture; anything else changes the page
+// at once, as the browser changes it a moment after it's asked, once it has a picture of
 // the page as it was. Where the browser can't, the page simply changes.
 let turning = false;
-function turn(into, update) {
+const words = () => document.querySelector("#settings[open] .page-in") || $(state.view === "list" ? "#app" : "#lists");
+function turn(into, update, at = () => lists.sheetButton(state.lid)) {
   if (!document.startViewTransition || reduceMotion.matches || turning) return update();
   turning = true;
   const root = document.documentElement;
-  // The words grow or shrink around a point a little above the middle of the screen.
-  const middle = () => innerHeight * 0.4 - $(state.view === "list" ? "#app" : "#lists").getBoundingClientRect().top + "px";
-  root.style.setProperty("--turn-was", middle());
+  // The middle of what was tapped, or of the screen, as seen from each page's words
+  const middle = () => { const el = at(), r = el && el.getBoundingClientRect(); return r && r.width ? [r.left + r.width / 2, r.top + r.height / 2] : [innerWidth / 2, innerHeight * 0.4]; };
+  const from = (p, r) => `${p[0] - r.left}px ${p[1] - r.top}px`;
+  const was = words().getBoundingClientRect(), p = into && middle(); // going in, what was tapped shows now; coming back, once the page has turned
+  if (p) root.style.setProperty("--turn-was", from(p, was));
   root.dataset.turn = into ? "in" : "out";
   document.startViewTransition(() => {
     update();
-    root.style.setProperty("--turn-now", middle());
+    const q = p || middle();
+    if (!p) root.style.setProperty("--turn-was", from(q, was));
+    root.style.setProperty("--turn-now", from(q, words().getBoundingClientRect()));
   }).finished.finally(() => {
     delete root.dataset.turn;
     root.style.removeProperty("--turn-was");

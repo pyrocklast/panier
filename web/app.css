@@ -379,9 +379,20 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 #app.readonly .chk:checked + .box { opacity: 0.5; }
 
 /* Sheets rise onto the page as it dims behind them; undo and the connection's status rise
-   into place when they appear */
+   into place when they appear. Each leaves as it came, but quicker: a sheet sinks a little
+   and fades as the dimming lifts, undo and the status fade; leaving, they take no taps.
+   A sheet stays where it is as it goes, even where the browser takes it off the top of the
+   page at once. Settings is a page, not a sheet: it turns (app.js). */
 .sheet[open], .dock:not([hidden]), .status:not([hidden]) { animation: rise var(--arrive) var(--ease-arrive); }
 .sheet[open]::backdrop { animation: appear var(--arrive) var(--ease-arrive); }
+.sheet:not(.page) { position: fixed; inset: 0; z-index: 40; margin: auto; height: fit-content; max-height: calc(100% - 6px - 2em); overflow: auto; }
+.sheet:not(.page), .sheet:not(.page)::backdrop, .dock, .status {
+  transition: opacity var(--quick) var(--ease-leave), transform var(--quick) var(--ease-leave), display var(--quick) allow-discrete, overlay var(--quick) allow-discrete;
+}
+:is(.sheet:not(.page):not([open]), .dock[hidden], .status[hidden]) { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.sheet:not(.page):not([open])::backdrop { opacity: 0; }
+.sheet.page[open], .sheet.page[open]::backdrop { animation: none; }
+.sheet.page::backdrop { display: none; } /* nothing dims under a page */
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
 @keyframes appear { from { opacity: 0; } }
 /* What shows on the page while you work is ink: suggestions above the field, colours
@@ -392,26 +403,29 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 #undo { overflow: hidden; } /* growing to fit the name */
 /* A colour spreads over what it dyes (motion.js) */
 :root[data-dye]::view-transition-group(root) { animation-duration: var(--move); animation-timing-function: var(--ease-move); }
-/* Between the lists page and a list, the page turns quietly (app.js). Beneath, the paper's
-   colour changes into the other's; on it, the words fade out, then the new ones fade in, a
-   touch nearer going into a list and a touch further coming back out. They fade through
-   rather than across: the old words go in 100 ms, quicker than anything else leaves, and
-   the new arrive over the 240 ms after, so two pages of words never show at once. */
+/* Between pages, the lists page and a list or Settings, the page turns quietly (app.js).
+   Beneath, the paper's colour changes into the other's; on it, the words fade out, then
+   the new ones fade in, out of what was tapped and a touch nearer going in, into it and a
+   touch further coming back. They fade through rather than across: the old words go in
+   100 ms, quicker than anything else leaves, and the new arrive over the 240 ms after,
+   so two pages of words never show at once. */
 :root[data-turn] #lists { view-transition-name: lists; }
 :root[data-turn] #app { view-transition-name: list; }
+:root[data-turn] #settings[open] .page-in { view-transition-name: settings; }
+:root[data-turn]:has(#settings[open]) #lists { view-transition-name: none; } /* out of sight under Settings */
 :root[data-turn] :is(.dock, .status) { opacity: 0; animation: none; } /* undo rises once the page has turned */
 :root[data-turn]::view-transition-group(*) { animation-duration: var(--move); }
-:root[data-turn]::view-transition-old(lists), :root[data-turn]::view-transition-old(list) { animation: words-out 100ms var(--ease-leave) both; transform-origin: 50% var(--turn-was); }
-:root[data-turn]::view-transition-new(lists), :root[data-turn]::view-transition-new(list) { animation: words-in var(--arrive) var(--ease-arrive) 80ms both; transform-origin: 50% var(--turn-now); }
-:root[data-turn="in"] { --turn-out: 1.02; --turn-in: 0.98; }
-:root[data-turn="out"] { --turn-out: 0.98; --turn-in: 1.02; }
+:root[data-turn]::view-transition-old(lists), :root[data-turn]::view-transition-old(list), :root[data-turn]::view-transition-old(settings) { animation: words-out 100ms var(--ease-leave) both; transform-origin: var(--turn-was); }
+:root[data-turn]::view-transition-new(lists), :root[data-turn]::view-transition-new(list), :root[data-turn]::view-transition-new(settings) { animation: words-in var(--arrive) var(--ease-arrive) 80ms both; transform-origin: var(--turn-now); }
+:root[data-turn="in"] { --turn-out: 1.04; --turn-in: 0.96; }
+:root[data-turn="out"] { --turn-out: 0.96; --turn-in: 1.04; }
 @keyframes words-out { to { opacity: 0; transform: scale(var(--turn-out)); } }
 @keyframes words-in { from { opacity: 0; transform: scale(var(--turn-in)); } }
 
 /* Motion: items glide from motion.js; this only turns the rest off when asked */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, ::backdrop { animation: none !important; }
-  .item, .box, .words, #basket-toggle .chev { transition: none; }
+  .item, .box, .words, #basket-toggle .chev, .sheet:not(.page), .sheet:not(.page)::backdrop, .dock, .status { transition: none; }
   :is(.item, .sec, .sheet-card).lifted, .sheet-card.ghost.leaving { transform: none; } /* lifted, nothing grows */
 }
 

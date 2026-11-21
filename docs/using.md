@@ -15,7 +15,7 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 A phone holds any number of lists, each shared with its own people. The app opens on the list last used.
 
 - **The lists page** is reached with *Lists*, at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to tick, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
-- **Open** a list with a tap. The page turns quietly into it: the desk takes the list's colour as the list's words fade in, a touch nearer. Going back, with *Lists* or the back gesture, it turns the other way.
+- **Open** a list with a tap. The page turns quietly into it: the desk takes the list's colour as the list's words open out of its sheet. Going back, with *Lists* or the back gesture, they draw back into it.
 - **New list:** type a name on the blank strip under the sheets; the new list opens ready to write on. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
 - **Move** a list: hold it, then drag it to its new place; the others glide aside. From a keyboard, Alt and an arrow move it one place earlier or later.
 - **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, at the foot of the list itself. It always asks first. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
@@ -148,8 +148,8 @@ Panier is paper, and what moves says where it happens:
 - **On the page**, what's written fades in or out where it is: an item added or deleted, a box filling, the pen stroke, suggestions, colours under a name, what others change, tinted a moment.
 - **Along the page**, rows and sections glide to their new places, the ticked group folds and unfolds, and what's in the way glides aside during a drag.
 - **Off the page**, what you hold lifts, with a shadow; a ticked item travels to the ticked group and settles there.
-- **On top**, the sheets, undo and the connection's status rise into place.
-- **The page itself** turns, between the lists page and a list, and takes a new colour.
+- **On top**, the sheets, undo and the connection's status rise into place, and sink or fade away, quicker, as they go.
+- **The page itself** turns, between the lists page and a list or Settings, out of what you tapped and back into it, and takes a new colour.
 
 Each takes 0.15 s to give feedback, 0.24 s to arrive or 0.32 s to move, a little longer for a long trip. When the phone asks for reduced motion, nothing moves.
 
