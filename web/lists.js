@@ -139,7 +139,7 @@ function moveSheet(lid, dir) {
 }
 
 // A list is deleted only once asked: on the lists page, dropped on the zone at the foot or
-// with the Delete key, or with Delete the list, at the foot of the list itself, which a
+// with the Delete key, or with Delete the list, in the list's own settings, which a
 // screen reader on a phone can reach. From this phone, the others keep it and its link
 // brings it back, and undo does too, until the app closes. For everyone, it asks again,
 // as nothing brings it back.
@@ -250,13 +250,15 @@ $("#setup-form").addEventListener("submit", async e => {
   }
 });
 
-// From a file: Markdown and plain text come straight in. Notes from Google Keep are
-// chosen first, as Takeout brings every note there is.
+// From a file, in Settings: Markdown and plain text come straight in. Notes from Google
+// Keep are chosen first, as Takeout brings every note there is. Once files are chosen,
+// Settings gives way to the lists page, where they arrive.
 $("#import-open").addEventListener("click", () => $("#import-file").click());
 $("#import-file").addEventListener("change", async e => {
   const files = [...(e.target.files || [])];
   e.target.value = "";
   if (!files.length) return;
+  if ($("#settings").open) $("#settings").close();
   const keep = files.filter(f => /\.(zip|json)$/i.test(f.name));
   const lists = [];
   for (const f of files.filter(f => !keep.includes(f))) lists.push(...fromMarkdown(await f.text().catch(() => "")));

@@ -57,15 +57,19 @@ export function openPair(all = false) {
 }
 // Who has the list: each phone writes itself onto it, with the name its owner gave in
 // Settings, if any. The server sees none of it.
-function paintPeople() {
+export function people() {
   const others = store.members().filter(m => !m.me);
   const named = others.filter(m => m.name).map(m => m.name), nameless = others.length - named.length;
   const who = [t("you"), ...named];
   if (nameless) who.push(plural(nameless, "{n} phone without a name", "{n} phones without a name"));
-  $("#members").textContent = others.length ? t("On this list: {x}.", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(who) }) : t("Only you, so far.");
-  $("#rekey-open").hidden = !others.length; // removing someone needs someone to remove
+  return others.length ? t("On this list: {x}.", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(who) }) : t("Only you, so far.");
 }
-$("#pair-open").addEventListener("click", () => openPair());
+function paintPeople() {
+  $("#members").textContent = people();
+  $("#rekey-open").hidden = !store.members().some(m => !m.me); // removing someone needs someone to remove
+}
+// From the list's settings, the sheet takes their place over the list.
+$("#pair-open").addEventListener("click", () => closeThen($("#list-settings"), () => openPair()));
 $("#pair-name-input").addEventListener("change", e => store.setMyName(clean(e.target.value, MAX_SECTION)));
 $("#pair-name-input").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
 $("#pair-close").addEventListener("click", () => $("#pair").close());
@@ -96,4 +100,7 @@ $("#rekey-open").addEventListener("click", () => closeThen($("#pair"), () => con
   },
 })));
 // Someone joined, or named themselves, while the sheet shows who's on the list.
-export const peopleChanged = () => { if ($("#pair").open && !$("#people").hidden) paintPeople(); };
+export const peopleChanged = () => {
+  if ($("#pair").open && !$("#people").hidden) paintPeople();
+  if ($("#list-settings").open) $("#list-people").textContent = people();
+};

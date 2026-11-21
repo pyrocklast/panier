@@ -1,13 +1,16 @@
-// Settings, a page of its own over the lists page.
+// Settings, the app's, a page of its own over the lists page; and a list's own settings,
+// a page over the list. Each opens from Settings at the top right of the page it's about.
 
 import * as store from "./store.js";
 import { t, lang } from "./i18n.js";
 import { toMarkdown } from "./md.js";
-import { clean, MAX_SECTION, sheetOfList } from "./model.js";
+import { clean, MAX_SECTION, LIST_COLORS, sheetOfList } from "./model.js";
 import { $, h, download } from "./dom.js";
 import { openSheet, closeThen } from "./sheets.js";
-import { nav } from "./state.js";
-import { openPair } from "./share.js";
+import { nav, readOnly, listName, listColor, tickedDays } from "./state.js";
+import { openPair, people } from "./share.js";
+import { palette } from "./edit.js";
+import * as list from "./list.js";
 
 const THEME_KEY = "panier-theme", LAYOUT_KEY = "panier-layout";
 // Asks the browser to keep the lists even when the phone runs low on space. Firefox
@@ -66,3 +69,31 @@ function exportAll() {
 }
 
 $("#export-all").addEventListener("click", exportAll);
+
+/* ---------- A list's settings ---------- */
+
+// What everyone on the list shares: its name and colour, how long its ticked items stay
+// in view, who's on it; then exporting or deleting it. A closed list's can only be read.
+export function paintListSettings() {
+  const ro = readOnly(), rename = $("#list-rename");
+  $("#list-settings-close").setAttribute("aria-label", listName());
+  if (document.activeElement !== rename) rename.value = store.listName() || "";
+  rename.disabled = ro;
+  $("#list-colours").replaceChildren(...(ro ? [] : [palette(listName(), LIST_COLORS, listColor(), list.recolourList)]));
+  const days = tickedDays();
+  for (const r of document.querySelectorAll('input[name="ticked"]')) { r.checked = +r.value === days; r.disabled = ro; }
+  $("#list-people").textContent = people();
+}
+const fromListButton = () => $("#list-settings-open");
+const closeListSettings = () => nav.turn(false, () => $("#list-settings").close(), fromListButton);
+$("#list-settings-open").addEventListener("click", () => nav.turn(true, () => { paintListSettings(); openSheet($("#list-settings")); }, fromListButton));
+$("#list-settings-close").addEventListener("click", closeListSettings);
+$("#list-settings").addEventListener("cancel", e => { e.preventDefault(); closeListSettings(); }); // Escape
+// A name left empty goes back to what it was.
+$("#list-rename").addEventListener("change", e => {
+  const name = clean(e.target.value, MAX_SECTION);
+  if (name) list.renameList(name);
+  e.target.value = store.listName() || "";
+});
+$("#list-rename").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
+for (const r of document.querySelectorAll('input[name="ticked"]')) r.addEventListener("change", () => list.setTicked(+r.value));

@@ -6,11 +6,11 @@ import { state, nav } from "./state.js";
 import { $ } from "./dom.js";
 
 // A list opened from the lists page is a step in the browser's history, and so is a sheet
-// (sharing, Settings) on top, so the phone's back gesture steps back through them like
-// pages. The app changes what it shows at once, and history follows: a step back lands a
-// moment later, so the next step waits for it, and a slow one can never land on top of
-// what came after it and undo it. Each sheet opening is its own step, so one left over
-// from before a reload doesn't count.
+// (sharing, either page of settings) on top, so the phone's back gesture steps back
+// through them like pages. The app changes what it shows at once, and history follows: a
+// step back lands a moment later, so the next step waits for it, and a slow one can never
+// land on top of what came after it and undo it. Each sheet opening is its own step, so
+// one left over from before a reload doesn't count.
 let stepping = false, syncing = false;
 export function follow() {
   if (stepping || syncing) return;
@@ -33,14 +33,14 @@ for (const dlg of document.querySelectorAll("dialog")) dlg.addEventListener("clo
 addEventListener("popstate", e => {
   if (stepping) { stepping = false; return follow(); }
   // The back gesture, or forward: what's shown follows history. Between the lists page and
-  // a list, or back from Settings, the page turns as it does for a tap, unless the browser
-  // has already shown a move of its own; history is read again as it turns, so a later
-  // step still wins.
-  const s = history.state || {}, page = $("#settings[open]");
+  // a list, or back from a page of settings, the page turns as it does for a tap, unless
+  // the browser has already shown a move of its own; history is read again as it turns,
+  // so a later step still wins.
+  const s = history.state || {}, page = document.querySelector("dialog.page[open]");
   const between = !s.sheet && !document.querySelector("dialog[open]") && (s.list ? state.view !== "list" : state.view === "list");
-  const leaving = !!page && s.sheet !== page.dataset.step && !document.querySelector("dialog:not(#settings)[open]");
+  const leaving = !!page && s.sheet !== page.dataset.step && !document.querySelector("dialog:not(.page)[open]");
   if (e.hasUAVisualTransition || !(between || leaving)) showHistory();
-  else if (leaving) nav.turn(false, showHistory, () => $("#settings-open"));
+  else if (leaving) nav.turn(false, showHistory, () => $("#" + page.id + "-open")); // into what opened it
   else nav.turn(!!s.list, showHistory);
 });
 function showHistory() {

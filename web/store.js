@@ -76,7 +76,7 @@ const MEMBER = "@m/"; // a phone on the list: "@m/" + its id, with "on" and, if 
 // written, from a broken or hostile phone, is passed over like one it can't read, so it
 // can neither stop the list syncing nor reach into the page. Fields this app doesn't
 // know, from a newer one, come in as they are.
-const TYPES = { text: "string", name: "string", section: "string", color: "string", pos: "number", checkedAt: "number", format: "number", checked: "boolean", deleted: "boolean", on: "boolean" };
+const TYPES = { text: "string", name: "string", section: "string", color: "string", pos: "number", checkedAt: "number", format: "number", ticked: "number", checked: "boolean", deleted: "boolean", on: "boolean" };
 const fits = op => Array.isArray(op) && typeof op[0] === "string" && typeof op[1] === "string" && !!op[0] &&
   !(op[0] in Object.prototype) && !(op[1] in Object.prototype) && Number.isSafeInteger(op[3]) && op[3] > 0 &&
   (!Object.hasOwn(TYPES, op[1]) || typeof op[2] === TYPES[op[1]]);
@@ -189,8 +189,9 @@ class List {
 
   // Items, sections, the list's own name and the phones on it share one map. A section's
   // key is "#" followed by its id; the three default sections ("ess", "look", "long") are
-  // only stored once changed. The list's name and colour are under "@list", each phone
-  // under "@m/" and its id. Item ids never start with either sign.
+  // only stored once changed. The list's name, its colour and how long its ticked items
+  // stay in view are under "@list", each phone under "@m/" and its id. Item ids never
+  // start with either sign.
   items() {
     if (!this.view) {
       this.view = new Map();
@@ -598,6 +599,7 @@ export const items = () => (cur ? cur.items() : []);
 export const sections = () => (cur ? cur.sections() : []);
 export const listName = () => cur && cur.valueOf("@list", "name");
 export const listColor = () => cur && cur.valueOf("@list", "color");
+export const listTicked = () => cur && cur.valueOf("@list", "ticked");
 export const change = (label, ops) => (cur ? cur.change(label, ops) : null);
 export const undo = () => cur && cur.step(cur.undoStack, cur.redoStack);
 export const redo = () => cur && cur.step(cur.redoStack, cur.undoStack);

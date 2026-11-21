@@ -119,17 +119,22 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 :is(.list-head, .sec-head, .item) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .list-top { display: flex; align-items: flex-start; gap: 4px; margin: -4px 0 0; }
 .list-head { flex: 1; min-width: 0; margin: 0; display: flex; font-size: 1.625rem; line-height: 1.4; color: var(--title); }
-/* At the right of a page's title, in words, the way to what's around it: the lists page
-   from a list, Settings from the lists page. Quiet beside the title, which it serves. */
+/* At the left of a page's title, the way back up: an arrow, as the phone draws it */
+.head-back {
+  flex: none; width: 44px; height: 44px; margin: 0 2px 0 -12px; padding: 0; border: 0; border-radius: 50%; background: none;
+  color: var(--title); display: grid; place-items: center; cursor: pointer;
+}
+/* At the right, in words, the settings for what the page shows: the list's on a list, the
+   app's on the lists page. Quiet beside the title, which it serves. */
 .head-btn {
   flex: none; height: 44px; margin: 0 -12px 0 0; padding: 0 12px; border: 0; border-radius: 999px; background: none;
   color: var(--muted); cursor: pointer;
 }
-/* While the name is edited, it has the whole row */
-.list-top.editing .head-btn { display: none; }
-.list-name { flex: 1; min-width: 0; padding: 4px 0; overflow-wrap: anywhere; cursor: text; outline: none; border-radius: 5px; }
-.list-name.editing { -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 currentColor; border-radius: 0; }
-/* A list without a name asks for one, quietly, where its name goes */
+/* While a new list is named, its name has the whole row */
+.list-top.editing :is(.head-btn, .head-back) { display: none; }
+.list-name { flex: 1; min-width: 0; padding: 4px 0; overflow-wrap: anywhere; outline: none; border-radius: 5px; }
+.list-name.editing { cursor: text; -webkit-user-select: text; user-select: text; box-shadow: inset 0 -2px 0 currentColor; border-radius: 0; }
+/* A list without a name says so, quietly, where its name goes; a new one asks for one */
 .list-name:empty::before { content: attr(data-placeholder); color: var(--muted); font-weight: 400; }
 #list { display: flex; flex-direction: column; gap: 28px; }
 /* clip: never scrolled from inside, even while a section changes height; the margin
@@ -247,7 +252,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sug-x-cell { display: flex; flex: none; }
 .sug-x { width: 48px; padding: 0; border: 0; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .sug-x-cell[aria-selected="true"] .sug-x { color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); border-radius: 12px; }
-@media (hover: hover) { .sugopt:hover, .ib:hover, .head-btn:hover { background-color: var(--press); } .bin:hover, .sug-x:hover { color: var(--danger); } }
+@media (hover: hover) { .sugopt:hover, .ib:hover, .head-btn:hover, .head-back:hover { background-color: var(--press); } .bin:hover, .sug-x:hover { color: var(--danger); } }
 .sugopt .t { color: var(--ink); overflow-wrap: anywhere; }
 .sugopt mark { background: none; color: inherit; font-weight: 700; }
 
@@ -279,8 +284,6 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 #basket-count { font-variant-numeric: tabular-nums; }
 .tickmark { width: 21px; height: 21px; border-radius: 5px; background: var(--title); color: var(--bg); display: grid; place-items: center; }
 #basket-toggle[aria-expanded="false"] .chev { transform: rotate(-90deg); }
-
-.foot { margin: 8px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 12px; }
 
 .linkbtn { min-height: 44px; border: 0; background: none; padding: 0 8px; color: var(--muted); font-size: 0.875rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
@@ -407,7 +410,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 #undo { overflow: hidden; } /* growing to fit the name */
 /* A colour spreads over what it dyes (motion.js) */
 :root[data-dye]::view-transition-group(root) { animation-duration: var(--move); animation-timing-function: var(--ease-move); }
-/* Between pages, the lists page and a list or Settings, the page turns quietly (app.js).
+/* Between pages, the lists page, a list and their settings, the page turns quietly (app.js).
    Beneath, the paper's colour changes into the other's; on it, the words fade out, then
    the new ones fade in, out of what was tapped and a touch nearer going in, into it and a
    touch further coming back. They fade through rather than across: the old words go in
@@ -415,8 +418,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
    so two pages of words never show at once. */
 :root[data-turn] #lists { view-transition-name: lists; }
 :root[data-turn] #app { view-transition-name: list; }
-:root[data-turn] #settings[open] .page-in { view-transition-name: settings; }
-:root[data-turn]:has(#settings[open]) #lists { view-transition-name: none; } /* out of sight under Settings */
+:root[data-turn] .sheet.page[open] .page-in { view-transition-name: settings; }
+:root[data-turn]:has(.sheet.page[open]) :is(#lists, #app) { view-transition-name: none; } /* out of sight under a page of settings */
 :root[data-turn] :is(.dock, .status) { opacity: 0; animation: none; } /* undo rises once the page has turned */
 :root[data-turn]::view-transition-group(*) { animation-duration: var(--move); }
 :root[data-turn]::view-transition-old(lists), :root[data-turn]::view-transition-old(list), :root[data-turn]::view-transition-old(settings) { animation: words-out 100ms var(--ease-leave) both; transform-origin: var(--turn-was); }
@@ -486,7 +489,6 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .new-list:focus-within { border-style: solid; border-color: var(--ink); }
 #new-list { font-weight: 700; }
 #new-list::placeholder { font-weight: 400; }
-.lists-foot { display: flex; justify-content: center; margin: -8px 0 0; } /* as a list's foot */
 /* While a sheet is dragged, dropping it here asks to delete the list */
 .remove-drop {
   display: none; position: fixed; z-index: 21; left: max(16px, (100vw - var(--page)) / 2 + 16px); right: max(16px, (100vw - var(--page)) / 2 + 16px);
@@ -551,11 +553,14 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border-radius: 0;
   background: var(--white); box-shadow: none; /* a page of its own, plain paper over the lists page's desk */
 }
+#list-settings { background: var(--bg); } /* the list's settings are on its own paper, as if on the back of it */
+.list-colours .palette { margin-top: 8px; padding-bottom: 0; animation: none; }
+.choices + .note { margin-top: 12px; }
 .page-in {
   max-width: 34rem; margin-inline: auto; box-sizing: border-box; display: flex; flex-direction: column;
   padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(32px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
-.page-head { display: flex; align-items: center; justify-content: space-between; margin: 0 -6px 8px 0; }
+.page-head { display: flex; align-items: center; margin: 0 0 8px; }
 .page-head h2 { margin: 0; font-size: 1.625rem; }
 .set { padding: 18px 0; border-top: 1px solid var(--line); }
 .set h3 { margin: 0 0 12px; font-size: inherit; }
@@ -596,7 +601,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   :root { --page: 60rem; }
   #app.wrap { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); column-gap: 40px; align-items: start; }
   #app > .list-top { grid-column: 1 / -1; }
-  #app > :is(#list, .add-sec, .foot) { grid-column: 1; }
+  #app > :is(#list, .add-sec) { grid-column: 1; }
   #app > .basket {
     grid-column: 2; grid-row: 2 / span 3; position: sticky; top: calc(12px + env(safe-area-inset-top, 0px));
     max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto;

@@ -59,6 +59,7 @@ export function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSa
   state.editing = key;
   const at = x != null ? offsetIn(span, caretAt(span, x, y)) : caret; // counted before the text turns plain
   const show = () => (fill ? fill(span, orig) : (span.textContent = orig));
+  const role = span.getAttribute("role"); // a button to edit it, or a heading's text
   span.textContent = orig;
   span.contentEditable = PLAIN ? "plaintext-only" : "true";
   span.classList.add("editing");
@@ -132,7 +133,7 @@ export function editInPlace(span, { key, row, orig, max, x, y, caret, fill, onSa
     if (onDone) onDone();
     span.contentEditable = "false";
     span.classList.remove("editing");
-    span.setAttribute("role", "button");
+    if (role) span.setAttribute("role", role); else span.removeAttribute("role");
     row.classList.remove("editing");
     state.editing = null;
     if (then) return then();

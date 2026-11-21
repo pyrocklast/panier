@@ -32,7 +32,14 @@ export const LIST = "@list"; // where the list's own name is kept, among items a
 // lists made before keep their three sections.
 export const startOps = (name = "") => [["#ess", "name", ""], ["#look", "deleted", true], ["#long", "deleted", true], ...(name ? [[LIST, "name", name]] : [])];
 
-export const RECENT_MS = 5 * 24 * 3600 * 1000; // ticked items show in the ticked group for five days
+// How many days ticked items stay in view in the ticked group, chosen for each list and
+// the same for everyone on it: a day, a week, a month, or always (0). Afterwards they're
+// still suggested. Anything else, or nothing, is a week.
+const TICKED = [1, 7, 30, 0];
+export const tickedOk = d => (TICKED.includes(d) ? d : 7);
+// Ticked before, as an import or a paste brings it: older than the ticked group shows,
+// unless it shows everything.
+export const BEFORE_MS = 31 * 864e5;
 
 export const fold = s => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 export const keyOf = s => fold(s).replace(/\s+/g, " ").trim();
@@ -128,7 +135,7 @@ export function sheetOfList({ name, color, sections: stored, items: its }) {
 // suggested.
 export function importOps(l) {
   const ops = [], used = new Set(), colours = new Set(), seen = new Set();
-  const old = Date.now() - RECENT_MS - 864e5;
+  const old = Date.now() - BEFORE_MS;
   let n = 0, k = 0;
   if (l.name) ops.push([LIST, "name", clean(l.name, MAX_SECTION)]);
   if (listColorOk(l.color)) ops.push([LIST, "color", l.color]);

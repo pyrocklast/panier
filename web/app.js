@@ -8,13 +8,14 @@ import { $, reduceMotion } from "./dom.js";
 import * as list from "./list.js";
 import * as lists from "./lists.js";
 import { paintStatus } from "./bar.js";
-import { follow } from "./sheets.js";
+import { follow, closeThen } from "./sheets.js";
 import { peopleChanged } from "./share.js";
-import { keepList } from "./settings.js";
+import { keepList, paintListSettings } from "./settings.js";
 import { startOps } from "./model.js";
 
 $("#lists-open").addEventListener("click", () => turn(false, showLists));
-$("#delete-open").addEventListener("click", () => lists.askDelete(state.lid)); // which shows the lists page once it's gone
+// From the list's settings, asked over the list; once it's gone, the lists page shows.
+$("#delete-open").addEventListener("click", () => closeThen($("#list-settings"), () => lists.askDelete(state.lid)));
 // Undo is the list's on a list, and on the lists page brings back a list deleted from this phone.
 const undo = () => (state.view === "lists" ? lists.undoRemove() : list.undo());
 const redo = () => { if (state.view === "list") list.redo(); };
@@ -44,14 +45,15 @@ store.subscribe(kind => {
   else if (kind === "remote") {
     list.refreshFromStore();
     peopleChanged();
+    if ($("#list-settings").open) paintListSettings(); // renamed or recoloured on another phone
   }
   else if (kind === "status" || kind === "local") {
     paintStatus();
-    if (list.readOnlyChanged()) list.refreshFromStore();
+    if (list.readOnlyChanged()) { list.refreshFromStore(); if ($("#list-settings").open) paintListSettings(); }
   }
 });
 
-// Between pages, the lists page and a list or Settings, the page turns quietly
+// Between pages, the lists page, a list and the settings of either, the page turns quietly
 // (app.css): beneath, its colour changes into the other's; on it, the words fade out and
 // the new ones fade in. Going in, they come out of what was tapped, the list's sheet or
 // Settings, a touch nearer; coming back, the words leave into it and the page settles
@@ -59,7 +61,7 @@ store.subscribe(kind => {
 // at once, as the browser changes it a moment after it's asked, once it has a picture of
 // the page as it was. Where the browser can't, the page simply changes.
 let turning = false;
-const words = () => document.querySelector("#settings[open] .page-in") || $(state.view === "list" ? "#app" : "#lists");
+const words = () => document.querySelector(".sheet.page[open] .page-in") || $(state.view === "list" ? "#app" : "#lists");
 function turn(into, update, at = () => lists.sheetButton(state.lid)) {
   if (!document.startViewTransition || reduceMotion.matches || turning) return update();
   turning = true;
@@ -104,6 +106,7 @@ function showList(lid) {
 }
 function showLists() {
   const from = document.activeElement;
+  if ($("#list-settings").open) $("#list-settings").close(); // the list gone from under them
   if (state.view === "list") { list.closeSug(); store.leave(); }
   state.view = "lists";
   follow();

@@ -16,6 +16,19 @@ const FR = {
   "Add a section": "Ajouter une section",
   "{n} ticked": ["{n} coché", "{n} cochés"],
   "Me": "Moi",
+
+  // A list's settings
+  "List settings": "Paramètres de la liste",
+  "Name and colour": "Nom et couleur",
+  "Name": "Nom",
+  "Ticked items stay in view for": "Les articles cochés restent visibles",
+  "A day": "Un jour",
+  "A week": "Une semaine",
+  "A month": "Un mois",
+  "Always": "Toujours",
+  "After that, they're still suggested as you type.": "Ensuite, ils restent proposés pendant la saisie.",
+  "People": "Personnes",
+  "Add someone": "Ajouter quelqu’un",
   "at {x}": "à {x}",
   "Add someone to this list": "Ajouter quelqu’un à cette liste",
   "Settings": "Paramètres",
@@ -88,7 +101,6 @@ const FR = {
 
   // The lists page
   "New list": "Nouvelle liste",
-  "From a file": "Depuis un fichier",
   "{x} moved earlier": "{x} avance",
   "{x} moved later": "{x} recule",
   "{n} to tick": ["{n} à cocher", "{n} à cocher"],
@@ -104,6 +116,7 @@ const FR = {
   "Brought in {x}": "Importé" + nb + ": {x}",
   "Bring in from Google Keep": "Importer depuis Google Keep",
   "Bring in": "Importer",
+  "Bring in from a file": "Importer depuis un fichier",
   "Archived": "Archivée",
   "{n} lists": ["{n} liste", "{n} listes"],
 
@@ -218,15 +231,21 @@ export function plural(n, one, many) {
   const form = Array.isArray(fr) ? fr[n <= 1 ? 0 : 1] : n === 1 ? one : many;
   return form.replace("{n}", n);
 }
-// When something happened, in the last few days: "at 12:45" today, then "yesterday",
-// then the day of the week. The clock is the phone's own, 12 or 24 hours.
+// When something happened: "at 12:45" today, then "yesterday", the day of the week for
+// the rest of the week, then the date, "12 Nov", with the year if it isn't this one. The
+// clock is the phone's own, 12 or 24 hours.
 const clock = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
 const weekday = new Intl.DateTimeFormat(lang, { weekday: "long" });
 const yesterday = new Intl.RelativeTimeFormat(lang, { numeric: "auto" }).format(-1, "day");
+const date = new Intl.DateTimeFormat(lang, { day: "numeric", month: "short" });
+const dated = new Intl.DateTimeFormat(lang, { day: "numeric", month: "short", year: "numeric" });
 const dayOf = ms => { const d = new Date(ms); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5; };
 export function when(ms) {
   const back = dayOf(Date.now()) - dayOf(ms);
-  return back < 1 ? t("at {x}", { x: clock.format(ms) }) : back === 1 ? yesterday : weekday.format(ms);
+  if (back < 1) return t("at {x}", { x: clock.format(ms) });
+  if (back === 1) return yesterday;
+  if (back < 7) return weekday.format(ms);
+  return (new Date(ms).getFullYear() === new Date().getFullYear() ? date : dated).format(ms);
 }
 // Quotes around a name.
 export const q = s => (lang === "fr" ? "«" + nb + s + nb + "»" : "“" + s + "”");

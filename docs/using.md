@@ -5,7 +5,7 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 ## Starting
 
 - **The first phone** opens the app's address and types the server's setup code (see [docs/cloudflare.md](cloudflare.md) or [docs/raspberry-pi.md](raspberry-pi.md) for where it comes from). The first list opens with its name to type.
-- **Another phone** joins with *Add someone to this list*, at the bottom of the list: it shows a QR code to scan, and buttons to share or copy the link.
+- **Another phone** joins with *Add someone*, in the list's settings: it shows a QR code to scan, and buttons to share or copy the link.
 - **Keep a copy of each list's link** in a password manager. It is the key to the list: it's the only way to get the list back if every phone is lost, and anyone who has it can open the list.
 - **Install it** so it opens like an app, full screen and offline: in Firefox, **⋮ → Install** (or **Add to home screen**); in Chrome, **⋮ → Install app**; on an iPhone, Safari's **Share → Add to Home Screen**.
 - **Opening a list's link** on a phone that has other lists adds it beside them, and opens it.
@@ -14,21 +14,33 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 
 A phone holds any number of lists, each shared with its own people. The app opens on the list last used.
 
-- **The lists page** is reached with *Lists*, at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to tick, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
-- **Open** a list with a tap. The page turns quietly into it: the desk takes the list's colour as the list's words open out of its sheet. Going back, with *Lists* or the back gesture, they draw back into it.
+- **Moving around:** the arrow at the top left of a page goes back up, one level at a time, as does the phone's back gesture: from a list's settings to the list, from a list or Settings to the lists page. *Settings*, at the top right, holds the settings of what's on screen: a list's on a list, the app's on the lists page. What you do every time, ticking and adding, is on the list itself; what you do now and then is a level further.
+- **The lists page** is reached with the arrow at the top left of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to tick, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
+- **Open** a list with a tap. The page turns quietly into it: the desk takes the list's colour as the list's words open out of its sheet. Going back, with the arrow or the back gesture, they draw back into it.
 - **New list:** type a name on the blank strip under the sheets; the new list opens ready to write on. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
 - **Move** a list: hold it, then drag it to its new place; the others glide aside. From a keyboard, Alt and an arrow move it one place earlier or later.
-- **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, at the foot of the list itself. It always asks first. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
-- **Settings** is at the top right of the lists page.
+- **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, in the list's settings. It always asks first. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
+- **Settings**, at the top right of the lists page, are the app's, for this phone.
 
 ## The page
 
 The list is written on the page itself, like paper: one left edge, ruled lines between items and under section names, and an underline where you type. Only what is lifted off the page has a shadow: something being dragged, the undo button, the sheets, which rise onto the page as it dims behind them.
 
-- **The list's name** is the title at the top. A new list is named as it's made; one without a name says *Name this list* there, and is *Untitled list* elsewhere. Tap it to rename it. It also names the exported file. At its right, *Lists* leads to the lists page.
-- **The list's colour.** While you rename the list, colours show under its name: white and eight hues. The paper is warm paper dyed with the colour, the ruled lines a deeper dye, the title a deep shade of it, and the writing leans its way. The browser's bars follow, and the app opens in the colour without a flash of white.
+- **The list's name** is the title at the top, between the arrow back and *Settings*. A new list is named as it's made, where its name goes; one without a name says *Untitled list*. It's renamed in the list's settings, and also names the exported file.
+- **The list's colour** is chosen in its settings, under its name: white and eight hues. The paper is warm paper dyed with the colour, the ruled lines a deeper dye, the title a deep shade of it, and the writing leans its way. The browser's bars follow, and the app opens in the colour without a flash of white.
 - **The eight colours weigh the same.** Each is a single hue, and every tone of it, from paper to tick box, is that hue at a lightness set by what it's for, so no colour shouts or fades beside another, in light or dark.
 - Every phone sees the name and colour, and undo puts the old ones back.
+
+## A list's settings
+
+*Settings*, at the top right of a list, turns to a page of the list's own, on its paper. What's there is the same for everyone on the list. The arrow at its top left, Escape or the back gesture go back to the list.
+
+- **Name and colour.** Emptying the name puts the old one back.
+- **Ticked items stay in view for** a day, a week, a month, or always. A week to start with. Nothing is deleted: older ticked items leave the ticked group but are still suggested as you type, and still exported.
+- **People:** who's on the list, and *Add someone*.
+- **Data:** *Export the list* and *Delete the list*.
+
+A closed list's settings can only be read, but it can still be exported or deleted.
 
 ## Sections
 
@@ -60,8 +72,8 @@ A new list is a plain sheet: its items sit under its name, with no heading. *Add
 
 - **Tap the square** to tick an item: it fills with its section's colour, and the words are struck through, as with a pen. A short vibration confirms it in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row leave together and the list doesn't move under your thumb.
-- They then rise off the page, travel to **the ticked group**, taking the size of its smaller rows on the way, and settle into the page there. It lies below the sections, after a dashed tear line. Its boxes fill with the colours of what's been ticked. It shows what was ticked in the last five days, latest first, so you can check what was done lately. Its heading, such as *3 ticked*, folds it away.
-- **Beside each ticked item**, who ticked it and when: *Isabelle, at 12:45*, *Me, yesterday*, then the day of the week. Someone who hasn't given a name shows as just the time, and so does everything on a list only on your phone. The time follows the phone's clock, 12 or 24 hours, and screen readers read it after the item's name.
+- They then rise off the page, travel to **the ticked group**, taking the size of its smaller rows on the way, and settle into the page there. It lies below the sections, after a dashed tear line. Its boxes fill with the colours of what's been ticked. It shows what was ticked lately, latest first, so you can check what was done: for a week, unless the list's settings say a day, a month, or always. Its heading, such as *3 ticked*, folds it away.
+- **Beside each ticked item**, who ticked it and when: *Isabelle, at 12:45*, *Me, yesterday*, then the day of the week, then the date. Someone who hasn't given a name shows as just the time, and so does everything on a list only on your phone. The time follows the phone's clock, 12 or 24 hours, and screen readers read it after the item's name.
 - Older ticked items are hidden, but still suggested when you type.
 - **Untick** an item by tapping its square: it goes back to the end of its section, or of the first section if its own was deleted. Undo ticks it again, still showing who ticked it and when.
 - **Drag** an item onto the drop zone under the ticked group's heading to tick it, or drag a ticked item into a section to put it back exactly where you drop it.
@@ -100,17 +112,17 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 
 `#` is the list's name, `##` each section in order, `- [ ]` an item to tick, `- [x]` one ticked before, under its section. Items before the first `##` are those without a heading. Colours ride in comments after the headings, which notes apps hide.
 
-- **Export the list**, at the bottom of a list, saves it as a `.md` file named after it.
+- **Export the list**, in the list's settings, saves it as a `.md` file named after it.
 - **Export all lists**, in Settings, saves every list in one file, each under its own `#`.
-- **From a file**, on the lists page, brings in a list, or several from one file. It reads any Markdown checklist: other bullets, numbered lines, headings of any level, plain lines, where a line followed by items names a section. Items ticked before come in as suggestions, not in the ticked group.
-- **From Google Keep:** in [Google Takeout](https://takeout.google.com), choose only Keep and export, then pick the `.zip` it gives with *From a file*, or the `.json` files inside it. Panier lists the checklists it finds, last edited first, each as its sheet will show; all are ticked to come in but archived ones. Each becomes a list with the note's title and colour, its items in one section, ticked as they were. Text notes and notes in the bin stay behind. Everything is read on the phone.
+- **Bring in from a file**, in Settings, brings in a list, or several from one file, onto the lists page. It reads any Markdown checklist: other bullets, numbered lines, headings of any level, plain lines, where a line followed by items names a section. Items ticked before come in as suggestions, not in the ticked group.
+- **From Google Keep:** in [Google Takeout](https://takeout.google.com), choose only Keep and export, then pick the `.zip` it gives with *Bring in from a file*, or the `.json` files inside it. Panier lists the checklists it finds, last edited first, each as its sheet will show; all are ticked to come in but archived ones. Each becomes a list with the note's title and colour, its items in one section, ticked as they were. Text notes and notes in the bin stay behind. Everything is read on the phone.
 - **Pasting several lines** into *Add item* adds one item per line, in that section, in one step to undo. Names already on the list are left as they are.
 
 ## People
 
-- **Your name** shows to the people you share lists with. It's optional, and the server never sees it. *Add someone to this list* asks for it until you've given one; Settings changes it.
-- **Who's on a list** shows in *Add someone to this list*: you, the names people gave, and how many phones gave none. On the lists page, a few quiet words under a list's name say who else has it. Everyone on a list sees who ticked what.
-- **Remove someone**, in the same place once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *List closed* and keep what they had, until they delete it from the lists page. Share the new link with those who should keep the list.
+- **Your name** shows to the people you share lists with. It's optional, and the server never sees it. The share sheet asks for it until you've given one; Settings changes it.
+- **Who's on a list** shows in its settings and on the share sheet: you, the names people gave, and how many phones gave none. On the lists page, a few quiet words under a list's name say who else has it. Everyone on a list sees who ticked what.
+- **Remove someone**, on the share sheet once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *List closed* and keep what they had, until they delete it from the lists page. Share the new link with those who should keep the list.
 - **A closed list is only read**: nothing can be added, edited, moved or ticked, since none of it could be sent, and its boxes show faint. *Export the list* still saves a copy. So does a list changed with a newer Panier, until this one updates.
 - **Set up another phone**, in Settings, shows one QR code that brings every list on this phone to another.
 
@@ -127,19 +139,19 @@ On a phone turned on its side, or a tablet or computer, the page uses the width:
 
 - **A list** lies in one wider column, and what's ticked lies beside it, torn off to the side, in view as you scroll. A ticked item crosses over to it, and an item dragged across is ticked.
 - **The lists page** has as many sheets to a row as fit.
-- **Settings** puts each part's heading on the left, beside what it holds.
+- **Settings**, and a list's, put each part's heading on the left, beside what it holds.
 - **A phone on its side** keeps the layout chosen in Settings: the compact one fits more in its height. The share sheet puts its code beside its words, so it fits.
 
 ## Settings
 
-*Settings*, at the top of the lists page, opens a page of its own; the phone's back gesture closes it. Settings are chosen on each phone.
+*Settings*, at the top right of the lists page, opens a page of its own; the arrow at its top left, Escape or the phone's back gesture close it. Settings are chosen on each phone.
 
 - **You:** your name, shown to the people you share lists with.
 - **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page.
 - **Data:**
   - Whether the browser keeps the lists even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep them on this phone* asks again.
   - How much space each list takes on this phone.
-  - *Export all lists* and *Set up another phone*, above.
+  - *Export all lists*, *Bring in from a file* and *Set up another phone*, above.
 - **About:** the version, the server, and what the server can and can't see.
 
 ## Motion
@@ -150,7 +162,7 @@ Panier is paper, and what moves says where it happens:
 - **Along the page**, rows and sections glide to their new places, the ticked group folds and unfolds, and what's in the way glides aside during a drag.
 - **Off the page**, what you hold lifts, with a shadow; a ticked item travels to the ticked group and settles there, who ticked it fading in on the way.
 - **On top**, the sheets, undo and the connection's status rise into place, and sink or fade away, quicker, as they go.
-- **The page itself** turns, between the lists page and a list or Settings, out of what you tapped and back into it, and takes a new colour.
+- **The page itself** turns, between the lists page, a list and their settings, out of what you tapped and back into it, and takes a new colour.
 
 Each takes 0.15 s to give feedback, 0.24 s to arrive or 0.32 s to move, a little longer for a long trip. When the phone asks for reduced motion, nothing moves.
 
