@@ -71,7 +71,7 @@ export function renderLists() {
   for (const lid of cards.keys()) if (!all.some(e => e.lid === lid)) cards.delete(lid);
   $("#new-list-form").hidden = first;
   $("#setup-form").hidden = !first && !needCode;
-  const msg = notice || (needCode ? t("This server wants its setup code for this.")
+  const msg = notice || (needCode ? t("This server asks for its setup code to make a list.")
     : first ? t("Open the link from a phone that already has a list, or start one with your server's setup code.") : "");
   $("#lists-msg").textContent = msg;
   $("#lists-msg").hidden = !msg;
@@ -139,7 +139,7 @@ function moveSheet(lid, dir) {
 }
 
 // A list is deleted only once asked: on the lists page, dropped on the zone at the foot or
-// with the Delete key, or with Delete the list, at the foot of the list itself, which a
+// with the Delete key, or with Delete the list, in the list's own settings, which a
 // screen reader on a phone can reach. From this phone, the others keep it and its link
 // brings it back, and undo does too, until the app closes. For everyone, it asks again,
 // as nothing brings it back.
@@ -149,7 +149,7 @@ export function askDelete(lid) {
   const name = e.name || t("Untitled list"), w = e.with, others = !!(w && (w.names.length || w.nameless));
   confirmSheet({
     title: t("Delete {x}?", { x: q(name) }),
-    text: e.closed ? t("It's closed already: this takes what's left of it off this phone.")
+    text: e.closed ? t("It's already closed: this removes what's left of it from this phone.")
       : others ? t("It goes from this phone only: the others keep it.")
       : t("It goes from this phone. Its link brings it back, if you kept one."),
     ok: t("Delete"),
@@ -250,13 +250,15 @@ $("#setup-form").addEventListener("submit", async e => {
   }
 });
 
-// From a file: Markdown and plain text come straight in. Notes from Google Keep are
-// chosen first, as Takeout brings every note there is.
+// From a file, in Settings: Markdown and plain text come straight in. Notes from Google
+// Keep are chosen first, as Takeout brings every note there is. Once files are chosen,
+// Settings gives way to the lists page, where they arrive.
 $("#import-open").addEventListener("click", () => $("#import-file").click());
 $("#import-file").addEventListener("change", async e => {
   const files = [...(e.target.files || [])];
   e.target.value = "";
   if (!files.length) return;
+  if ($("#settings").open) $("#settings").close();
   const keep = files.filter(f => /\.(zip|json)$/i.test(f.name));
   const lists = [];
   for (const f of files.filter(f => !keep.includes(f))) lists.push(...fromMarkdown(await f.text().catch(() => "")));

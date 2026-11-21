@@ -23,7 +23,7 @@ const colorOk = (c, fallback) => (COLORS.some(([id]) => id === c) ? c : fallback
 export const LIST_COLORS = [["", "White"], ...COLORS.filter(([id]) => id !== "ess")];
 export const listColorOk = c => (LIST_COLORS.some(([id]) => id === c) ? c : "");
 
-export const MAX_ITEM = 120; // three lines on a phone
+export const MAX_ITEM = 300; // a few sentences, about eight lines on a phone
 export const MAX_SECTION = 40; // and the list's name
 export const LIST = "@list"; // where the list's own name is kept, among items and sections
 
@@ -32,7 +32,14 @@ export const LIST = "@list"; // where the list's own name is kept, among items a
 // lists made before keep their three sections.
 export const startOps = (name = "") => [["#ess", "name", ""], ["#look", "deleted", true], ["#long", "deleted", true], ...(name ? [[LIST, "name", name]] : [])];
 
-export const RECENT_MS = 5 * 24 * 3600 * 1000; // ticked items show in the ticked group for five days
+// How many days ticked items stay in view in the ticked group, chosen for each list and
+// the same for everyone on it: a day, a week, a month, or always (0). Afterwards they're
+// still suggested. Anything else, or nothing, is a week.
+const TICKED = [1, 7, 30, 0];
+export const tickedOk = d => (TICKED.includes(d) ? d : 7);
+// Ticked before, as an import or a paste brings it: older than the ticked group shows,
+// unless it shows everything.
+export const BEFORE_MS = 31 * 864e5;
 
 export const fold = s => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 export const keyOf = s => fold(s).replace(/\s+/g, " ").trim();
@@ -97,12 +104,12 @@ export function layout(storedSections, its, typing = [], inList = i => !i.checke
     all.set(d.id, { ...d, name: st.name ?? d.name, color: colorOk(st.color, d.color), pos: st.pos ?? d.pos, deleted: !!st.deleted });
   }
   for (const st of stored.values()) {
-    if (!all.has(st.id)) all.set(st.id, { id: st.id, name: st.name || t("Untitled"), color: colorOk(st.color, PALETTE[0]), pos: st.pos ?? 100, deleted: st.deleted });
+    if (!all.has(st.id)) all.set(st.id, { id: st.id, name: st.name || t("Untitled section"), color: colorOk(st.color, PALETTE[0]), pos: st.pos ?? 100, deleted: st.deleted });
   }
   const used = new Set(its.filter(inList).map(i => i.section));
   for (const id of typing) used.add(id);
-  for (const id of used) if (!all.has(id)) all.set(id, { id, name: t("Untitled"), color: PALETTE[0], pos: 100, deleted: false });
-  // The section without a name, which has no heading, always comes first.
+  for (const id of used) if (!all.has(id)) all.set(id, { id, name: t("Untitled section"), color: PALETTE[0], pos: 100, deleted: false });
+  // The section without a name always comes first.
   const order = (a, b) => !!a.name - !!b.name || a.pos - b.pos || (a.id < b.id ? -1 : 1);
   const shown = [...all.values()].filter(s => !s.deleted || used.has(s.id)).sort(order);
   // Two phones can each delete one of the last two sections at once: the first of them
@@ -128,7 +135,7 @@ export function sheetOfList({ name, color, sections: stored, items: its }) {
 // suggested.
 export function importOps(l) {
   const ops = [], used = new Set(), colours = new Set(), seen = new Set();
-  const old = Date.now() - RECENT_MS - 864e5;
+  const old = Date.now() - BEFORE_MS;
   let n = 0, k = 0;
   if (l.name) ops.push([LIST, "name", clean(l.name, MAX_SECTION)]);
   if (listColorOk(l.color)) ops.push([LIST, "color", l.color]);
@@ -139,7 +146,7 @@ export function importOps(l) {
     const color = colorOk(sec.color, d ? d.color : PALETTE.find(c => !colours.has(c)) || PALETTE[0]);
     used.add(id);
     colours.add(color);
-    ops.push([key, "name", name || (i === 0 ? "" : d ? d.name : t("Untitled"))], [key, "pos", i + 1], [key, "color", color], [key, "deleted", false]);
+    ops.push([key, "name", name || (i === 0 ? "" : d ? d.name : t("Untitled section"))], [key, "pos", i + 1], [key, "color", color], [key, "deleted", false]);
     sec.items.forEach((it, j) => {
       const text = clean(it.text), nk = text && nameKey(text);
       if (!text || seen.has(nk)) return;

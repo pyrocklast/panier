@@ -3,8 +3,8 @@
 import * as store from "./store.js";
 import { t, plural, q, when } from "./i18n.js";
 import { toMarkdown, pastedItems } from "./md.js";
-import { state, readOnly, listName, listColor, draftsKey } from "./state.js";
-import { DEFAULTS, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, RECENT_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout, sheetOfList } from "./model.js";
+import { state, readOnly, listName, listColor, tickedDays, draftsKey } from "./state.js";
+import { DEFAULTS, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, BEFORE_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout, sheetOfList } from "./model.js";
 import { $, h, icon, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, download, reduceMotion } from "./dom.js";
 import { whenTapEnds, bindPress, beginDrag } from "./press.js";
 import { float, landAll, snapshot, glide, fly, shift, shuffle, foldAway, dye, MOTION } from "./motion.js";
@@ -23,20 +23,27 @@ const ui = { sugSec: null, sug: [], sugIndex: -1, sugCol: 0, basketOpen: true };
 let wasReadOnly = false; // as the list on screen was last drawn
 
 const find = id => items.find(i => i.id === id);
-// A section by name; the one without a name, at the top, goes by the list's.
-const nameOf = id => { const s = sectionInfo.get(id); return s ? s.name || listName() : t("this section"); };
+// A section by name; the one without a name, alone at the top, goes by the list's, and
+// beside others says it has none.
+const nameOf = id => { const s = sectionInfo.get(id); return s ? s.name || (sections.length > 1 ? t("Untitled section") : listName()) : t("this section"); };
 const colorOf = id => (sectionInfo.has(id) ? sectionInfo.get(id).color : "muted");
 const isShown = id => sections.some(s => s.id === id);
 const inList = i => !i.checked || settling.has(i.id);
 const shown = sec => items.filter(i => i.section === sec && inList(i)).sort((a, b) => a.pos - b.pos || (a.id < b.id ? -1 : 1));
 const maxPos = sec => shown(sec).reduce((m, i) => Math.max(m, i.pos), 0);
-const onScreen = i => inList(i) || i.checkedAt >= Date.now() - RECENT_MS;
+// Since when ticked items stay in view, as the list's settings say: a day, a week, a
+// month, or always.
+const since = () => { const d = tickedDays(); return d ? Date.now() - d * 864e5 : -Infinity; };
+const onScreen = i => inList(i) || i.checkedAt >= since();
 
 function computeSections() {
   const typing = Object.entries(shells).filter(([, sh]) => sh.input.value.trim()).map(([id]) => id);
   const l = layout(store.sections(), items, typing, inList);
   sectionInfo = l.all;
-  sections = l.shown;
+  // Once sections have names, the one without has a place only while it holds something
+  // to tick, under a heading like theirs, to be named: nothing new goes outside a section.
+  const holds = id => typing.includes(id) || items.some(i => i.section === id && inList(i));
+  sections = l.shown.some(s => s.name) ? l.shown.filter(s => s.name || holds(s.id)) : l.shown;
 }
 
 /* ---------- Changes ---------- */
@@ -130,16 +137,17 @@ function toggle(id, checked) {
     if (fromList) settling.add(id);
     buzz(12);
     announce(t("{x} ticked", { x: it.text }));
-    act(t("checking {x}", { x: q(it.text) }), [[id, "checked", true], [id, "checkedAt", Date.now()]], { animate: false });
+    act(t("ticking {x}", { x: q(it.text) }), [[id, "checked", true], [id, "checkedAt", Date.now()]], { animate: false });
   } else {
     settling.delete(id);
     const ops = [[id, "checked", false]]; // when it was ticked, and who by, stay for undo
     if (!wasSettling) {
-      const sec = isShown(it.section) ? it.section : sections[0].id;
+      // Back in its section, if it still has one; the one without a name counts, and shows again.
+      const own = sectionInfo.get(it.section), sec = own && (isShown(it.section) || !own.name) && !own.deleted ? it.section : sections[0].id;
       ops.push([id, "section", sec], [id, "pos", maxPos(sec) + 1]);
     }
     announce(t("{x} back on the list", { x: it.text }));
-    act(t("unchecking {x}", { x: q(it.text) }), ops, { animate: !wasSettling });
+    act(t("unticking {x}", { x: q(it.text) }), ops, { animate: !wasSettling });
   }
   scheduleSettle();
 }
@@ -204,7 +212,7 @@ function submitAdd(sec, leaving = false) {
 // Lines ticked in Markdown ("- [x]") are kept as ticked before, to be suggested.
 function addMany(sec, pasted) {
   closeSug(); // what was typed before stays in the field
-  const ops = [], seen = new Set(), old = Date.now() - RECENT_MS - 864e5;
+  const ops = [], seen = new Set(), old = Date.now() - BEFORE_MS;
   let added = 0, had = 0, pos = maxPos(sec);
   for (const p of pasted) {
     const text = clean(p.text), k = nameKey(text);
@@ -263,7 +271,7 @@ function renameSection(id, name) {
   const info = sectionInfo.get(id);
   const fallback = (DEFAULTS.find(d => d.id === id) || {}).name;
   announce(t("Renamed section to {x}", { x: name }));
-  act(t("renaming section {x}", { x: q(info.name) }), [["#" + id, "name", name, fallback]], { leaving: true });
+  act(t("renaming section {x}", { x: q(info.name || t("Untitled section")) }), [["#" + id, "name", name, fallback]], { leaving: true });
 }
 // A section can only be deleted once it has nothing to tick, and the last one stays.
 const canDelete = id => sections.length > 1 && !items.some(i => i.section === id && inList(i));
@@ -279,7 +287,7 @@ function deleteSection(id) {
 // phones changed meanwhile shows once the text is left as it was.
 const edit = (span, o) => editInPlace(span, {
   ...o,
-  onDone: () => { if (rows.has(o.key)) rows.get(o.key).shown = null; },
+  onDone: () => { if (o.onDone) o.onDone(); if (rows.has(o.key)) rows.get(o.key).shown = null; },
   onUnchanged: () => { if (renderPending) whenTapEnds(refreshFromStore); },
 });
 function editItem(span, id, x, y, caret) {
@@ -364,7 +372,7 @@ function joinItem(id, text) {
 
 function editSection(span, id, x, y) {
   if (readOnly()) return;
-  const orig = nameOf(id);
+  const orig = sectionInfo.get(id).name; // the one without a name starts empty
   edit(span, {
     key: "#" + id, row: span.closest(".sec-head"), orig, max: MAX_SECTION, x, y,
     below: palette(orig, COLORS, colorOf(id), (c, label) => recolour(id, c, label)),
@@ -372,27 +380,35 @@ function editSection(span, id, x, y) {
     onSave: name => renameSection(id, name),
   });
 }
-// The list's name, at the top, is renamed the same way as a section's, its colour chosen
-// under it. A list without a name says "Name this list" there; named with Enter, the
-// cursor goes on to its first Add item, ready to write on.
-function editListName(span, x, y) {
+// A new list without a name is named first, where its name goes, as a section's is
+// renamed, its colour chosen under it; named with Enter, the cursor goes on to its first
+// Add item, ready to write on. Later, it's renamed in its settings.
+function editListName(span) {
   if (readOnly()) return;
-  const orig = store.listName() || "";
+  span.dataset.placeholder = t("Name this list");
   edit(span, {
-    key: LIST, row: span.closest(".list-top"), orig, max: MAX_SECTION, x, y,
-    below: palette(listName(), LIST_COLORS, listColor(), (c, label) => {
-      announce(t("{x} is now {y}", { x: listName(), y: t(label).toLowerCase() }));
-      dye(() => act(t("changing the colour of {x}", { x: q(listName()) }), [[LIST, "color", c, ""]], { animate: false }));
-    }),
+    key: LIST, row: span.closest(".list-top"), orig: store.listName() || "", max: MAX_SECTION,
+    below: palette(listName(), LIST_COLORS, listColor(), recolourList),
     onSave: (name, entered) => {
-      announce(t("Renamed the list to {x}", { x: name }));
-      act(t("renaming the list {x}", { x: q(orig || listName()) }), [[LIST, "name", name, ""]], { leaving: true });
-      if (entered && !orig && sections.length) $("#add-" + sections[0].id).focus();
+      renameList(name);
+      if (entered && sections.length) $("#add-" + sections[0].id).focus();
     },
+    onDone: () => { span.dataset.placeholder = t("Untitled list"); },
   });
 }
-// Naming a new list, as it opens: the first list, made with the setup code.
 export const editName = () => editListName($("#list-name"));
+// The list's own settings, from its settings page or as it's named.
+export function renameList(name) {
+  const was = store.listName() || "";
+  if (!name || name === was) return;
+  announce(t("Renamed the list to {x}", { x: name }));
+  act(t("renaming the list {x}", { x: q(was || listName()) }), [[LIST, "name", name, ""]], { leaving: true });
+}
+export function recolourList(c, label) {
+  announce(t("{x} is now {y}", { x: listName(), y: t(label).toLowerCase() }));
+  dye(() => act(t("changing the colour of {x}", { x: q(listName()) }), [[LIST, "color", c, ""]], { animate: false }));
+}
+export const setTicked = days => act(null, [[LIST, "ticked", days, 7]], { animate: false });
 function recolour(id, color, label) {
   const fallback = (DEFAULTS.find(d => d.id === id) || {}).color;
   announce(t("{x} is now {y}", { x: nameOf(id), y: t(label).toLowerCase() }));
@@ -502,7 +518,7 @@ function buildShell(id) {
     escape: () => (ui.sugSec === id ? closeSug() : clearAdd(id)),
   });
   const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Ticked before"), hidden: true });
-  const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id } });
+  const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id, placeholder: t("Untitled section") } });
   name.addEventListener("click", e => {
     if (state.suppressClick) { state.suppressClick = false; return; }
     if (state.editing !== "#" + id) editSection(name, id, e.clientX, e.clientY);
@@ -514,7 +530,7 @@ function buildShell(id) {
   });
   const head = h("h2", { class: "sec-head" }, name);
   const el = h("section", { class: "sec", "data-sec": id, "aria-labelledby": "h-" + id }, head, ul, sug, form);
-  bindPress(head, { look: el, can: () => !readOnly() && sections.length > 1, start: (offY, y) => startSectionDrag(id, y) });
+  bindPress(head, { look: el, can: () => !readOnly() && sections.length > 1 && !!sectionInfo.get(id).name, start: (offY, y) => startSectionDrag(id, y) });
   input.addEventListener("input", () => {
     saveDraft(id, input.value.trim() ? input.value : "");
     updateSug(id);
@@ -559,10 +575,13 @@ function syncShells() {
     sh.el.style.setProperty("--sec", "var(--" + s.color + ")");
     if (sh.el.dataset.color !== s.color) sh.el.dataset.color = s.color;
     if (state.editing !== "#" + s.id && sh.name.textContent !== s.name) sh.name.textContent = s.name;
-    // A section without a name shows no heading: its items sit under the list's name.
-    sh.el.classList.toggle("plain", !s.name);
-    if (s.name) sh.el.setAttribute("aria-labelledby", "h-" + s.id); else sh.el.removeAttribute("aria-labelledby");
-    sh.name.setAttribute("aria-label", readOnly() ? s.name : t("{x}, rename", { x: s.name }));
+    // A section without a name, alone, shows no heading: its items sit under the list's
+    // name. Beside others, it has one like theirs, which says so, to be named; it stays first.
+    const plain = !s.name && sections.length === 1, called = s.name || t("Untitled section");
+    sh.el.classList.toggle("unnamed", !s.name);
+    sh.el.classList.toggle("plain", plain);
+    if (!plain) sh.el.setAttribute("aria-labelledby", "h-" + s.id); else sh.el.removeAttribute("aria-labelledby");
+    sh.name.setAttribute("aria-label", readOnly() ? called : t("{x}, rename", { x: called }));
     sh.input.setAttribute("aria-label", s.name ? t("Add item to {x}", { x: s.name }) : t("Add item"));
     if (list.children[i] !== sh.el) list.insertBefore(sh.el, list.children[i] || null);
   });
@@ -708,7 +727,7 @@ function endDrag() {
     settling.delete(id);
     buzz(12);
     announce(t("{x} ticked", { x: it.text }));
-    store.change(t("checking {x}", { x: q(it.text) }), [[id, "checked", true], [id, "checkedAt", Date.now()]]);
+    store.change(t("ticking {x}", { x: q(it.text) }), [[id, "checked", true], [id, "checkedAt", Date.now()]]);
   } else if (!toTick) {
     const ul = li.parentElement, sec = ul.dataset.sec;
     const sibs = [...ul.children], i = sibs.indexOf(li);
@@ -720,7 +739,7 @@ function endDrag() {
       ops.push([id, "checked", false]);
       announce(t("{x} back on the list", { x: it.text }));
     } else if (it.section !== sec) announce(t("{x} moved to {y}", { x: it.text, y: nameOf(sec) }));
-    store.change(t(it.checked ? "unchecking {x}" : "moving {x}", { x: q(it.text) }), ops);
+    store.change(t(it.checked ? "unticking {x}" : "moving {x}", { x: q(it.text) }), ops);
   }
   // Also when nothing changed, such as an item dropped where it started: it comes back into view.
   sync();
@@ -754,7 +773,7 @@ function placeSection(y) {
   const list = $("#list");
   let before = null;
   for (const c of list.children) {
-    if (c === state.drag.el || c.classList.contains("plain")) continue; // the section without a name stays first
+    if (c === state.drag.el || c.classList.contains("unnamed")) continue; // the section without a name stays first
     const r = c.getBoundingClientRect();
     if (y < r.top + r.height / 2) { before = c; break; }
   }
@@ -769,7 +788,7 @@ function endSectionDrag() {
   const dropped = ghost.getBoundingClientRect().top;
   const snap = letGo(); // folded: the sections unfold from here
   el.classList.remove("placeholder");
-  if (store.change(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order))) announce(t("Section moved: {x}", { x: nameOf(id) }));
+  if (store.change(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order))) announce(t("Moved section {x}", { x: nameOf(id) }));
   sync();
   render();
   const head = el.querySelector(".sec-head"), page = document.documentElement;
@@ -789,7 +808,7 @@ function endSectionDrag() {
 function moveSection(id, dir) {
   if (readOnly()) return;
   const order = sections.map(s => s.id), i = order.indexOf(id), j = i + dir;
-  if (j < 0 || j >= order.length || !sections[j].name) return; // the section without a name stays first
+  if (j < 0 || j >= order.length || !sections[i].name || !sections[j].name) return; // the section without a name stays first
   [order[i], order[j]] = [order[j], order[i]];
   announce(t(dir < 0 ? "{x} moved up" : "{x} moved down", { x: nameOf(id) }));
   act(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order), { focusKey: "name-" + id });
@@ -799,9 +818,9 @@ function moveSection(id, dir) {
 
 function render() {
   if (state.view !== "list" || !store.current()) return; // the lists page shows; the list draws when it's back
-  const name = store.listName() || "", title = $("#list-name"); // without one, it says "Name this list" (app.css)
+  const name = store.listName() || "", title = $("#list-name"); // without one, it says so (app.css)
   if (state.editing !== LIST && title.textContent !== name) title.textContent = name;
-  title.setAttribute("aria-label", readOnly() ? listName() : name ? t("{x}, rename", { x: name }) : t("Name this list"));
+  title.setAttribute("aria-label", listName());
   document.title = name || "Panier";
   wasReadOnly = readOnly();
   $("#app").classList.toggle("readonly", wasReadOnly);
@@ -815,10 +834,10 @@ function render() {
   const kept = new Set();
   const fill = (ul, list, note) => { for (const i of list) kept.add(i.id); setRows(ul, list.map(i => rowOf(i, tint.has(i.id), note && note(i)))); };
   for (const s of sections) fill(shells[s.id].ul, shown(s.id));
-  const since = Date.now() - RECENT_MS;
-  const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= since).sort((a, b) => b.checkedAt - a.checkedAt);
+  const from = since();
+  const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= from).sort((a, b) => b.checkedAt - a.checkedAt);
   $("#basket").classList.toggle("empty", basket.length === 0);
-  // "3 ticked": true while the list is in use and after, unlike a basket; the last five days show, newest first
+  // "3 ticked": true while the list is in use and after, unlike a basket; newest first
   $("#basket-count").textContent = plural(basket.length, "{n} ticked", "{n} ticked");
   $("#basket-toggle").setAttribute("aria-expanded", String(ui.basketOpen));
   // Beside each, who ticked it and when: "Isabelle, at 12:45", "Me, yesterday"; on a list
@@ -852,15 +871,10 @@ function exportList() {
 }
 
 $("#export-btn").addEventListener("click", exportList);
-$("#list-name").dataset.placeholder = t("Name this list");
+$("#list-name").dataset.placeholder = t("Untitled list");
 
 // Adding a section moves the cursor to its Add item field.
 addRow($("#add-sec-form"), $("#add-sec"), { add: () => addSection($("#add-sec").value) });
-$("#list-name").addEventListener("click", e => { if (state.editing !== LIST) editListName(e.currentTarget, e.clientX, e.clientY); });
-$("#list-name").addEventListener("keydown", e => {
-  if (state.editing === LIST) return;
-  if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editListName(e.currentTarget); }
-});
 
 // The ticked group folds away, its rows fading as it closes and what follows moving up;
 // unfolding, it opens as the list glides, its rows fading in.

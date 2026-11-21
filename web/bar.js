@@ -39,7 +39,7 @@ function setHist(btn, label, verb) {
 let statusTimer = 0, statusShown = "";
 function statusInfo() {
   const { online, full, closed, waiting } = store.status();
-  if (closed) return { text: t("List closed"), detail: t("Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone until you delete it, from the lists page.") };
+  if (closed) return { text: t("List closed"), detail: t("Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone until you delete it.") };
   if (store.newerFormat()) return { text: t("Update Panier"), detail: t("This list was changed with a newer Panier, which updates itself: close the app and open it again. Nothing is sent from here meanwhile.") };
   if (online && !full) return null;
   const kept = waiting

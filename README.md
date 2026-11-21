@@ -2,17 +2,17 @@
 
 Private lists, shared between phones: end-to-end encrypted, with no accounts. It runs on Cloudflare's free plan or on a Raspberry Pi at home.
 
-<p align="center"><img src="docs/screens.png" width="560" alt="Panier on two phones. Left, in light mode, the lists page: six lists as sheets of paper, each tinted its own colour, Groceries shared with Alex. Right, in dark mode, the end of the Groceries list: its sections named in their colours, and three ticked items below a dashed line, each box filled with its section’s colour, and beside each who ticked it and when, such as “Alex, at 10:17”."></p>
+<p align="center"><img src="docs/screens.png" width="560" alt="Panier on two phones. Left, in light mode, the lists page: six lists as sheets of paper, each tinted its own colour, Groceries shared with Alex. Right, in dark mode, the end of the Groceries list: its sections named in their colours, and five ticked items below a dashed line, each box filled with its section’s colour, and beside each who ticked it and when, such as “Alex, at 11:25”."></p>
 
 ## What it is
 
 - **Shared.** Each list with whoever you choose, each on their own phone. Changes show on the other phones within a second.
 - **Several lists.** The weekly shop, the hardware store, the market: each its own sheet on the lists page, each shared with its own people.
-- **Private.** Lists are encrypted on the phones. The server stores them without being able to read them.
+- **Private.** Lists are encrypted on the phones. The server stores them but can't read them.
 - **No accounts.** Another phone joins a list by scanning a QR code from one that has it.
 - **Offline.** It works without signal and catches up when the connection returns.
 - **An app from the browser.** It installs from Firefox, Chrome or Safari, with no app store.
-- **Made for everyday lists.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, the last five days of ticked items with who ticked each, drag to reorder, and undo for everything.
+- **Made for everyday lists.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, who ticked what and when, drag to reorder, and undo for everything.
 - **Markdown in and out.** A list exports as a Markdown checklist, and any Markdown checklist, a few pasted lines, or checklists from Google Keep come in.
 - **In English and French**, light and dark.
 
@@ -44,22 +44,23 @@ First a server, then the phones.
 Then, on the phones:
 
 1. On the first phone, open the setup link from the guide. It creates the first list, which opens with its name to type.
-2. On another phone, scan the QR code that *Add someone to this list* shows.
+2. On another phone, scan the QR code that *Add someone*, in the list's settings, shows.
 3. Install the app on each phone: in Firefox, **⋮ → Install**; in Chrome, **⋮ → Install app**; on an iPhone, Safari's **Share → Add to Home Screen**.
 4. Save the list's link in a password manager.
 
 ## Using it
 
 - **Add:** tap *Add item* at the end of a section and type. Enter adds the item and keeps the field open for the next.
-- **Tick:** tap the square. Ticked items move to the ticked group after a moment, and stay there for five days, with who ticked them and when.
+- **Tick:** tap the square. Ticked items move to the ticked group after a moment, which says who ticked each and when, and stay there for a week, or as the list's settings say.
 - **Edit:** tap the words. Clear them to delete the item.
 - **Move:** hold an item, or a section's name, for half a second, then drag.
 - **Sections:** a new list is a plain sheet. *Add a section*, below the items, adds a heading when it helps; tap a heading to rename it or change its colour.
-- **The list:** tap its name to rename it or choose its paper's colour.
-- **Lists:** *Lists*, at the top right of a list, or the back gesture, leads to the lists page: tap a list to open it, *New list* to start one, hold one to move it, or drop it at the foot to delete it, which asks first. *Delete the list*, at the foot of a list, does the same.
-- **Import:** *From a file* on the lists page brings in a Markdown or text list, or the checklists in a Google Keep export, chosen first; several lines pasted into *Add item* become several items.
+- **Getting around:** the arrow at the top left goes back up, as does the back gesture; *Settings*, at the top right, holds the settings of what's on screen.
+- **The list's settings:** its name and paper's colour, how long ticked items stay in view, who's on it, and exporting or deleting it.
+- **Lists:** the lists page shows every list: tap one to open it, *New list* to start one, hold one to move it, or drop it at the foot to delete it, which asks first.
+- **Import:** *Bring in from a file*, in Settings, brings in a Markdown or text list, or the checklists in a Google Keep export, chosen first; several lines pasted into *Add item* become several items.
 - **Undo and redo:** the buttons at the bottom right.
-- **Settings**, on the lists page: your name, light or dark, a compact layout, exporting every list, and setting up another phone.
+- **Settings**, on the lists page: your name, light or dark, a compact layout, exporting and bringing in lists, and setting up another phone.
 
 [docs/using.md](docs/using.md) has everything else: quantities, suggestions, keyboard shortcuts, what each gesture does exactly.
 
@@ -68,7 +69,7 @@ Then, on the phones:
 - **Browsers:** Firefox 121, Chrome 123, Safari 17.5 or later.
 - **Sideways, or on a tablet or computer,** what's ticked lies beside the list rather than under it, and the lists page has more sheets to a row.
 - **Where the lists live:** in the browser's storage on each phone, and encrypted on the server. If a phone's browser data is cleared, each list's link brings it back. Panier asks the browser to keep the lists even when space runs low; Settings shows whether it agreed.
-- **How long things stay:** ticked items show for five days, then are only suggested. Deleted items are forgotten after about six months.
+- **How long things stay:** ticked items show for a week, or as each list's settings say, then are only suggested. Deleted items are forgotten after about six months.
 - **Size:** the server keeps up to 32 MB per list, about 88,000 changes: many years of weekly shopping for a household. A full list says *List full* and keeps new changes on the phone.
 - **Updates** download in the background when the app opens. It then reloads into the new version, waiting until you're not typing, editing or dragging.
 - **Vibration** when ticking works in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
@@ -120,7 +121,7 @@ On every push to `main` or `next` and every pull request, GitHub runs the Go tes
 
 ## Next
 
-Bigger features change how lists are stored and shared, so each starts with a short design note, agreed before building, like [docs/roadmap.md](docs/roadmap.md) for several lists and more people:
+Bigger features change how lists are stored and shared, so each starts with a short design note, agreed before building:
 
 - encrypted backups kept on the server;
 - recurring lists or sections, such as a weekly shop;

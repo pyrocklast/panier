@@ -37,8 +37,8 @@ const loadQr = () => (qrLib ||= new Promise((resolve, reject) => {
 // to set up another phone.
 export function openPair(all = false) {
   shared = all ? store.allLink() : store.pairingLink();
-  $("#pair-title").textContent = all ? t("Set up another phone") : t("Add someone to this list");
-  $("#pair-text").textContent = all ? t("Scan this code with the other phone, and it has every list this one has.")
+  $("#pair-title").textContent = all ? t("Set up another phone") : t("Add someone");
+  $("#pair-text").textContent = all ? t("Scan this code with the other phone to give it every list on this one.")
     : t("They scan this code with their phone, or open the link you send them.");
   $("#pair-note").textContent = all ? t("This link holds the keys to all your lists: anyone who has it can open them. Keep it to yourself.")
     : t("This link is the key to your list: anyone who has it can open it. Keep a copy in your password manager to recover the list if you lose your phones.");
@@ -57,14 +57,18 @@ export function openPair(all = false) {
 }
 // Who has the list: each phone writes itself onto it, with the name its owner gave in
 // Settings, if any. The server sees none of it.
-function paintPeople() {
+export function people() {
   const others = store.members().filter(m => !m.me);
   const named = others.filter(m => m.name).map(m => m.name), nameless = others.length - named.length;
   const who = [t("you"), ...named];
   if (nameless) who.push(plural(nameless, "{n} phone without a name", "{n} phones without a name"));
-  $("#members").textContent = others.length ? t("On this list: {x}.", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(who) }) : t("Only you, so far.");
-  $("#rekey-open").hidden = !others.length; // removing someone needs someone to remove
+  return others.length ? t("On this list: {x}.", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(who) }) : t("Only you, so far.");
 }
+function paintPeople() {
+  $("#members").textContent = people();
+  $("#rekey-open").hidden = !store.members().some(m => !m.me); // removing someone needs someone to remove
+}
+// From the list's settings, over them: closing it goes back to them.
 $("#pair-open").addEventListener("click", () => openPair());
 $("#pair-name-input").addEventListener("change", e => store.setMyName(clean(e.target.value, MAX_SECTION)));
 $("#pair-name-input").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
@@ -87,7 +91,7 @@ $("#copy-link").addEventListener("click", async e => {
 // closed, for everyone. The people who should keep it get the new link.
 $("#rekey-open").addEventListener("click", () => closeThen($("#pair"), () => confirmSheet({
   title: t("Remove someone from {x}?", { x: q(listName()) }),
-  text: t("The list moves to a new key. Everyone who has it now loses it, on every phone but this one, though they keep what they had. Then send the new link to those who should keep it."),
+  text: t("The list moves to a new key. Every other phone loses it, though each keeps what it had. Then send the new link to those who should keep it."),
   ok: t("Give it a new key"),
   run: async () => {
     await store.changeKey();
@@ -96,4 +100,7 @@ $("#rekey-open").addEventListener("click", () => closeThen($("#pair"), () => con
   },
 })));
 // Someone joined, or named themselves, while the sheet shows who's on the list.
-export const peopleChanged = () => { if ($("#pair").open && !$("#people").hidden) paintPeople(); };
+export const peopleChanged = () => {
+  if ($("#pair").open && !$("#people").hidden) paintPeople();
+  if ($("#list-settings").open) $("#list-people").textContent = people();
+};
