@@ -9,13 +9,17 @@
 // link) is all a phone needs.
 //
 // A phone keeps an index of its lists, in the order they're shown, with what each one
-// looked like last time (its name, colour and what's left to get), so the lists page
+// looked like last time (its name, colour and what's left to tick), so the lists page
 // draws without opening them; and one storage entry per list. Only the list on screen
 // listens live. The others catch up when the lists page shows, and send what they have
 // waiting whenever the connection returns.
 
 const INDEX = "panier2"; // this phone's id and name, and its lists
 const ENTRY = "panier2:"; // one list, by its id on this phone
+// The version before several lists kept its one list, key included, under these names.
+// Every list has come back by import, so what it left is cleared; this line can go once
+// every phone has opened this version.
+try { for (const k of ["panier", "panier-drafts", "panier-basket-open", "panier-dragged-once", "panier-style"]) localStorage.removeItem(k); } catch (_) {}
 const FORMAT = 1; // what this app reads; a list can ask for more with "@list" "format"
 const MAX_UNDO = 100;
 const text = new TextEncoder();
@@ -68,6 +72,14 @@ const blank = key => ({ key, clock: 0, seq: 0, items: {}, devs: [], outbox: [] }
 const DEFAULT_POS = { ess: 1, look: 2, long: 3 };
 const isItem = id => id[0] !== "#" && id[0] !== "@";
 const MEMBER = "@m/"; // a phone on the list: "@m/" + its id, with "on" and, if given, "name"
+// What other phones send is checked before it's merged: a change this app couldn't have
+// written, from a broken or hostile phone, is passed over like one it can't read, so it
+// can neither stop the list syncing nor reach into the page. Fields this app doesn't
+// know, from a newer one, come in as they are.
+const TYPES = { text: "string", name: "string", section: "string", color: "string", pos: "number", checkedAt: "number", format: "number", checked: "boolean", deleted: "boolean", on: "boolean" };
+const fits = op => Array.isArray(op) && typeof op[0] === "string" && typeof op[1] === "string" && !!op[0] &&
+  !(op[0] in Object.prototype) && !(op[1] in Object.prototype) && Number.isSafeInteger(op[3]) && op[3] > 0 &&
+  (!Object.hasOwn(TYPES, op[1]) || typeof op[2] === TYPES[op[1]]);
 
 // Changes are padded with spaces to a multiple of 256 bytes before encryption, so the
 // server can't tell an item's name length from the size of what it stores. A change
@@ -222,7 +234,7 @@ class List {
     }
     return out.sort((a, b) => b.me - a.me || a.since - b.since);
   }
-  // What the lists page shows of this list: its name and colour, how much is left to get,
+  // What the lists page shows of this list: its name and colour, how much is left to tick,
   // and the first three of those, in the order the list shows them.
   summarize() {
     const e = entryOf(this.lid);
@@ -266,7 +278,11 @@ class List {
     if (this.s.closed) return null; // a closed list takes nothing more
     const t = this.tick();
     const recs = [];
-    for (const [id, field, value, fallback] of ops) {
+    // Every write in a step has the same time, so the last one given to a field is the
+    // one kept, such as a section an import names after a new list's start.
+    const last = new Map();
+    for (const op of ops) last.set(op[0] + "\n" + op[1], op);
+    for (const [id, field, value, fallback] of last.values()) {
       const stored = this.valueOf(id, field);
       const prev = stored === undefined ? fallback : stored;
       if (prev !== undefined && same(prev, value)) continue;
@@ -434,7 +450,9 @@ class List {
             let ch = null;
             try { ch = await this.open(c.data); } catch (_) { /* unreadable change: written with another key, skip it */ }
             if (!this.still(st, session)) return;
-            if (ch) for (const [id, field, value, t] of ch.o) {
+            if (ch && typeof ch.d === "string" && Array.isArray(ch.o)) for (const op of ch.o) {
+              if (!fits(op)) continue;
+              const [id, field, value, t] = op;
               st.clock = Math.max(st.clock, t);
               if (this.put(id, field, value, t, ch.d)) {
                 changed = true;
@@ -653,25 +671,30 @@ export function addKeys(keys) {
   return out;
 }
 
+// register asks the server for a new list, with keys d: with the setup code, or vouched
+// for by a list it already holds.
+const register = (d, { code = null, by = null }) => fetch("/api/lists", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", ...(by ? { Authorization: "Bearer " + by.auth } : { "X-Setup-Code": code.trim() }) },
+  body: JSON.stringify({ id: d.id, auth: d.auth, ...(by ? { by: by.id } : {}) }),
+});
 // createList makes a new list on the server: vouched for by a list this phone already
-// has there, or with the server's setup code when it has none, or none will. Throws
-// "code" when the setup code is needed (or was wrong), "server" when unreachable.
-export async function createList({ code = null, name = "" } = {}) {
+// has there, or with the server's setup code when it has none, or none will. ops is what
+// the list starts with (see startOps in model.js), and, for an import, what it holds: one
+// step, as if typed. Throws "code" when the setup code is needed (or was wrong), "server"
+// when unreachable. Returns the list's id on this phone.
+export async function createList({ code = null, ops = [] } = {}) {
   const raw = crypto.getRandomValues(new Uint8Array(32));
   const d = await derive(raw);
-  const body = { id: d.id, auth: d.auth };
-  const post = (headers, extra = {}) => fetch("/api/lists", {
-    method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify({ ...body, ...extra }),
-  });
   let res = null;
   try {
-    if (code !== null) res = await post({ "X-Setup-Code": code.trim() });
+    if (code !== null) res = await register(d, { code });
     else {
       for (const e of index.lists) {
         if (e.closed) continue;
         const v = get(e.lid);
         await v.ready();
-        res = await post({ Authorization: "Bearer " + v.session.auth }, { by: v.session.id });
+        res = await register(d, { by: v.session });
         if (res.status !== 403) break;
       }
     }
@@ -684,17 +707,10 @@ export async function createList({ code = null, name = "" } = {}) {
   l.session = d;
   l.deriving = Promise.resolve(d);
   l.hello();
-  if (name) l.change(null, [["@list", "name", name]]);
+  if (ops.length) l.change(null, ops);
   l.summarize();
   emit("lists");
   return l.lid;
-}
-
-// A new list holding ops, for an import: one step, as if typed. Returns its id.
-export async function createFrom(ops, opts) {
-  const lid = await createList(opts);
-  get(lid).change(null, ops);
-  return lid;
 }
 
 // remove takes a list off this phone; it stays on the server for the others. Returns
@@ -756,13 +772,7 @@ export async function changeKey() {
   const raw = crypto.getRandomValues(new Uint8Array(32));
   const d = await derive(raw);
   let res;
-  try {
-    res = await fetch("/api/lists", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + old.session.auth },
-      body: JSON.stringify({ id: d.id, auth: d.auth, by: old.session.id }),
-    });
-  } catch (_) { throw new Error("server"); }
+  try { res = await register(d, { by: old.session }); } catch (_) { throw new Error("server"); }
   if (!res.ok) throw new Error(res.status === 403 ? "full" : "server");
   const copy = new List(old.lid, blank(b64u(raw)));
   copy.unsaved = true; // written only once the old list is closed: until then, it is the one kept

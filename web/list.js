@@ -7,7 +7,7 @@ import { state, readOnly, listName, listColor, draftsKey } from "./state.js";
 import { DEFAULTS, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, RECENT_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout, sheetOfList } from "./model.js";
 import { $, h, icon, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, download, reduceMotion } from "./dom.js";
 import { whenTapEnds, bindPress, beginDrag } from "./press.js";
-import { float, landAll, snapshot, glide, fly, MOTION } from "./motion.js";
+import { float, landAll, snapshot, glide, fly, shift, shuffle, foldAway, dye, MOTION } from "./motion.js";
 import { editInPlace, palette } from "./edit.js";
 import { noteUndo, paintDock, paintStatus } from "./bar.js";
 
@@ -23,7 +23,8 @@ const ui = { sugSec: null, sug: [], sugIndex: -1, sugCol: 0, basketOpen: true };
 let wasReadOnly = false; // as the list on screen was last drawn
 
 const find = id => items.find(i => i.id === id);
-const nameOf = id => (sectionInfo.get(id) || { name: t("this section") }).name;
+// A section by name; the one without a name, at the top, goes by the list's.
+const nameOf = id => { const s = sectionInfo.get(id); return s ? s.name || listName() : t("this section"); };
 const colorOf = id => (sectionInfo.has(id) ? sectionInfo.get(id).color : "muted");
 const isShown = id => sections.some(s => s.id === id);
 const inList = i => !i.checked || settling.has(i.id);
@@ -155,7 +156,7 @@ function clearAdd(sec) {
   saveDraft(sec, "");
   if (ui.sugSec === sec) closeSug(); // not another field's, typed into just after leaving this one
 }
-// Puts an item bought before back on the list as text, into sec: picked from its
+// Puts an item ticked before back on the list as text, into sec: picked from its
 // suggestion, or, when added, typed in full. When it was ticked doesn't matter once it's
 // back, so it isn't written: the change stays under 256 bytes (see store.js).
 function revive(id, sec, text, opts = {}, added = false) {
@@ -179,7 +180,7 @@ function submitAdd(sec, leaving = false) {
   if (!text) { clearAdd(sec); return; }
   const same = items.filter(i => nameKey(i.text) === nameKey(text));
   const ex = same.find(inList) || same[0];
-  // The same name bought before: that item comes back, as typed, rather than a copy.
+  // The same name ticked before: that item comes back, as typed, rather than a copy.
   if (ex && ex.checked && !settling.has(ex.id)) return revive(ex.id, sec, text, opts, true);
   clearAdd(sec);
   if (ex) { // already on the list: highlighted, with the quantity just typed, if any
@@ -199,8 +200,8 @@ function submitAdd(sec, leaving = false) {
   act(t("adding {x}", { x: q(text) }), [[id, "text", text], [id, "section", sec], [id, "pos", maxPos(sec) + 1], [id, "deleted", false]], opts);
 }
 // Several lines pasted into an Add item field: one item each, in that section, in one
-// step to undo. Names already on the list stay as they are; those bought before come back.
-// Lines ticked in Markdown ("- [x]") are kept as bought before, to be suggested.
+// step to undo. Names already on the list stay as they are; those ticked before come back.
+// Lines ticked in Markdown ("- [x]") are kept as ticked before, to be suggested.
 function addMany(sec, pasted) {
   closeSug(); // what was typed before stays in the field
   const ops = [], seen = new Set(), old = Date.now() - RECENT_MS - 864e5;
@@ -264,7 +265,7 @@ function renameSection(id, name) {
   announce(t("Renamed section to {x}", { x: name }));
   act(t("renaming section {x}", { x: q(info.name) }), [["#" + id, "name", name, fallback]], { leaving: true });
 }
-// A section can only be deleted once it has nothing to get, and the last one stays.
+// A section can only be deleted once it has nothing to tick, and the last one stays.
 const canDelete = id => sections.length > 1 && !items.some(i => i.section === id && inList(i));
 function deleteSection(id) {
   const name = nameOf(id);
@@ -311,7 +312,7 @@ function editItem(span, id, x, y, caret) {
 
 // Enter inside an item's text splits it in two: the first part stays, the second becomes
 // the next item, ready to edit. As when adding or renaming, a part that's already on the
-// list isn't added twice, and one bought before comes back.
+// list isn't added twice, and one ticked before comes back.
 let lastSplit = null; // so Backspace can join the two parts back exactly
 function splitItem(id, first, second, glue) {
   const it = find(id);
@@ -328,7 +329,7 @@ function splitItem(id, first, second, glue) {
   const d2 = dupOf(second);
   if (nameKey(second) === nameKey(first)) { /* "milk milk": one is enough */ }
   else if (d2 && inList(d2)) { flashId = d2.id; msg = t("{x} is already on the list", { x: d2.text }); }
-  else if (d2) { ops.push([d2.id, "text", second], ...here(d2.id)); next = d2.id; } // bought before: back as typed
+  else if (d2) { ops.push([d2.id, "text", second], ...here(d2.id)); next = d2.id; } // ticked before: back as typed
   else {
     next = store.newId();
     ops.push([next, "text", second], ...here(next), [next, "deleted", false]);
@@ -372,29 +373,33 @@ function editSection(span, id, x, y) {
   });
 }
 // The list's name, at the top, is renamed the same way as a section's, its colour chosen
-// under it.
+// under it. A list without a name says "Name this list" there; named with Enter, the
+// cursor goes on to its first Add item, ready to write on.
 function editListName(span, x, y) {
   if (readOnly()) return;
-  const orig = listName();
+  const orig = store.listName() || "";
   edit(span, {
     key: LIST, row: span.closest(".list-top"), orig, max: MAX_SECTION, x, y,
-    below: palette(orig, LIST_COLORS, listColor(), (c, label) => {
+    below: palette(listName(), LIST_COLORS, listColor(), (c, label) => {
       announce(t("{x} is now {y}", { x: listName(), y: t(label).toLowerCase() }));
-      act(t("changing the colour of {x}", { x: q(listName()) }), [[LIST, "color", c, ""]], { animate: false });
+      dye(() => act(t("changing the colour of {x}", { x: q(listName()) }), [[LIST, "color", c, ""]], { animate: false }));
     }),
-    onSave: name => {
+    onSave: (name, entered) => {
       announce(t("Renamed the list to {x}", { x: name }));
-      act(t("renaming the list {x}", { x: q(orig) }), [[LIST, "name", name, t("Shopping list")]], { leaving: true });
+      act(t("renaming the list {x}", { x: q(orig || listName()) }), [[LIST, "name", name, ""]], { leaving: true });
+      if (entered && !orig && sections.length) $("#add-" + sections[0].id).focus();
     },
   });
 }
+// Naming a new list, as it opens: the first list, made with the setup code.
+export const editName = () => editListName($("#list-name"));
 function recolour(id, color, label) {
   const fallback = (DEFAULTS.find(d => d.id === id) || {}).color;
   announce(t("{x} is now {y}", { x: nameOf(id), y: t(label).toLowerCase() }));
-  act(t("changing the colour of {x}", { x: q(nameOf(id)) }), [["#" + id, "color", color, fallback]], { animate: false });
+  dye(() => act(t("changing the colour of {x}", { x: q(nameOf(id)) }), [["#" + id, "color", color, fallback]], { animate: false }));
 }
 
-/* ---------- Suggestions from everything bought before ---------- */
+/* ---------- Suggestions from everything ticked before ---------- */
 
 function suggestions(text) {
   const n = nameKey(text);
@@ -409,7 +414,7 @@ function suggestions(text) {
     scored.push({ it, score: at === 0 ? 0 : wordStart ? 1 : 2 });
   }
   scored.sort((a, b) => a.score - b.score || b.it.checkedAt - a.it.checkedAt);
-  // Shown by name only, so one name is suggested once, even if it was bought twice.
+  // Shown by name only, so one name is suggested once, even if it was ticked twice.
   const seen = new Set(), out = [];
   for (const { it } of scored) {
     const k = nameKey(it.text);
@@ -430,7 +435,7 @@ function highlight(text, query) {
 }
 // Each suggestion is a row of two cells: the item, which brings it back, and a × that
 // removes it for good. With the keyboard, arrows move between them and Enter picks.
-// Suggestions show the name alone: the quantity bought last time stays behind.
+// Suggestions show the name alone: the quantity ticked last time stays behind.
 const sugCellId = (sec, i, col) => "sug-" + sec + "-" + i + (col ? "-x" : "");
 function paintSug(sec, list) {
   const sh = shells[sec], query = splitQty(sh.input.value).name;
@@ -448,14 +453,16 @@ function paintSug(sec, list) {
   if (list.length && active >= 0) sh.input.setAttribute("aria-activedescendant", sugCellId(sec, active, ui.sugCol));
   else sh.input.removeAttribute("aria-activedescendant");
 }
+// As you type, suggestions come and go above the field, which glides to make room for them.
 function updateSug(sec) {
   if (ui.sugSec && ui.sugSec !== sec) paintSug(ui.sugSec, []);
-  const list = suggestions(shells[sec].input.value);
+  const list = suggestions(shells[sec].input.value), more = list.length !== shells[sec].sug.children.length;
   ui.sugSec = list.length ? sec : null;
   ui.sug = list;
   ui.sugIndex = -1;
   ui.sugCol = 0;
-  paintSug(sec, list);
+  if (more) shift(() => paintSug(sec, list));
+  else paintSug(sec, list);
 }
 export function closeSug() {
   if (ui.sugSec) paintSug(ui.sugSec, []);
@@ -494,7 +501,7 @@ function buildShell(id) {
     clear: () => clearAdd(id),
     escape: () => (ui.sugSec === id ? closeSug() : clearAdd(id)),
   });
-  const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Bought before"), hidden: true });
+  const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Ticked before"), hidden: true });
   const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id } });
   name.addEventListener("click", e => {
     if (state.suppressClick) { state.suppressClick = false; return; }
@@ -552,8 +559,11 @@ function syncShells() {
     sh.el.style.setProperty("--sec", "var(--" + s.color + ")");
     if (sh.el.dataset.color !== s.color) sh.el.dataset.color = s.color;
     if (state.editing !== "#" + s.id && sh.name.textContent !== s.name) sh.name.textContent = s.name;
+    // A section without a name shows no heading: its items sit under the list's name.
+    sh.el.classList.toggle("plain", !s.name);
+    if (s.name) sh.el.setAttribute("aria-labelledby", "h-" + s.id); else sh.el.removeAttribute("aria-labelledby");
     sh.name.setAttribute("aria-label", readOnly() ? s.name : t("{x}, rename", { x: s.name }));
-    sh.input.setAttribute("aria-label", t("Add item to {x}", { x: s.name }));
+    sh.input.setAttribute("aria-label", s.name ? t("Add item to {x}", { x: s.name }) : t("Add item"));
     if (list.children[i] !== sh.el) list.insertBefore(sh.el, list.children[i] || null);
   });
 }
@@ -609,7 +619,7 @@ function itemEl(id) {
     else if (e.key === "Delete") { e.preventDefault(); del(id); }
   });
   li.append(cell, text);
-  bindPress(li, { can: () => !readOnly() && !!li.closest("#list .items, #basket-list"), start: (offY, y) => startDrag(li, id, offY, y) });
+  bindPress(li, { can: () => !readOnly() && !!li.closest("#list .items, #basket-list"), start: (offY, y, offX, x) => startDrag(li, id, offY, y, offX, x) });
   return { li, chk, text, shown: null };
 }
 
@@ -628,26 +638,33 @@ function letGo() {
   return snap;
 }
 
-function startDrag(li, id, offY, y) {
+function startDrag(li, id, offY, y, offX, x) {
   landAll();
   li.style.opacity = "";
   const ghost = float(li.cloneNode(true), li.getBoundingClientRect(), "ghost", y - offY);
   li.classList.add("placeholder");
   // A ticked item can go back into a section; over the ticked group, it returns to its place there.
   const ticked = li.parentElement.id === "basket-list";
-  document.documentElement.classList.add("dragging");
-  document.documentElement.classList.toggle("drag-ticked", ticked);
+  shift(() => { // which shows the ticked group, to drop on: what follows glides down to make room
+    document.documentElement.classList.add("dragging");
+    document.documentElement.classList.toggle("drag-ticked", ticked);
+  });
   const home = { ul: li.parentElement, next: li.nextElementSibling, sec: li.style.getPropertyValue("--sec") };
-  beginDrag({ id, li, ghost, offY, y, toTick: null, ticked, home, place, end: endDrag });
+  // On a wide screen, the ticked group lies beside the list (app.css): the item then
+  // follows the finger sideways too, and goes there to be ticked.
+  const beside = $("#basket").getBoundingClientRect().left >= $("#list").getBoundingClientRect().right;
+  beginDrag({ id, li, ghost, offY, y, ...(beside ? { offX, x } : {}), beside, toTick: null, ticked, home, place, end: endDrag });
 }
 
 function setSec(sec) {
   state.drag.li.style.setProperty("--sec", sec);
   state.drag.ghost.style.setProperty("--sec", sec);
 }
-function place(y) {
-  // Over the ticked group, from its heading down: the item will be ticked, or stay ticked.
-  const toTick = y > $("#basket").getBoundingClientRect().top - 8;
+function place(y, x) {
+  // Over the ticked group, from its heading down, or beside the list on a wide screen: the
+  // item will be ticked, or stay ticked.
+  const b = $("#basket").getBoundingClientRect();
+  const toTick = state.drag.beside ? x > b.left - 8 : y > b.top - 8;
   if (toTick !== state.drag.toTick) {
     if (toTick && state.drag.toTick === false) buzz(8);
     state.drag.toTick = toTick;
@@ -657,7 +674,7 @@ function place(y) {
       state.drag.li.classList.toggle("away", toTick); // its slot empties, nothing moves
       $("#tick-drop").classList.toggle("over", toTick);
     } else if (toTick) {
-      state.drag.home.ul.insertBefore(state.drag.li, state.drag.home.next);
+      shift(() => state.drag.home.ul.insertBefore(state.drag.li, state.drag.home.next));
       setSec(state.drag.home.sec);
     }
   }
@@ -673,7 +690,7 @@ function place(y) {
     if (y < r.top + r.height / 2) { before = n; break; }
   }
   if (state.drag.li.parentElement === ul && state.drag.li.nextElementSibling === before) return;
-  ul.insertBefore(state.drag.li, before);
+  shift(() => ul.insertBefore(state.drag.li, before)); // what's in the way glides aside
   setSec("var(--" + colorOf(ul.dataset.sec) + ")");
 }
 function endDrag() {
@@ -714,8 +731,12 @@ function startSectionDrag(id, y) {
   landAll();
   const el = shells[id].el;
   const before = el.getBoundingClientRect().top;
-  document.documentElement.classList.add("sorting");
-  window.scrollBy(0, el.getBoundingClientRect().top - before); // its heading stays under your finger
+  // Every section folds to its heading: what each held fades where it was, as the
+  // headings glide together, the one held staying under your finger.
+  shuffle("#list > .sec", () => {
+    document.documentElement.classList.add("sorting");
+    window.scrollBy(0, el.getBoundingClientRect().top - before);
+  }, { fold: true });
   const r = el.getBoundingClientRect(), offY = Math.min(Math.max(y - r.top, 0), r.height);
   const copy = el.cloneNode(true);
   copy.replaceChildren(copy.querySelector(".sec-head"));
@@ -727,11 +748,11 @@ function placeSection(y) {
   const list = $("#list");
   let before = null;
   for (const c of list.children) {
-    if (c === state.drag.el) continue;
+    if (c === state.drag.el || c.classList.contains("plain")) continue; // the section without a name stays first
     const r = c.getBoundingClientRect();
     if (y < r.top + r.height / 2) { before = c; break; }
   }
-  if (state.drag.el.nextElementSibling !== before) list.insertBefore(state.drag.el, before);
+  if (state.drag.el.nextElementSibling !== before) shuffle("#list > .sec", () => list.insertBefore(state.drag.el, before));
 }
 // Let go, the section stays where it was dropped, as far as the page allows: the sections
 // above it unfold at once, upwards, out of the way, and it unfolds downwards with those
@@ -762,7 +783,7 @@ function endSectionDrag() {
 function moveSection(id, dir) {
   if (readOnly()) return;
   const order = sections.map(s => s.id), i = order.indexOf(id), j = i + dir;
-  if (j < 0 || j >= order.length) return;
+  if (j < 0 || j >= order.length || !sections[j].name) return; // the section without a name stays first
   [order[i], order[j]] = [order[j], order[i]];
   announce(t(dir < 0 ? "{x} moved up" : "{x} moved down", { x: nameOf(id) }));
   act(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order), { focusKey: "name-" + id });
@@ -772,13 +793,13 @@ function moveSection(id, dir) {
 
 function render() {
   if (state.view !== "list" || !store.current()) return; // the lists page shows; the list draws when it's back
-  const name = listName(), title = $("#list-name");
+  const name = store.listName() || "", title = $("#list-name"); // without one, it says "Name this list" (app.css)
   if (state.editing !== LIST && title.textContent !== name) title.textContent = name;
-  title.setAttribute("aria-label", readOnly() ? name : t("{x}, rename", { x: name }));
-  document.title = name;
+  title.setAttribute("aria-label", readOnly() ? listName() : name ? t("{x}, rename", { x: name }) : t("Name this list"));
+  document.title = name || "Panier";
   wasReadOnly = readOnly();
   $("#app").classList.toggle("readonly", wasReadOnly);
-  if (window.panierList) window.panierList(listColor());
+  window.panierList(listColor());
   computeSections();
   syncShells();
   // What the other phones changed is tinted where it is, without scrolling to it.
@@ -791,7 +812,7 @@ function render() {
   const since = Date.now() - RECENT_MS;
   const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= since).sort((a, b) => b.checkedAt - a.checkedAt);
   $("#basket").classList.toggle("empty", basket.length === 0);
-  // "3 ticked": true while shopping and after, unlike a basket; the last five days show, newest first
+  // "3 ticked": true while the list is in use and after, unlike a basket; the last five days show, newest first
   $("#basket-count").textContent = plural(basket.length, "{n} ticked", "{n} ticked");
   $("#basket-toggle").setAttribute("aria-expanded", String(ui.basketOpen));
   const bl = $("#basket-list");
@@ -818,6 +839,7 @@ function exportList() {
 }
 
 $("#export-btn").addEventListener("click", exportList);
+$("#list-name").dataset.placeholder = t("Name this list");
 
 // Adding a section moves the cursor to its Add item field.
 addRow($("#add-sec-form"), $("#add-sec"), { add: () => addSection($("#add-sec").value) });
@@ -827,10 +849,15 @@ $("#list-name").addEventListener("keydown", e => {
   if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editListName(e.currentTarget); }
 });
 
+// The ticked group folds away, its rows fading as it closes and what follows moving up;
+// unfolding, it opens as the list glides, its rows fading in.
 $("#basket-toggle").addEventListener("click", () => {
   ui.basketOpen = !ui.basketOpen;
   store.setFolded(state.lid, !ui.basketOpen);
-  paint(null, false);
+  const bl = $("#basket-list");
+  for (const a of bl.getAnimations()) a.cancel(); // folding a moment ago: it opens from where it is
+  if (ui.basketOpen) paint(null);
+  else foldAway(bl, () => paint(null, false));
 });
 
 /* ---------- For app.js ---------- */
@@ -838,7 +865,7 @@ $("#basket-toggle").addEventListener("click", () => {
 // Another list takes the screen: nothing of the last one stays.
 export function reset() {
   closeSug();
-  landAll();
+  landAll(true);
   clearTimeout(settleTimer);
   for (const id of Object.keys(shells)) { shells[id].el.remove(); delete shells[id]; }
   rows.clear();

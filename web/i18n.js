@@ -9,7 +9,8 @@ export const lang = preferred.map(l => String(l).slice(0, 2).toLowerCase()).find
 const nb = " "; // French puts a narrow no-break space before : and inside « »
 const FR = {
   // The page
-  "Shopping list": "Liste de courses",
+  "Untitled list": "Liste sans nom",
+  "Name this list": "Nommer cette liste",
   "Renamed the list to {x}": "Liste renommée en {x}",
   "renaming the list {x}": "renommer la liste {x}",
   "Add a section": "Ajouter une section",
@@ -30,6 +31,7 @@ const FR = {
   "Data": "Données",
   "Keep them on this phone": "Les garder sur ce téléphone",
   "Export the list": "Exporter la liste",
+  "Delete the list": "Supprimer la liste",
   "Export all lists": "Exporter toutes les listes",
   "Set up another phone": "Préparer un autre téléphone",
   "You": "Vous",
@@ -87,8 +89,8 @@ const FR = {
   "From a file": "Depuis un fichier",
   "{x} moved earlier": "{x} avance",
   "{x} moved later": "{x} recule",
-  "{n} to get": ["{n} à acheter", "{n} à acheter"],
-  "Nothing to get": "Rien à acheter",
+  "{n} to tick": ["{n} à cocher", "{n} à cocher"],
+  "Nothing to tick": "Rien à cocher",
   "Closed": "Fermée",
   "Update Panier to open it": "Mettez Panier à jour pour l’ouvrir",
   "Open the link from a phone that already has a list, or start one with your server's setup code.":
@@ -98,6 +100,9 @@ const FR = {
   "This server wants its setup code for this.": "Ce serveur demande son code d’installation pour cela.",
   "There's no list to bring in from {x}.": "Aucune liste à importer depuis {x}.",
   "Brought in {x}": "Importé" + nb + ": {x}",
+  "Bring in from Google Keep": "Importer depuis Google Keep",
+  "Bring in": "Importer",
+  "Archived": "Archivée",
   "{n} lists": ["{n} liste", "{n} listes"],
 
   // Sections
@@ -109,7 +114,7 @@ const FR = {
   "Add item": "Ajouter un article",
   "Add item to {x}": "Ajouter un article à {x}",
   "{x}, rename": "{x}, renommer",
-  "Bought before": "Déjà achetés",
+  "Ticked before": "Déjà cochés",
   "Colour of {x}": "Couleur de {x}",
   "White": "Blanc", "Ink": "Encre", "Green": "Vert", "Teal": "Bleu canard", "Blue": "Bleu", "Indigo": "Indigo",
   "Plum": "Prune", "Rose": "Rose", "Amber": "Ambre", "Olive": "Olive",

@@ -34,13 +34,11 @@ test("export writes a title, sections in order and checkboxes, with colours in c
 
 test("what is exported reads back the same, several lists too", () => {
   const other = { name: "Hardware store", color: "", sections: [{ name: "Garden", color: "teal", items: [{ text: "Hose", checked: false }] }] };
-  const { lists, skipped } = fromMarkdown(toMarkdown([list, other]));
-  assert.equal(skipped, 0);
-  assert.deepEqual(lists, [list, { ...other, color: null }]);
+  assert.deepEqual(fromMarkdown(toMarkdown([list, other])), [list, { ...other, color: null }]);
 });
 
 test("any Markdown checklist reads: other bullets, numbers, headings of any level, plain lines", () => {
-  const { lists, skipped } = fromMarkdown([
+  const lists = fromMarkdown([
     "---", "title: from a notes app", "---",
     "Some notes before anything",
     "### Fruit",
@@ -59,18 +57,23 @@ test("any Markdown checklist reads: other bullets, numbers, headings of any leve
     [null, ["Some notes before anything"]],
     ["Fruit", ["Apples ✓", "Pears", "Plums"]],
     ["Bakery", ["Bread"]],
-  ]);
-  assert.equal(skipped, 4, "the quote and the code block");
+  ], "the quote and the code block left out");
 });
 
-test("the first export's text files read too, what was bought before going back in the first section", () => {
-  for (const [title, bought] of [["Shopping list, 12 November 2026", "Bought before"], ["Liste de courses, 1er décembre 2026", "Déjà achetés"]]) {
-    const { lists } = fromMarkdown([title, "", "Essentials", "- [ ] 2 eggs", "", "Look out for", "- [ ] Ripe avocados", "", bought, "- [x] Milk", ""].join("\n"));
-    assert.equal(lists.length, 1);
-    assert.equal(lists[0].name, title.split(",")[0]);
-    assert.deepEqual(lists[0].sections.map(s => s.name), ["Essentials", "Look out for"]);
-    assert.deepEqual(lists[0].sections[0].items, [{ text: "2 eggs", checked: false }, { text: "Milk", checked: true }]);
-  }
+test("a plain-text list reads too: a line with items after it names a section", () => {
+  const lists = fromMarkdown(["Essentials", "- [ ] 2 eggs", "", "Look out for", "- Ripe avocados", "Bread", ""].join("\n"));
+  assert.deepEqual(lists[0].sections.map(s => [s.name, s.items.map(i => i.text)]), [["Essentials", ["2 eggs"]], ["Look out for", ["Ripe avocados", "Bread"]]]);
+});
+
+test("a plain sheet's items come before any section, both ways", () => {
+  const plain = { name: "Hardware store", color: "", sections: [
+    { name: "", color: "ess", items: [{ text: "Screws", checked: false }] },
+    { name: "Garden", color: "teal", items: [{ text: "Hose", checked: true }] },
+  ] };
+  const md = toMarkdown([plain]);
+  assert.equal(md, "# Hardware store\n\n- [ ] Screws\n\n## Garden <!-- teal -->\n- [x] Hose\n");
+  assert.deepEqual(fromMarkdown(md)[0].sections.map(s => [s.name, s.items.map(i => i.text)]), [[null, ["Screws"]], ["Garden", ["Hose"]]]);
+  assert.equal(toMarkdown([{ name: "Empty", color: "", sections: [{ name: "", color: "ess", items: [] }] }]), "# Empty\n");
 });
 
 test("pasting several lines gives one item each; one line is just text", () => {

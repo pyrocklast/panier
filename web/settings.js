@@ -6,6 +6,7 @@ import { toMarkdown } from "./md.js";
 import { clean, MAX_SECTION, sheetOfList } from "./model.js";
 import { $, h, download } from "./dom.js";
 import { openSheet, closeThen } from "./sheets.js";
+import { nav } from "./state.js";
 import { openPair } from "./share.js";
 
 const THEME_KEY = "panier-theme", LAYOUT_KEY = "panier-layout";
@@ -26,7 +27,7 @@ async function paintSettings() {
   $("#compact-layout").checked = document.documentElement.dataset.layout === "compact";
   $("#my-name").value = store.myName();
   const all = store.lists();
-  $("#sizes").replaceChildren(...all.map(e => h("li", {}, h("span", {}, e.name || t("Shopping list")), h("span", {}, size(store.storedSize(e.lid))))));
+  $("#sizes").replaceChildren(...all.map(e => h("li", {}, h("span", {}, e.name || t("Untitled list")), h("span", {}, size(store.storedSize(e.lid))))));
   $("#export-all").hidden = $("#phone-open").hidden = !all.length;
   $("#about-server").textContent = location.host;
   const [kept, keys] = await Promise.all([isKept(), caches.keys().catch(() => [])]);
@@ -37,18 +38,22 @@ async function paintSettings() {
   const k = keys.find(k => k.startsWith("panier-") && !k.startsWith("panier-static-"));
   $("#about-version").textContent = k ? k.slice(7) : "dev";
 }
-$("#settings-open").addEventListener("click", () => { paintSettings(); openSheet($("#settings")); });
-$("#settings-close").addEventListener("click", () => $("#settings").close());
+// Settings is a page of its own: the page turns into it from its button, and back.
+const fromButton = () => $("#settings-open");
+const closeSettings = () => nav.turn(false, () => $("#settings").close(), fromButton);
+$("#settings-open").addEventListener("click", () => nav.turn(true, () => { paintSettings(); openSheet($("#settings")); }, fromButton));
+$("#settings-close").addEventListener("click", closeSettings);
+$("#settings").addEventListener("cancel", e => { e.preventDefault(); closeSettings(); }); // Escape
 // Compact: every row 44 px, with smaller gaps and titles, on this phone only.
 $("#compact-layout").addEventListener("change", e => {
   const l = e.target.checked ? "compact" : "";
   try { if (l) localStorage.setItem(LAYOUT_KEY, l); else localStorage.removeItem(LAYOUT_KEY); } catch (_) {}
-  if (window.panierLayout) window.panierLayout(l);
+  window.panierLayout(l);
 });
 for (const r of document.querySelectorAll('input[name="theme"]')) {
   r.addEventListener("change", () => {
     try { if (r.value) localStorage.setItem(THEME_KEY, r.value); else localStorage.removeItem(THEME_KEY); } catch (_) {}
-    if (window.panierTheme) window.panierTheme(r.value);
+    window.panierTheme(r.value);
   });
 }
 $("#my-name").addEventListener("change", e => store.setMyName(clean(e.target.value, MAX_SECTION)));

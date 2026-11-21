@@ -1,6 +1,6 @@
 # Panier
 
-Shopping lists shared between phones, end-to-end encrypted, with no accounts. It runs on Cloudflare's free plan or on a Raspberry Pi at home.
+Private lists, shared between phones: end-to-end encrypted, with no accounts. It runs on Cloudflare's free plan or on a Raspberry Pi at home.
 
 <p align="center"><img src="docs/screens.png" width="560" alt="Panier on two phones. Left, in light mode, the lists page: six lists as sheets of paper, each tinted its own colour, Groceries shared with Alex. Right, in dark mode, the end of the Groceries list: its sections named in their colours, and three ticked items below a dashed line, each box filled with its section’s colour."></p>
 
@@ -12,8 +12,8 @@ Shopping lists shared between phones, end-to-end encrypted, with no accounts. It
 - **No accounts.** Another phone joins a list by scanning a QR code from one that has it.
 - **Offline.** It works without signal and catches up when the connection returns.
 - **An app from the browser.** It installs from Firefox, Chrome or Safari, with no app store.
-- **Made for shopping.** Coloured sections, quantities such as *500 g flour*, suggestions from what you bought before, the last five days of ticked items, drag to reorder, and undo for everything.
-- **Markdown in and out.** A list exports as a Markdown checklist, and any Markdown checklist, or a few pasted lines, comes in.
+- **Made for everyday lists.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, the last five days of ticked items, drag to reorder, and undo for everything.
+- **Markdown in and out.** A list exports as a Markdown checklist, and any Markdown checklist, a few pasted lines, or checklists from Google Keep come in.
 - **In English and French**, light and dark.
 
 ## What it isn't, yet
@@ -43,7 +43,7 @@ First a server, then the phones.
 
 Then, on the phones:
 
-1. On the first phone, open the setup link from the guide. It creates the first list.
+1. On the first phone, open the setup link from the guide. It creates the first list, which opens with its name to type.
 2. On another phone, scan the QR code that *Add someone to this list* shows.
 3. Install the app on each phone: in Firefox, **⋮ → Install**; in Chrome, **⋮ → Install app**; on an iPhone, Safari's **Share → Add to Home Screen**.
 4. Save the list's link in a password manager.
@@ -54,10 +54,10 @@ Then, on the phones:
 - **Tick:** tap the square. Ticked items move to the ticked group after a moment, and stay there for five days.
 - **Edit:** tap the words. Clear them to delete the item.
 - **Move:** hold an item, or a section's name, for half a second, then drag.
-- **Sections:** tap a section's name to rename it or change its colour. *Add a section* is below the last one.
+- **Sections:** a new list is a plain sheet. *Add a section*, below the items, adds a heading when it helps; tap a heading to rename it or change its colour.
 - **The list:** tap its name to rename it or choose its paper's colour.
-- **Lists:** the sheets at the top right of a list, or the back gesture, lead to the lists page: tap a list to open it, *New list* to start one, hold one to move it, or drop it at the foot to delete it, which asks first.
-- **Import:** *From a file* on the lists page brings in a Markdown or text list; several lines pasted into *Add item* become several items.
+- **Lists:** *Lists*, at the top right of a list, or the back gesture, leads to the lists page: tap a list to open it, *New list* to start one, hold one to move it, or drop it at the foot to delete it, which asks first. *Delete the list*, at the foot of a list, does the same.
+- **Import:** *From a file* on the lists page brings in a Markdown or text list, or the checklists in a Google Keep export, chosen first; several lines pasted into *Add item* become several items.
 - **Undo and redo:** the buttons at the bottom right.
 - **Settings**, on the lists page: your name, light or dark, a compact layout, exporting every list, and setting up another phone.
 
@@ -66,6 +66,7 @@ Then, on the phones:
 ## Good to know
 
 - **Browsers:** Firefox 121, Chrome 123, Safari 17.5 or later.
+- **Sideways, or on a tablet or computer,** what's ticked lies beside the list rather than under it, and the lists page has more sheets to a row.
 - **Where the lists live:** in the browser's storage on each phone, and encrypted on the server. If a phone's browser data is cleared, each list's link brings it back. Panier asks the browser to keep the lists even when space runs low; Settings shows whether it agreed.
 - **How long things stay:** ticked items show for five days, then are only suggested. Deleted items are forgotten after about six months.
 - **Size:** the server keeps up to 32 MB per list, about 88,000 changes: many years of weekly shopping for a household. A full list says *List full* and keeps new changes on the phone.
@@ -86,7 +87,7 @@ Then, on the phones:
 
 | Folder | What's in it |
 | --- | --- |
-| [`web/`](web/) | the app, in plain modules: `app.js` starts it and moves between the lists page (`lists.js`) and a list (`list.js`); `store.js` is storage, encryption and sync; `model.js` what a list is made of; `md.js` Markdown; `i18n.js` the words; the rest, one part of the screen each |
+| [`web/`](web/) | the app, in plain modules: `app.js` starts it and moves between the lists page (`lists.js`) and a list (`list.js`); `store.js` is storage, encryption and sync; `model.js` what a list is made of; `md.js` Markdown; `googlekeep.js` Google Keep exports; `i18n.js` the words; the rest, one part of the screen each |
 | [`worker/`](worker/) | the Cloudflare server |
 | `*.go` | the Go server |
 | [`deploy/install.sh`](deploy/install.sh) | the Raspberry Pi installer |
@@ -115,7 +116,7 @@ BASE=http://127.0.0.1:8080 SETUP=<code> STORE=./data node --test test/browser.te
 
 `BROWSER=firefox` runs the browser tests in Firefox, and `LAYOUT=compact` in the compact layout. [`test/update.test.mjs`](test/update.test.mjs) explains how to run the update test.
 
-On every push to `main` and every pull request, GitHub runs the Go tests, the update test, and the API and browser tests on both servers in Chromium, and on the Go server in Firefox. When they pass on `main`, it deploys to Cloudflare. Publishing a release (tag `v…`) builds the Go server for the Raspberry Pi (`arm64`, `armv7`, `armv6`) and `amd64`, with checksums.
+On every push to `main` or `next` and every pull request, GitHub runs the Go tests, the update test, and the API and browser tests on both servers in Chromium, and on the Go server in Firefox. When they pass on `main`, it deploys to Cloudflare; on `next`, to a test copy of its own, *Panier next*, which installs beside Panier with lists of its own, so changes are tried on real phones before they're merged. Publishing a release (tag `v…`) builds the Go server for the Raspberry Pi (`arm64`, `armv7`, `armv6`) and `amd64`, with checksums.
 
 ## Next
 

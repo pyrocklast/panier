@@ -4,7 +4,7 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 
 ## Starting
 
-- **The first phone** opens the app's address and types the server's setup code (see [docs/cloudflare.md](cloudflare.md) or [docs/raspberry-pi.md](raspberry-pi.md) for where it comes from). The first list starts with three sections.
+- **The first phone** opens the app's address and types the server's setup code (see [docs/cloudflare.md](cloudflare.md) or [docs/raspberry-pi.md](raspberry-pi.md) for where it comes from). The first list opens with its name to type.
 - **Another phone** joins with *Add someone to this list*, at the bottom of the list: it shows a QR code to scan, and buttons to share or copy the link.
 - **Keep a copy of each list's link** in a password manager. It is the key to the list: it's the only way to get the list back if every phone is lost, and anyone who has it can open the list.
 - **Install it** so it opens like an app, full screen and offline: in Firefox, **⋮ → Install** (or **Add to home screen**); in Chrome, **⋮ → Install app**; on an iPhone, Safari's **Share → Add to Home Screen**.
@@ -14,36 +14,30 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 
 A phone holds any number of lists, each shared with its own people. The app opens on the list last used.
 
-- **The lists page** is reached with the sheets at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to get, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
-- **Open** a list with a tap.
+- **The lists page** is reached with *Lists*, at the top right of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to tick, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
+- **Open** a list with a tap. The page turns quietly into it: the desk takes the list's colour as the list's words open out of its sheet. Going back, with *Lists* or the back gesture, they draw back into it.
 - **New list:** type a name on the blank strip under the sheets; the new list opens ready to write on. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
-- **Move** a list: hold it, then drag it to its new place. From a keyboard, Alt and an arrow move it one place earlier or later.
-- **Delete** a list: drag it onto the zone that appears at the foot, or press Delete on it from a keyboard. Lists are deleted only here, and only once asked. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
+- **Move** a list: hold it, then drag it to its new place; the others glide aside. From a keyboard, Alt and an arrow move it one place earlier or later.
+- **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, at the foot of the list itself. It always asks first. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
 - **Settings** is at the top right of the lists page.
 
 ## The page
 
-The list is written on the page itself, like paper: one left edge, ruled lines between items and under section names, and an underline where you type. Only what is lifted off the page has a shadow: something being dragged, the undo button, the sheets.
+The list is written on the page itself, like paper: one left edge, ruled lines between items and under section names, and an underline where you type. Only what is lifted off the page has a shadow: something being dragged, the undo button, the sheets, which rise onto the page as it dims behind them.
 
-- **The list's name** is the title at the top, *Shopping list* to start with. Tap it to rename it. It also names the exported file. At its right, the sheets lead to the lists page.
+- **The list's name** is the title at the top. A new list is named as it's made; one without a name says *Name this list* there, and is *Untitled list* elsewhere. Tap it to rename it. It also names the exported file. At its right, *Lists* leads to the lists page.
 - **The list's colour.** While you rename the list, colours show under its name: white and eight hues. The paper is warm paper dyed with the colour, the ruled lines a deeper dye, the title a deep shade of it, and the writing leans its way. The browser's bars follow, and the app opens in the colour without a flash of white.
 - **The eight colours weigh the same.** Each is a single hue, and every tone of it, from paper to tick box, is that hue at a lightness set by what it's for, so no colour shouts or fades beside another, in light or dark.
 - Every phone sees the name and colour, and undo puts the old ones back.
 
 ## Sections
 
-A list starts with three sections:
+A new list is a plain sheet: its items sit under its name, with no heading. *Add a section* adds headings when they help: the items without one stay first, above them. Lists made before plain sheets keep the three sections they started with, *Essentials*, *Look out for* and *Long term*.
 
-| Section | Colour | For |
-| --- | --- | --- |
-| Essentials | ink | everyday things the home runs on |
-| Look out for | amber | things to buy if you come across them |
-| Long term | indigo | things to get eventually |
-
-- **Rename** a section by tapping its name. Every phone sees the new name. Emptying the name and leaving puts the old one back.
-- **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it at once. Its name is written in a deep shade of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
+- **Rename** a section by tapping its heading. Every phone sees the new name. Emptying the name and leaving puts the old one back.
+- **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it, the new colour spreading over it, as it does over the list's paper. Its name is written in a deep shade of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
 - **Add a section** with *Add a section*, below the last one. It gets the first colour not used yet. Enter or `+` adds it, the cross clears what you typed, and the cursor then moves to its *Add item* row.
-- **Delete** a section once nothing is left to get in it: while you rename it, a cross appears. The last section can't be deleted. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
+- **Delete** a section once nothing is left to tick in it: while you rename it, a cross appears. The items without a heading, at the top, always have their place. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 
 ## Adding items
 
@@ -51,22 +45,22 @@ A list starts with three sections:
 - **Enter** or `+` adds the item and keeps the field open for the next one.
 - **Leaving the field** adds what you typed, so nothing is lost, and what you tapped to leave stays where it is on screen. A notification or switching apps doesn't cut it short. Text left in the field when the app closes is added the next time it opens.
 - **The cross** at the end of the row throws away what you typed, and the cursor stays in the field. Escape does the same from a keyboard, once any suggestions are closed.
-- **Something already on the list** is highlighted instead of added twice. Typing the full name of something bought before puts that item back, into the section you are typing in.
+- **Something already on the list** is highlighted instead of added twice. Typing the full name of something ticked before puts that item back, into the section you are typing in.
 - **Quantities.** A number at the start, such as *2 milk*, *2× milk*, *500 g flour*, *1.5kg potatoes*, *2 litres of milk* or *3 paquets de pâtes*, is shown in bold, slightly apart from the name. It's left out when comparing names: *2 litres of milk* is still Milk, typing *3 milk* while it's on the list changes the quantity, and *mil* suggests Milk.
-- A quantity is for one shop. The ticked group still shows it, so unticking a mistake puts the item back as it was, but a suggestion brings the item back without it.
+- A quantity is for this time only. The ticked group still shows it, so unticking a mistake puts the item back as it was, but a suggestion brings the item back without it.
 
 ## Suggestions
 
-- From the second letter, items bought before are suggested above the field, where the phone's keyboard can't hide them.
-- Accents and capitals don't matter. Names that start with what you typed come first, then names with a word that does, then the most recently bought. Five at most.
+- From the second letter, items ticked before are suggested above the field, where the phone's keyboard can't hide them.
+- Accents and capitals don't matter. Names that start with what you typed come first, then names with a word that does, then the most recently ticked. Five at most.
 - **Tap a suggestion** to put the item back, with any quantity typed so far: *2 mil*, then Milk, gives *2 milk*. Enter only adds what you typed.
 - **The × on a suggestion** removes that item for good, for typos such as *Mlik*. Undo brings it back.
 
 ## Ticking
 
-- **Tap the square** to tick an item: it fills with its section's colour. A short vibration confirms it in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
+- **Tap the square** to tick an item: it fills with its section's colour, and the words are struck through, as with a pen. A short vibration confirms it in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row leave together and the list doesn't move under your thumb.
-- They then slide into **the ticked group**, below the sections, after a dashed tear line, which fills with the colours of what's been got. It shows what was ticked in the last five days, latest first, so you can check what was bought lately. Its heading, such as *3 ticked*, folds it away.
+- They then rise off the page, travel to **the ticked group**, taking the size of its smaller rows on the way, and settle into the page there. It lies below the sections, after a dashed tear line. Its boxes fill with the colours of what's been ticked. It shows what was ticked in the last five days, latest first, so you can check what was done lately. Its heading, such as *3 ticked*, folds it away.
 - Older ticked items are hidden, but still suggested when you type.
 - **Untick** an item by tapping its square: it goes back to the end of its section, or of the first section if its own was deleted.
 - **Drag** an item onto the drop zone under the ticked group's heading to tick it, or drag a ticked item into a section to put it back exactly where you drop it.
@@ -83,7 +77,7 @@ A list starts with three sections:
 
 - **Hold an item** for about half a second: it lifts and its tick box turns into a grip. Drag it anywhere, including into another section; the grip takes the colour of the section it's over. Letting go without moving does nothing. With a mouse, dragging starts as soon as you move.
 - **Hold a section's name** to move the section. While it moves, every section folds down to its name, so long ones are easy to reorder; they unfold when you let go, and the one you moved stays where you dropped it.
-- What you let go of glides into its place, and anything else that moves after a change glides too, without getting in the way of a tap.
+- While you drag, what's in the way glides aside. What you let go of glides into its place and settles into the page, and anything else that moves after a change glides too, without getting in the way of a tap. What you add stays where you typed it, and what you delete fades where it was.
 
 ## Undo and redo
 
@@ -103,11 +97,12 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 - [x] Eggs
 ```
 
-`#` is the list's name, `##` each section in order, `- [ ]` an item to get, `- [x]` one bought before, under its section. Colours ride in comments after the headings, which notes apps hide.
+`#` is the list's name, `##` each section in order, `- [ ]` an item to tick, `- [x]` one ticked before, under its section. Items before the first `##` are those without a heading. Colours ride in comments after the headings, which notes apps hide.
 
 - **Export the list**, at the bottom of a list, saves it as a `.md` file named after it.
 - **Export all lists**, in Settings, saves every list in one file, each under its own `#`.
-- **From a file**, on the lists page, brings in a list, or several from one file. It reads any Markdown checklist: other bullets, numbered lines, headings of any level, plain lines. It also reads the `.txt` files the earlier *Export the list* saved. Items bought before come in as suggestions, not ticked.
+- **From a file**, on the lists page, brings in a list, or several from one file. It reads any Markdown checklist: other bullets, numbered lines, headings of any level, plain lines, where a line followed by items names a section. Items ticked before come in as suggestions, not in the ticked group.
+- **From Google Keep:** in [Google Takeout](https://takeout.google.com), choose only Keep and export, then pick the `.zip` it gives with *From a file*, or the `.json` files inside it. Panier lists the checklists it finds, last edited first, each as its sheet will show; all are ticked to come in but archived ones. Each becomes a list with the note's title and colour, its items in one section, ticked as they were. Text notes and notes in the bin stay behind. Everything is read on the phone.
 - **Pasting several lines** into *Add item* adds one item per line, in that section, in one step to undo. Names already on the list are left as they are.
 
 ## People
@@ -125,17 +120,38 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 - Without a connection, the app keeps working. A pill at the bottom left shows *Offline*; tap it to see how many changes are waiting. They are sent when the connection returns. *Can't reach the server* means the phone is online but the server isn't answering.
 - *List full* means the server has no room left for the list (32 MB, many years of use). Changes are kept on the phone.
 
+## Sideways and on wider screens
+
+On a phone turned on its side, or a tablet or computer, the page uses the width:
+
+- **A list** lies in one wider column, and what's ticked lies beside it, torn off to the side, in view as you scroll. A ticked item crosses over to it, and an item dragged across is ticked.
+- **The lists page** has as many sheets to a row as fit.
+- **Settings** puts each part's heading on the left, beside what it holds.
+- **A phone on its side** keeps the layout chosen in Settings: the compact one fits more in its height. The share sheet puts its code beside its words, so it fits.
+
 ## Settings
 
 *Settings*, at the top of the lists page, opens a page of its own; the phone's back gesture closes it. Settings are chosen on each phone.
 
 - **You:** your name, shown to the people you share lists with.
-- **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and each list on one line on the lists page.
+- **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page.
 - **Data:**
   - Whether the browser keeps the lists even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep them on this phone* asks again.
   - How much space each list takes on this phone.
   - *Export all lists* and *Set up another phone*, above.
 - **About:** the version, the server, and what the server can and can't see.
+
+## Motion
+
+Panier is paper, and what moves says where it happens:
+
+- **On the page**, what's written fades in or out where it is: an item added or deleted, a box filling, the pen stroke, suggestions, colours under a name, what others change, tinted a moment.
+- **Along the page**, rows and sections glide to their new places, the ticked group folds and unfolds, and what's in the way glides aside during a drag.
+- **Off the page**, what you hold lifts, with a shadow; a ticked item travels to the ticked group and settles there.
+- **On top**, the sheets, undo and the connection's status rise into place, and sink or fade away, quicker, as they go.
+- **The page itself** turns, between the lists page and a list or Settings, out of what you tapped and back into it, and takes a new colour.
+
+Each takes 0.15 s to give feedback, 0.24 s to arrive or 0.32 s to move, a little longer for a long trip. When the phone asks for reduced motion, nothing moves.
 
 ## Keyboard and screen readers
 
@@ -149,8 +165,10 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 
 In suggestions, ↓ and ↑ choose one, → moves to its ×, Enter picks it and Shift+Delete removes it.
 
-Changes are announced to screen readers. Light and dark follow the phone unless chosen in Settings, and reduced motion is respected. On the list, text, tick boxes and buttons keep WCAG AA contrast on every list and section colour, in both themes.
+On the lists page, Alt and an arrow move a list, and Delete deletes it, once asked.
+
+Changes are announced to screen readers. Light and dark follow the phone unless chosen in Settings, and when the phone asks for reduced motion, nothing moves. Text, tick boxes and buttons keep WCAG AA contrast on every list and section colour, in both themes, on a list and on the lists page.
 
 ## Languages
 
-Panier is in English and French, following the phone's language. The starting section names follow it too, until one is renamed: *Essentiels*, *À l’occasion*, *À long terme*, and the list is called *Liste de courses*. The words live in [`web/i18n.js`](../web/i18n.js); another language is one more table there.
+Panier is in English and French, following the phone's language. The words live in [`web/i18n.js`](../web/i18n.js); another language is one more table there.

@@ -6,14 +6,15 @@
 //   - [ ] 2 milk
 //   - [x] Eggs
 //
-// "#" is a list's name, "##" each of its sections in order, "- [ ]" an item to get and
-// "- [x]" one bought before, under its section, so unticking puts it back there.
+// "#" is a list's name, "##" each of its sections in order, "- [ ]" an item to tick and
+// "- [x]" one ticked before, under its section, so unticking puts it back there. Items
+// before the first "##" are in the section without a name, which has no heading.
 // Colours ride in comments after the headings, which Markdown hides. A file can hold
 // several lists, each under its own "#".
 //
 // Reading is lenient, so lists from elsewhere come in too: any heading below "#" is a
 // section, any bullet or numbered line an item, and so is a plain line, unless items
-// follow it, as section names did in the text files the first export wrote.
+// follow it, when it names a section, as plain-text lists often do.
 
 // Colours by name in files, by id in the app.
 const COLOURS = { ess: "ink", green: "green", teal: "teal", blue: "blue", long: "indigo", plum: "plum", rose: "rose", look: "amber", olive: "olive" };
@@ -27,7 +28,8 @@ export function toMarkdown(lists) {
   return lists.map(l => {
     const out = ["# " + one(l.name) + tag(l.color)];
     for (const s of l.sections) {
-      out.push("", "## " + one(s.name) + tag(s.color));
+      if (s.name) out.push("", "## " + one(s.name) + tag(s.color));
+      else if (s.items.length) out.push("");
       for (const i of s.items) out.push((i.checked ? "- [x] " : "- [ ] ") + one(i.text));
     }
     return out.join("\n");
@@ -39,8 +41,6 @@ const COLOUR = /\s*<!--\s*([a-z]+)\s*-->\s*$/i;
 const TASK = /^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s+(.*)$/;
 const BULLET = /^\s*(?:[-*+•]|\d+[.)])\s+(.*)$/;
 const NOISE = /^\s*(?:>|\||<!--|-{3,}\s*$|\*{3,}\s*$|_{3,}\s*$)/; // quotes, tables, comments, rules
-const DATED = /,\s+\d{1,2}(?:er)?\s+\S+\s+\d{4}$/; // the first export's title: "Shopping list, 12 November 2026"
-const BOUGHT = /^(?:bought before|déjà achetés)$/i; // and its last section
 
 function named(s) {
   const m = COLOUR.exec(s);
@@ -54,12 +54,12 @@ const itemOf = line => {
   return m ? { text: one(m[1].replace(/^\[\s?\]\s+/, "")), checked: false } : null;
 };
 
-// fromMarkdown reads lists from a file: { lists, skipped }, skipped counting the lines it
-// couldn't use. A list or section without a name has name null; one without a colour,
-// color null; a list's sections in order, an item's text as written.
+// fromMarkdown reads the lists in a file, leaving out lines it can't use, such as quotes,
+// tables and code. A list or section without a name has name null; one without a
+// colour, color null; a list's sections in order, an item's text as written.
 export function fromMarkdown(text) {
   const lines = String(text).replace(/^﻿/, "").replace(/\r\n?/g, "\n").split("\n");
-  let k = 0, skipped = 0, fence = false;
+  let k = 0, fence = false;
   if (lines[0] && lines[0].trim() === "---") { // front matter, as notes apps write it
     const end = lines.findIndex((l, i) => i > 0 && l.trim() === "---");
     if (end > 0) k = end + 1;
@@ -80,8 +80,8 @@ export function fromMarkdown(text) {
   const next = i => { for (let j = i + 1; j < lines.length; j++) if (lines[j].trim()) return lines[j]; return null; };
   for (let i = k; i < lines.length; i++) {
     const line = lines[i];
-    if (/^\s*(```|~~~)/.test(line)) { fence = !fence; skipped++; continue; }
-    if (fence) { if (line.trim()) skipped++; continue; }
+    if (/^\s*(```|~~~)/.test(line)) { fence = !fence; continue; }
+    if (fence) continue;
     if (!line.trim()) continue;
     const h = HEADING.exec(line);
     if (h) {
@@ -92,22 +92,12 @@ export function fromMarkdown(text) {
     }
     const it = itemOf(line);
     if (it) { add(it); continue; }
-    if (NOISE.test(line)) { skipped++; continue; }
+    if (NOISE.test(line)) continue;
     const plain = one(line), after = next(i);
-    if (!lists.length && DATED.test(plain) && !(after && itemOf(after))) { newList(plain.replace(DATED, ""), null); continue; }
     if (after && itemOf(after) && plain.length <= 60) { newSection(named(plain).name, named(plain).color); continue; }
     add({ text: plain, checked: false });
   }
-  // The first export listed what was bought before in a section of its own: those items
-  // go back into the first section, still ticked.
-  for (const l of lists) {
-    const bought = l.sections.filter(s => s.name && BOUGHT.test(s.name) && s.items.every(i => i.checked));
-    if (!bought.length) continue;
-    l.sections = l.sections.filter(s => !bought.includes(s));
-    if (!l.sections.length) l.sections.push({ name: null, color: null, items: [] });
-    for (const s of bought) l.sections[0].items.push(...s.items);
-  }
-  return { lists: lists.filter(l => l.name || l.sections.some(s => s.items.length || s.name)), skipped };
+  return lists.filter(l => l.name || l.sections.some(s => s.items.length || s.name));
 }
 
 // pastedItems reads what was pasted into an Add item field: several lines become several

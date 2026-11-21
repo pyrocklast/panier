@@ -141,10 +141,6 @@ async function createList(req, env) {
   return created ? new Response(null, { status: 201, headers: HEADERS }) : text(409, "list already exists");
 }
 
-// Lists stored by the version before ListV2. Nothing reaches them any more; the class
-// stays until a migration deletes it, with their data, once every list has been restored.
-export class List extends DurableObject {}
-
 export class ListV2 extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);

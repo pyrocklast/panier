@@ -25,7 +25,7 @@ From now on, stored data only gains new kinds of record, under `@`, which older 
 
 ### Several lists
 
-The lists page is the surface the lists lie on, side by side, each list a small sheet of its own paper, with its name, who else has it, the first three things left to get, and how many there are. Lists are deleted only there, and only once asked. It is reached from the *Lists* control at the right of a list's header, or the back gesture, and it holds Settings. The app opens on the last list used.
+The lists page is the surface the lists lie on, side by side, each list a small sheet of its own paper, with its name, who else has it, the first three things left to tick, and how many there are. Lists are deleted there, or at the foot of the list itself, and only once asked. It is reached from the *Lists* control at the right of a list's header, or the back gesture, and it holds Settings. The app opens on the last list used.
 
 Only the list on screen keeps a live connection. The others catch up when the lists page shows, and send what they have waiting when the connection returns.
 
@@ -44,7 +44,7 @@ A phone that holds a list on a server may create more lists there, proving it wi
 - [ ] Ripe avocados
 ```
 
-`#` is the list's name, `##` each section in order, `- [ ]` an item to get, `- [x]` one bought before, kept under its section so unticking puts it back there. Colours ride in comments after the headings, which Markdown hides: they work for several lists in one file, which a block at the top couldn't. *Export all lists* writes one file with a `#` per list. The reader also takes any Markdown checklist, plain lines, and the `.txt` files the earlier *Export the list* wrote. Pasting several lines into *Add item* adds one item per line.
+`#` is the list's name, `##` each section in order, `- [ ]` an item to tick, `- [x]` one ticked before, kept under its section so unticking puts it back there. Colours ride in comments after the headings, which Markdown hides: they work for several lists in one file, which a block at the top couldn't. *Export all lists* writes one file with a `#` per list. The reader also takes any Markdown checklist and plain lines. Pasting several lines into *Add item* adds one item per line.
 
 ### More people
 
@@ -73,4 +73,4 @@ The `next` branch deploys to `panier-next`, a Worker of its own on the same `wor
 1. Pass the import gate in the test copy, with every export restored there.
 2. Merge `next` into `main`. Each phone opens on an empty lists page.
 3. One person imports each export, then shares each list with the others. Save the new links.
-4. Once every list is back, a Wrangler migration deletes the old Durable Object class and its data. Until then, reverting the merge brings the old Panier back as it was.
+4. Once every list is back, a Wrangler migration deletes the old Durable Object class and its data, and each phone clears what the old version left. Until then, reverting the merge brings the old Panier back as it was. Done: every list came back, so `v3` in `wrangler.jsonc` deleted the old class.

@@ -1,19 +1,19 @@
 // The lists page. Each list lies on it as a sheet of its own paper, the sheets side by
-// side: its name, who else has it, the first three things to get and how many there are,
+// side: its name, who else has it, the first three things to tick and how many there are,
 // as this phone last saw them. Tap one to open it; hold to drag it to another place, or
 // onto the zone at the foot to delete it. The blank strip under them starts a new list.
 
 import * as store from "./store.js";
 import { t, plural, q, lang } from "./i18n.js";
 import { fromMarkdown } from "./md.js";
+import { readKeep } from "./googlekeep.js";
 import { state, nav, draftsKey } from "./state.js";
-import { clean, MAX_SECTION, listColorOk, importOps } from "./model.js";
-import { $, h, fillText, addRow, emptyField, announce, activeFk, buzz, setRows } from "./dom.js";
+import { clean, MAX_SECTION, listColorOk, importOps, startOps } from "./model.js";
+import { $, h, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, reduceMotion } from "./dom.js";
 import { bindPress, beginDrag } from "./press.js";
-import { float } from "./motion.js";
+import { float, fly, shuffle } from "./motion.js";
 import { noteUndo, paintDock } from "./bar.js";
-import { confirmSheet } from "./sheets.js";
-import { openPair } from "./share.js";
+import { confirmSheet, openSheet } from "./sheets.js";
 import { keepList } from "./settings.js";
 
 // Who else has a list, in a few quiet words under its name: two names at most, then a count.
@@ -24,7 +24,7 @@ function withOf(e) {
   const who = names.length ? [...names, ...(more ? [plural(more, "{n} other", "{n} others")] : [])] : [plural(more, "{n} other phone", "{n} other phones")];
   return t("with {x}", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(who) });
 }
-const countOf = e => (e.closed ? t("Closed") : e.newer ? t("Update Panier to open it") : e.toGet ? plural(e.toGet, "{n} to get", "{n} to get") : t("Nothing to get"));
+const countOf = e => (e.closed ? t("Closed") : e.newer ? t("Update Panier to open it") : e.toGet ? plural(e.toGet, "{n} to tick", "{n} to tick") : t("Nothing to tick"));
 // Each sheet keeps its element from one drawing to the next, and only what changed is
 // written, so a sheet held or focused stays as it is while the lists catch up.
 const cards = new Map(); // list id → { li, btn, name, who, first, count, shown }
@@ -35,7 +35,7 @@ function cardOf(e) {
     const btn = h("button", { type: "button", class: "sheet-open", dataset: { fk: "sheet-" + e.lid } },
       h("span", { class: "sheet-in", "aria-hidden": "true" }, name, who, first, count));
     const li = h("li", { class: "sheet-card", "data-lid": e.lid }, btn);
-    btn.addEventListener("click", () => { if (state.suppressClick) { state.suppressClick = false; return; } nav.showList(e.lid); });
+    btn.addEventListener("click", () => { if (state.suppressClick) { state.suppressClick = false; return; } nav.turn(true, () => nav.showList(e.lid), () => btn); });
     btn.addEventListener("keydown", ev => {
       const dir = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[ev.key];
       if (ev.altKey && dir) { ev.preventDefault(); moveSheet(e.lid, dir); }
@@ -44,7 +44,7 @@ function cardOf(e) {
     bindPress(li, { can: () => true, start: (offY, y, offX, x) => startSheetDrag(li, e.lid, offY, y, offX, x) });
     cards.set(e.lid, (c = { li, btn, name, who, first, count, shown: "" }));
   }
-  const nm = e.name || t("Shopping list"), cnt = countOf(e), gone = !!(e.closed || e.newer), first = gone ? [] : e.first || [];
+  const nm = e.name || t("Untitled list"), cnt = countOf(e), gone = !!(e.closed || e.newer), first = gone ? [] : e.first || [];
   const w = gone ? "" : withOf(e);
   const shown = JSON.stringify([nm, cnt, first, e.color, gone, w]);
   if (c.shown !== shown) {
@@ -81,6 +81,7 @@ export function renderLists() {
 }
 export const say = msg => { notice = msg; renderLists(); announce(msg); };
 
+const SHEETS = "#sheets > .sheet-card";
 // Sheets lie side by side, so a dragged one follows the finger both ways, and goes before
 // the first sheet it's left of, on its row, or above.
 function startSheetDrag(li, lid, offY, y, offX, x) {
@@ -110,40 +111,42 @@ function placeSheet(y, x) {
     const r = c.getBoundingClientRect();
     if (y < r.top - gap || (y <= r.bottom + gap && x < r.left + r.width / 2)) { before = c; break; }
   }
-  if (state.drag.li.nextElementSibling !== before) ul.insertBefore(state.drag.li, before);
+  if (state.drag.li.nextElementSibling !== before) shuffle(SHEETS, () => ul.insertBefore(state.drag.li, before)); // the others glide aside
 }
 function endSheetDrag() {
   const { lid, li, toRemove, ghost, before } = state.drag;
   const order = [...$("#sheets").children].map(c => c.dataset.lid);
-  ghost.remove();
+  const from = ghost.getBoundingClientRect();
   li.classList.remove("placeholder", "away"); // the same sheet stays on the page
   $("#remove-drop").classList.remove("over");
   document.documentElement.classList.remove("dragging-sheet");
   state.drag = null;
   if (!toRemove && order.join() !== before) store.reorder(order);
   renderLists();
+  if (toRemove || reduceMotion.matches) ghost.remove();
+  else fly({ li: ghost, rect: from, part: null }, li.getBoundingClientRect(), li); // it settles into its place
   if (toRemove) askDelete(lid);
 }
 function moveSheet(lid, dir) {
   const order = store.lists().map(e => e.lid), i = order.indexOf(lid), j = i + dir;
   if (j < 0 || j >= order.length) return;
   [order[i], order[j]] = [order[j], order[i]];
-  store.reorder(order);
+  shuffle(SHEETS, () => { store.reorder(order); renderLists(); }); // the store redraws the page as it changes
   const e = store.lists().find(x => x.lid === lid);
-  announce(t(dir < 0 ? "{x} moved earlier" : "{x} moved later", { x: e.name || t("Shopping list") }));
-  renderLists();
+  announce(t(dir < 0 ? "{x} moved earlier" : "{x} moved later", { x: e.name || t("Untitled list") }));
   const el = document.querySelector('[data-fk="sheet-' + lid + '"]');
   if (el) el.focus();
 }
 
-// A list is deleted only here, on the lists page, dropped on the zone at the foot or with
-// the Delete key, and only once asked. From this phone, the others keep it and its link
+// A list is deleted only once asked: on the lists page, dropped on the zone at the foot or
+// with the Delete key, or with Delete the list, at the foot of the list itself, which a
+// screen reader on a phone can reach. From this phone, the others keep it and its link
 // brings it back, and undo does too, until the app closes. For everyone, it asks again,
 // as nothing brings it back.
-function askDelete(lid) {
+export function askDelete(lid) {
   const e = store.lists().find(x => x.lid === lid);
   if (!e) return;
-  const name = e.name || t("Shopping list"), w = e.with, others = !!(w && (w.names.length || w.nameless));
+  const name = e.name || t("Untitled list"), w = e.with, others = !!(w && (w.names.length || w.nameless));
   confirmSheet({
     title: t("Delete {x}?", { x: q(name) }),
     text: e.closed ? t("It's closed already: this takes what's left of it off this phone.")
@@ -157,6 +160,7 @@ function askDelete(lid) {
       ok: t("Delete for everyone"),
       run: async () => {
         await store.deleteForEveryone(lid);
+        try { localStorage.removeItem(draftsKey(lid)); } catch (_) {} // what was typed in it goes too
         $("#confirm").close();
         announce(t("Deleted {x} for everyone", { x: name }));
         lostFocus($("#sheets .sheet-open") || $("#new-list"));
@@ -169,23 +173,21 @@ const lostFocus = el => { if (!document.activeElement || document.activeElement 
 function removeList(lid) {
   const e = store.lists().find(x => x.lid === lid);
   if (!e) return;
-  const name = e.name || t("Shopping list"), dk = draftsKey(lid);
+  const name = e.name || t("Untitled list"), dk = draftsKey(lid);
   let drafts = null;
   try { drafts = localStorage.getItem(dk); localStorage.removeItem(dk); } catch (_) {}
-  state.removed.push({ label: t("deleting {x}", { x: q(name) }), r: store.remove(lid), drafts, dk });
   noteUndo(name);
+  shuffle(SHEETS, () => { state.removed.push({ label: t("deleting {x}", { x: q(name) }), r: store.remove(lid), drafts, dk }); renderLists(); });
   announce(t("Deleted {x} from this phone", { x: name }));
-  renderLists();
   lostFocus($("#undo")); // which would bring it back
 }
 export function undoRemove() {
   const u = state.removed.pop();
   if (!u) return;
-  store.restore(u.r);
   try { if (u.drafts) localStorage.setItem(u.dk, u.drafts); } catch (_) {}
   noteUndo(null);
+  shuffle(SHEETS, () => { store.restore(u.r); renderLists(); });
   announce(t("Undid {x}", { x: u.label }));
-  renderLists();
 }
 
 // A new list starts from a name, typed on the blank strip. The server makes it on the
@@ -215,7 +217,7 @@ async function create(make, done) {
 addRow($("#new-list-form"), $("#new-list"), {
   add: () => {
     const name = clean($("#new-list").value, MAX_SECTION);
-    if (name) create(code => store.createList({ code, name }), lid => {
+    if (name) create(code => store.createList({ code, ops: startOps(name) }), lid => {
       emptyField($("#new-list"));
       announce(t("Added {x}", { x: name }));
       nav.showList(lid);
@@ -233,7 +235,7 @@ $("#setup-form").addEventListener("submit", async e => {
   const code = $("#setup-code").value;
   if (!code.trim() || creating) return;
   creating = true;
-  const p = pending || { make: c => store.createList({ code: c }), done: lid => { nav.showList(lid); openPair(); keepList(); } };
+  const p = pending || { make: c => store.createList({ code: c, ops: startOps() }), done: lid => { nav.showList(lid); keepList(); nav.editName(); } };
   try {
     const r = await p.make(code);
     pending = null;
@@ -248,19 +250,26 @@ $("#setup-form").addEventListener("submit", async e => {
   }
 });
 
+// From a file: Markdown and plain text come straight in. Notes from Google Keep are
+// chosen first, as Takeout brings every note there is.
 $("#import-open").addEventListener("click", () => $("#import-file").click());
 $("#import-file").addEventListener("change", async e => {
-  const f = e.target.files && e.target.files[0];
+  const files = [...(e.target.files || [])];
   e.target.value = "";
-  if (!f) return;
-  let text = "";
-  try { text = await f.text(); } catch (_) {}
-  const { lists } = fromMarkdown(text);
-  if (!lists.length) return say(t("There's no list to bring in from {x}.", { x: f.name }));
+  if (!files.length) return;
+  const keep = files.filter(f => /\.(zip|json)$/i.test(f.name));
+  const lists = [];
+  for (const f of files.filter(f => !keep.includes(f))) lists.push(...fromMarkdown(await f.text().catch(() => "")));
+  if (keep.length) lists.push(...(await readKeep(keep).catch(() => [])));
+  if (!lists.length) return say(t("There's no list to bring in from {x}.", { x: new Intl.ListFormat(lang, { type: "conjunction" }).format(files.map(f => f.name)) }));
+  if (keep.length) pick(lists);
+  else bringIn(lists);
+});
+function bringIn(lists) {
   const made = lists.map(importOps);
   create(async code => {
     const lids = [];
-    for (const m of made) { lids.push(await store.createFrom(m.ops, { code })); code = null; }
+    for (const m of made) { lids.push(await store.createList({ code, ops: [...startOps(), ...m.ops] })); code = null; }
     return lids;
   }, lids => {
     const n = made.reduce((a, m) => a + m.n, 0);
@@ -268,7 +277,26 @@ $("#import-file").addEventListener("change", async e => {
     if (lids.length === 1) nav.showList(lids[0]);
     else renderLists();
   });
-});
+}
+// Each note as its sheet will show: its name, what there is to tick and the first three
+// of them. All are ticked to come in but those archived, which are mostly done with;
+// Bring in waits for one at least.
+function pick(lists) {
+  const ok = $("#pick-ok");
+  const boxes = lists.map(l => h("input", { type: "checkbox", class: "chk", checked: !l.archived }));
+  const ready = () => { ok.disabled = !boxes.some(b => b.checked); };
+  $("#pick-list").replaceChildren(...lists.map((l, i) => {
+    const toGet = l.sections.flatMap(s => s.items).filter(it => !it.checked).map(it => clean(it.text));
+    const about = [l.archived && t("Archived"), toGet.length ? plural(toGet.length, "{n} to tick", "{n} to tick") : t("Nothing to tick"), toGet.slice(0, 3).join(", ")];
+    boxes[i].addEventListener("change", ready);
+    return h("li", null, h("label", null, boxes[i], h("span", { class: "box", "aria-hidden": "true" }),
+      h("span", { class: "pick-in" }, h("span", { class: "pick-name" }, clean(l.name || "", MAX_SECTION) || t("Untitled list")), h("span", { class: "pick-about" }, about.filter(Boolean).join(" · ")))));
+  }));
+  ready();
+  ok.onclick = () => { $("#pick").close(); bringIn(lists.filter((_, i) => boxes[i].checked)); };
+  openSheet($("#pick"));
+}
+$("#pick-cancel").addEventListener("click", () => $("#pick").close());
 // Opening a list clears what was last said here; coming back from one, the cursor returns
 // to its sheet.
 export const clearNotice = () => { notice = ""; };

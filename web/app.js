@@ -4,15 +4,17 @@
 import * as store from "./store.js";
 import { translatePage } from "./i18n.js";
 import { state, nav } from "./state.js";
-import { $ } from "./dom.js";
+import { $, reduceMotion } from "./dom.js";
 import * as list from "./list.js";
 import * as lists from "./lists.js";
 import { paintStatus } from "./bar.js";
 import { follow } from "./sheets.js";
-import { openPair, peopleChanged } from "./share.js";
+import { peopleChanged } from "./share.js";
 import { keepList } from "./settings.js";
+import { startOps } from "./model.js";
 
-$("#lists-open").addEventListener("click", showLists);
+$("#lists-open").addEventListener("click", () => turn(false, showLists));
+$("#delete-open").addEventListener("click", () => lists.askDelete(state.lid)); // which shows the lists page once it's gone
 // Undo is the list's on a list, and on the lists page brings back a list deleted from this phone.
 const undo = () => (state.view === "lists" ? lists.undoRemove() : list.undo());
 const redo = () => { if (state.view === "list") list.redo(); };
@@ -49,6 +51,39 @@ store.subscribe(kind => {
   }
 });
 
+// Between pages, the lists page and a list or Settings, the page turns quietly
+// (app.css): beneath, its colour changes into the other's; on it, the words fade out and
+// the new ones fade in. Going in, they come out of what was tapped, the list's sheet or
+// Settings, a touch nearer; coming back, the words leave into it and the page settles
+// around it. It turns for a tap and for the back gesture; anything else changes the page
+// at once, as the browser changes it a moment after it's asked, once it has a picture of
+// the page as it was. Where the browser can't, the page simply changes.
+let turning = false;
+const words = () => document.querySelector("#settings[open] .page-in") || $(state.view === "list" ? "#app" : "#lists");
+function turn(into, update, at = () => lists.sheetButton(state.lid)) {
+  if (!document.startViewTransition || reduceMotion.matches || turning) return update();
+  turning = true;
+  const root = document.documentElement;
+  // The middle of what was tapped, or of the screen, as seen from each page's words
+  const middle = () => { const el = at(), r = el && el.getBoundingClientRect(); return r && r.width ? [r.left + r.width / 2, r.top + r.height / 2] : [innerWidth / 2, innerHeight * 0.4]; };
+  const from = (p, r) => `${p[0] - r.left}px ${p[1] - r.top}px`;
+  const was = words().getBoundingClientRect(), p = into && middle(); // going in, what was tapped shows now; coming back, once the page has turned
+  if (p) root.style.setProperty("--turn-was", from(p, was));
+  root.dataset.turn = into ? "in" : "out";
+  document.startViewTransition(() => {
+    update();
+    const q = p || middle();
+    if (!p) root.style.setProperty("--turn-was", from(q, was));
+    root.style.setProperty("--turn-now", from(q, words().getBoundingClientRect()));
+  }).finished.finally(() => {
+    delete root.dataset.turn;
+    root.style.removeProperty("--turn-was");
+    root.style.removeProperty("--turn-now");
+    turning = false;
+  });
+}
+nav.turn = turn;
+
 function showList(lid) {
   const from = document.activeElement;
   if (!store.open(lid)) return showLists();
@@ -60,7 +95,7 @@ function showList(lid) {
   follow();
   $("#lists").hidden = true;
   $("#app").hidden = false;
-  if (window.panierView) window.panierView("");
+  window.panierView("");
   if (switched) window.scrollTo(0, 0);
   list.show(lid);
   // Opened from the keyboard, the cursor moves to the list's name rather than stay on a
@@ -74,7 +109,7 @@ function showLists() {
   follow();
   $("#app").hidden = true;
   $("#lists").hidden = false;
-  if (window.panierView) window.panierView("lists");
+  window.panierView("lists");
   document.title = "Panier";
   store.refreshAll();
   lists.renderLists();
@@ -99,10 +134,10 @@ async function init() {
   }
   if (params.get("setup") && !store.lists().length) {
     try {
-      const lid = await store.createList({ code: params.get("setup") });
+      const lid = await store.createList({ code: params.get("setup"), ops: startOps() });
       begin(lid);
-      openPair();
       keepList();
+      list.editName(); // a new list is named first
       return;
     } catch (err) {
       lists.say(lists.MESSAGES[err.message] || lists.MESSAGES.server);
@@ -122,6 +157,7 @@ function begin(lid, toLists = false) {
 }
 nav.showList = showList;
 nav.showLists = showLists;
+nav.editName = list.editName;
 translatePage();
 init();
 // A pairing or setup link opened in this tab, with the app already open: it starts afresh

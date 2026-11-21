@@ -5,6 +5,7 @@ import * as store from "./store.js";
 import { t, plural } from "./i18n.js";
 import { state, readOnly } from "./state.js";
 import { $, announce } from "./dom.js";
+import { resize } from "./motion.js";
 
 // Undo floats at the bottom right; redo joins it once something has been undone. On the
 // lists page, it brings back a list taken off this phone.
@@ -22,9 +23,10 @@ export function paintDock() {
   setHist($("#undo"), u, "Undo");
   setHist($("#redo"), r, "Redo");
   $("#redo").hidden = !r;
-  const named = !!(undoNote && u);
-  $("#undo").classList.toggle("named", named);
-  $("#undo-what").textContent = named ? undoNote : "";
+  // Naming what it brings back, undo grows to fit the name, and shrinks back after.
+  const named = !!(undoNote && u), name = () => { $("#undo").classList.toggle("named", named); $("#undo-what").textContent = named ? undoNote : ""; };
+  if ($("#undo").classList.contains("named") !== named) resize($("#undo"), name);
+  else name();
 }
 function setHist(btn, label, verb) {
   btn.setAttribute("aria-disabled", String(!label));
