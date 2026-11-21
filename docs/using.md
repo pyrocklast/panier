@@ -61,8 +61,9 @@ A new list is a plain sheet: its items sit under its name, with no heading. *Add
 - **Tap the square** to tick an item: it fills with its section's colour, and the words are struck through, as with a pen. A short vibration confirms it in Chrome and Samsung Internet on Android. Firefox and Safari don't let web pages vibrate.
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row leave together and the list doesn't move under your thumb.
 - They then rise off the page, travel to **the ticked group**, taking the size of its smaller rows on the way, and settle into the page there. It lies below the sections, after a dashed tear line. Its boxes fill with the colours of what's been ticked. It shows what was ticked in the last five days, latest first, so you can check what was done lately. Its heading, such as *3 ticked*, folds it away.
+- **Beside each ticked item**, who ticked it and when: *Isabelle, at 12:45*, *Me, yesterday*, then the day of the week. Someone who hasn't given a name shows as just the time, and so does everything on a list only on your phone. The time follows the phone's clock, 12 or 24 hours, and screen readers read it after the item's name.
 - Older ticked items are hidden, but still suggested when you type.
-- **Untick** an item by tapping its square: it goes back to the end of its section, or of the first section if its own was deleted.
+- **Untick** an item by tapping its square: it goes back to the end of its section, or of the first section if its own was deleted. Undo ticks it again, still showing who ticked it and when.
 - **Drag** an item onto the drop zone under the ticked group's heading to tick it, or drag a ticked item into a section to put it back exactly where you drop it.
 
 ## Editing and deleting
@@ -108,7 +109,7 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 ## People
 
 - **Your name** shows to the people you share lists with. It's optional, and the server never sees it. *Add someone to this list* asks for it until you've given one; Settings changes it.
-- **Who's on a list** shows in *Add someone to this list*: you, the names people gave, and how many phones gave none. On the lists page, a few quiet words under a list's name say who else has it.
+- **Who's on a list** shows in *Add someone to this list*: you, the names people gave, and how many phones gave none. On the lists page, a few quiet words under a list's name say who else has it. Everyone on a list sees who ticked what.
 - **Remove someone**, in the same place once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *List closed* and keep what they had, until they delete it from the lists page. Share the new link with those who should keep the list.
 - **A closed list is only read**: nothing can be added, edited, moved or ticked, since none of it could be sent, and its boxes show faint. *Export the list* still saves a copy. So does a list changed with a newer Panier, until this one updates.
 - **Set up another phone**, in Settings, shows one QR code that brings every list on this phone to another.
@@ -147,7 +148,7 @@ Panier is paper, and what moves says where it happens:
 
 - **On the page**, what's written fades in or out where it is: an item added or deleted, a box filling, the pen stroke, suggestions, colours under a name, what others change, tinted a moment.
 - **Along the page**, rows and sections glide to their new places, the ticked group folds and unfolds, and what's in the way glides aside during a drag.
-- **Off the page**, what you hold lifts, with a shadow; a ticked item travels to the ticked group and settles there.
+- **Off the page**, what you hold lifts, with a shadow; a ticked item travels to the ticked group and settles there, who ticked it fading in on the way.
 - **On top**, the sheets, undo and the connection's status rise into place, and sink or fade away, quicker, as they go.
 - **The page itself** turns, between the lists page and a list or Settings, out of what you tapped and back into it, and takes a new colour.
 

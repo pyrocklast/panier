@@ -2,7 +2,7 @@
 
 Private lists, shared between phones: end-to-end encrypted, with no accounts. It runs on Cloudflare's free plan or on a Raspberry Pi at home.
 
-<p align="center"><img src="docs/screens.png" width="560" alt="Panier on two phones. Left, in light mode, the lists page: six lists as sheets of paper, each tinted its own colour, Groceries shared with Alex. Right, in dark mode, the end of the Groceries list: its sections named in their colours, and three ticked items below a dashed line, each box filled with its section’s colour."></p>
+<p align="center"><img src="docs/screens.png" width="560" alt="Panier on two phones. Left, in light mode, the lists page: six lists as sheets of paper, each tinted its own colour, Groceries shared with Alex. Right, in dark mode, the end of the Groceries list: its sections named in their colours, and three ticked items below a dashed line, each box filled with its section’s colour, and beside each who ticked it and when, such as “Alex, at 10:17”."></p>
 
 ## What it is
 
@@ -12,7 +12,7 @@ Private lists, shared between phones: end-to-end encrypted, with no accounts. It
 - **No accounts.** Another phone joins a list by scanning a QR code from one that has it.
 - **Offline.** It works without signal and catches up when the connection returns.
 - **An app from the browser.** It installs from Firefox, Chrome or Safari, with no app store.
-- **Made for everyday lists.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, the last five days of ticked items, drag to reorder, and undo for everything.
+- **Made for everyday lists.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, the last five days of ticked items with who ticked each, drag to reorder, and undo for everything.
 - **Markdown in and out.** A list exports as a Markdown checklist, and any Markdown checklist, a few pasted lines, or checklists from Google Keep come in.
 - **In English and French**, light and dark.
 
@@ -51,7 +51,7 @@ Then, on the phones:
 ## Using it
 
 - **Add:** tap *Add item* at the end of a section and type. Enter adds the item and keeps the field open for the next.
-- **Tick:** tap the square. Ticked items move to the ticked group after a moment, and stay there for five days.
+- **Tick:** tap the square. Ticked items move to the ticked group after a moment, and stay there for five days, with who ticked them and when.
 - **Edit:** tap the words. Clear them to delete the item.
 - **Move:** hold an item, or a section's name, for half a second, then drag.
 - **Sections:** a new list is a plain sheet. *Add a section*, below the items, adds a heading when it helps; tap a heading to rename it or change its colour.
