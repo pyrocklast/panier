@@ -34,7 +34,7 @@ export function h(tag, attrs, ...kids) {
 }
 // Icons are drawn once, in index.html, and placed by name at their size: each is made
 // once, then copied, as suggestions place several on every keystroke.
-const ICON_SIZES = { plus: 18, back: 16, cross: 16 }, icons = {};
+const ICON_SIZES = { plus: 18, back: 16, cross: 16, chev: 14 }, icons = {};
 export function icon(name) {
   if (!icons[name]) {
     const t = document.createElement("template"), w = ICON_SIZES[name];

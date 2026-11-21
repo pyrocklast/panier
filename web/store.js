@@ -56,8 +56,8 @@ function saveIndexNow() {
 }
 const saveIndex = () => { if (!indexTimer) indexTimer = setTimeout(saveIndexNow, 400); };
 
-// The lists, in order: { lid, key, name, color, toGet, first, with, closed, newer, folded },
-// as last seen; and one of them, by its id.
+// The lists, in order: { lid, key, name, color, toGet, first, with, closed, newer, folded,
+// foldedSections }, as last seen; and one of them, by its id.
 export const lists = () => index.lists;
 export const entryOf = lid => index.lists.find(e => e.lid === lid);
 export const openId = () => index.open;
@@ -753,9 +753,11 @@ export function reorder(lids) {
   saveIndexNow();
   emit("lists");
 }
-export function setFolded(lid, folded) {
+// What's folded on a list, on this phone only: { folded } for its ticked group,
+// { foldedSections } for the ids of its sections.
+export function setFolded(lid, change) {
   const e = entryOf(lid);
-  if (e && !!e.folded !== folded) { e.folded = folded; saveIndex(); }
+  if (e) { Object.assign(e, change); saveIndex(); }
 }
 
 // This phone's name, shown to the people its lists are shared with, on every list it has.

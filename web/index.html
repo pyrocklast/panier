@@ -38,6 +38,7 @@
   <symbol id="i-cross" viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" vector-effect="non-scaling-stroke"/></symbol>
   <symbol id="i-arrow" viewBox="0 0 20 20"><path d="M16 10H4.5M9.5 4.5L4 10l5.5 5.5" vector-effect="non-scaling-stroke"/></symbol>
   <symbol id="i-back" viewBox="0 0 20 20"><path d="M7.5 4.4L3.1 8.75l4.4 4.35M3.75 8.75h8.75a4.4 4.4 0 0 1 0 8.75H10" vector-effect="non-scaling-stroke"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" vector-effect="non-scaling-stroke"/></symbol>
 </svg>
 
 <main class="wrap" id="app" hidden>
@@ -57,7 +58,7 @@
       <button type="button" id="basket-toggle" aria-expanded="true" aria-controls="basket-list">
         <span class="tickmark" aria-hidden="true"><svg viewBox="0 0 16 16" width="13" height="13"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
         <span id="basket-count"></span>
-        <svg class="chev" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="icon chev" width="14" height="14" aria-hidden="true"><use href="#i-chev"/></svg>
       </button>
     </h2>
     <div class="drop" id="tick-drop" aria-hidden="true">
@@ -131,7 +132,7 @@
     </section>
     <section class="set" aria-labelledby="set-data">
       <h3 id="set-data">Data</h3>
-      <button type="button" class="fold" id="data-open" aria-expanded="false" aria-controls="data-lists"><span id="data-sum"></span><svg class="chev" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button type="button" class="fold" id="data-open" aria-expanded="false" aria-controls="data-lists"><span id="data-sum"></span><svg class="icon chev" width="14" height="14" aria-hidden="true"><use href="#i-chev"/></svg></button>
       <ul class="rows" id="data-lists" hidden></ul>
       <p class="sum" id="keep-text"></p>
       <ul class="rows">
