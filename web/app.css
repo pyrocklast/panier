@@ -480,8 +480,12 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sheet-with { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Ruled lines down to the count, the first three written on, so a sheet with less to say
    is still paper */
-.sheet-first { flex: 1; display: flex; flex-direction: column; min-height: 90px; margin-top: 8px; background: repeating-linear-gradient(var(--rule) 0 1px, transparent 1px 30px); }
-.sheet-item { display: flex; align-items: center; gap: 8px; height: 30px; font-size: 0.875rem; }
+.sheet-first {
+  --ruled: 30px; /* between the lines */
+  flex: 1; display: flex; flex-direction: column; min-height: calc(3 * var(--ruled)); margin-top: 8px;
+  background: repeating-linear-gradient(var(--rule) 0 1px, transparent 1px var(--ruled));
+}
+.sheet-item { display: flex; align-items: center; gap: 8px; height: var(--ruled); font-size: 0.875rem; }
 .sheet-item::before { content: ""; flex: none; width: 11px; height: 11px; box-sizing: border-box; border: 1.5px solid var(--quiet); border-radius: 3px; }
 .sheet-item > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sheet-count { margin-top: auto; padding-top: 8px; font-variant-numeric: tabular-nums; }
@@ -655,7 +659,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 [data-layout="compact"] :is(.list-head, .lists-top h1, .page-head h2) { font-size: 1.25rem; } /* every page's title */
 [data-layout="compact"] .sheets { gap: 8px; }
 [data-layout="compact"] .sheet-open { padding-block: 10px 8px; }
-[data-layout="compact"] .sheet-first { display: none; } /* the name and the count */
+[data-layout="compact"] .sheet-first { --ruled: 24px; margin-top: 6px; } /* the same three items, closer */
 [data-layout="compact"] .new-list { min-height: 48px; }
 [data-layout="compact"] :is(.list-name, .lists-top h1) { padding: 8px 0; } /* 44 px, in line with what's beside it */
 [data-layout="compact"] .sec-head { min-height: 44px; }
