@@ -2,10 +2,10 @@
 
 import * as store from "./store.js";
 import { t, plural, q, when } from "./i18n.js";
-import { toMarkdown, pastedItems } from "./md.js";
+import { pastedItems } from "./md.js";
 import { state, readOnly, listName, listColor, tickedDays, draftsKey } from "./state.js";
-import { DEFAULTS, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, BEFORE_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout, sheetOfList } from "./model.js";
-import { $, h, icon, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, download, reduceMotion } from "./dom.js";
+import { DEFAULTS, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, BEFORE_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout } from "./model.js";
+import { $, h, icon, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, reduceMotion } from "./dom.js";
 import { whenTapEnds, bindPress, beginDrag } from "./press.js";
 import { float, landAll, snapshot, glide, fly, shift, shuffle, foldAway, dye, MOTION } from "./motion.js";
 import { editInPlace, palette } from "./edit.js";
@@ -251,7 +251,7 @@ function nudge(id, dir) {
   if (!next) return;
   const l = shown(next.id);
   const pos = dir > 0 ? (l.length ? l[0].pos - 1 : 1) : maxPos(next.id) + 1;
-  announce(t("{x} moved to {y}", { x: it.text, y: next.name }));
+  announce(t("{x} moved to {y}", { x: it.text, y: nameOf(next.id) }));
   act(t("moving {x}", { x: q(it.text) }), [[id, "section", next.id], [id, "pos", pos]], { focusKey: "chk-" + id });
 }
 
@@ -383,7 +383,8 @@ function editSection(span, id, x, y) {
 // A new list without a name is named first, where its name goes, as a section's is
 // renamed, its colour chosen under it; named with Enter, the cursor goes on to its first
 // Add item, ready to write on. Later, it's renamed in its settings.
-function editListName(span) {
+export function editName() {
+  const span = $("#list-name");
   if (readOnly()) return;
   span.dataset.placeholder = t("Name this list");
   edit(span, {
@@ -396,7 +397,6 @@ function editListName(span) {
     onDone: () => { span.dataset.placeholder = t("Untitled list"); },
   });
 }
-export const editName = () => editListName($("#list-name"));
 // The list's own settings, from its settings page or as it's named.
 export function renameList(name) {
   const was = store.listName() || "";
@@ -866,11 +866,6 @@ function render() {
   }
 }
 
-function exportList() {
-  download(listName(), toMarkdown([sheetOfList({ name: listName(), color: listColor(), sections: store.sections(), items })]));
-}
-
-$("#export-btn").addEventListener("click", exportList);
 $("#list-name").dataset.placeholder = t("Untitled list");
 
 // Adding a section moves the cursor to its Add item field.
@@ -906,7 +901,7 @@ export function reset() {
 }
 // Draws the list the store has just opened, lid, with its ticked group folded as it was left.
 export function show(lid) {
-  const e = store.lists().find(x => x.lid === lid);
+  const e = store.entryOf(lid);
   ui.basketOpen = !(e && e.folded);
   items = store.items();
   render();

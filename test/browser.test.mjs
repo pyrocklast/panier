@@ -523,6 +523,20 @@ test("the list's colour, chosen in its settings, tints the paper on both phones"
   await a.click("#redo");
   assert.ok(await eventually(async () => (await page(b))[0] === "teal"));
 
+  // In the list's settings, what the other phone does leaves the cursor on the colours,
+  // which change when the colour does.
+  await listSettings(a);
+  await swatches.nth(3).focus();
+  await add(b, "ess", "Eggs");
+  await a.locator("#list .item", { hasText: "Eggs" }).waitFor({ state: "attached" });
+  assert.equal(await a.evaluate(() => document.activeElement.getAttribute("aria-label")), "Blue", "the cursor stays where it was");
+  await listSettings(b);
+  await b.locator("#list-colours .swatch").nth(6).click();
+  assert.ok(await eventually(async () => (await swatches.nth(6).getAttribute("aria-pressed")) === "true"), "Rose, chosen on the other phone");
+  await backToList(b);
+  await swatches.nth(2).click(); await dyed(a);
+  await backToList(a);
+
   // Opening the app again, the paper is tinted before anything is drawn.
   await t.A.addInitScript(() => document.addEventListener("DOMContentLoaded", () => { window.firstList = document.documentElement.dataset.list; }));
   await a.reload();
@@ -1350,7 +1364,7 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   await item(a, "Milk").locator(".boxcell").click();
   await sleep(1900);
   await listSettings(a);
-  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
+  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-list")]);
   await backToList(a);
   assert.match(dl.suggestedFilename(), /^shopping-list-\d{4}-\d{2}-\d{2}\.md$/, "the list exports from its settings, named after it");
   assert.equal(readFileSync(await dl.path(), "utf8"), [
@@ -1751,7 +1765,7 @@ test("a new list is a plain sheet, named first; sections come when added, and li
   await a.keyboard.press("Alt+ArrowUp");
   assert.equal(await a.locator("#list > .sec").first().getAttribute("data-sec"), "ess", "and stay first");
   await listSettings(a);
-  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
+  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-list")]);
   await backToList(a);
   assert.equal(readFileSync(await dl.path(), "utf8"), "# Hardware store\n\n- [ ] Screws\n- [ ] Sandpaper\n\n## Garden <!-- teal -->\n- [ ] Hose\n", "and in Markdown, before any heading");
   // Emptied, it goes, so nothing new is added outside a section; an item put back brings it back.
@@ -1761,6 +1775,9 @@ test("a new list is a plain sheet, named first; sections come when added, and li
   await a.locator("#basket-list .item").filter({ hasText: "Screws" }).locator(".boxcell").click();
   assert.ok(await eventually(async () => (await a.locator('#list .sec[data-sec="ess"] .items .text').allInnerTexts()).join() === "Screws"), "unticked, an item goes back to it");
   assert.deepEqual(await heads(), ["Untitled section", "Garden"]);
+  await item(a, "Hose").locator(".chk").focus();
+  await a.keyboard.press("Alt+ArrowUp");
+  assert.ok(await eventually(async () => (await live(a)) === "Hose moved to Untitled section"), "moved into it with the keyboard, it's called that");
   await a.click("#h-ess");
   assert.equal(await a.locator("#h-ess").innerText(), "", "named from empty, not from the list's name");
   await a.keyboard.type("Tools");
@@ -1817,7 +1834,7 @@ test("on a phone on its side, what's ticked lies beside the list, and an item dr
   await p.close();
 });
 
-test("lists are reordered by dragging, and deleted once asked, on the lists page or at the foot of the list; undo brings them back", async () => {
+test("lists are reordered by dragging, and deleted once asked, on the lists page or in the list's settings; undo brings them back", async () => {
   const p = await alone();
   const a = p.page;
   await toLists(a);
@@ -1898,7 +1915,7 @@ test("lists come in from Markdown, from plain text, and from several pasted line
   await section(a, "Garden").locator(".add-input").fill("");
   await blur(a);
   await listSettings(a);
-  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-btn")]);
+  const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-list")]);
   await backToList(a);
   assert.equal(readFileSync(await dl.path(), "utf8"), md.replace("## Essentials\n", "## Essentials <!-- ink -->\n"), "and exports as it came in");
 
@@ -2091,7 +2108,7 @@ test("changing a list's key leaves everyone else with it closed, until they open
   assert.ok(await a.locator("#list-rename").isDisabled(), "nor renamed");
   assert.equal(await a.locator("#list-colours .swatch").count(), 0, "nor recoloured");
   assert.ok(await a.locator('input[name="ticked"]').first().isDisabled(), "nor its ticked items kept longer");
-  assert.equal(await a.locator("#export-btn").isVisible(), true, "but it can still be exported");
+  assert.equal(await a.locator("#export-list").isVisible(), true, "but it can still be exported");
   assert.equal(await a.locator("#delete-what").innerText(), "From this phone", "and deleted from this phone");
   await backToList(a);
   await a.click("#status-pill");

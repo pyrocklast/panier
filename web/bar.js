@@ -53,7 +53,6 @@ function statusInfo() {
 const listsStatus = () => (!navigator.onLine && store.lists().length
   ? { text: t("Offline"), detail: t("No connection. Your lists show as this phone last saw them.") } : null);
 export function paintStatus() {
-  if (state.view === "list") $("#pair-open").hidden = store.status().closed || store.newerFormat(); // a closed list's link opens nothing
   const now = () => (state.view === "lists" ? listsStatus() : state.view === "list" ? statusInfo() : null);
   const info = now();
   const el = $("#status");

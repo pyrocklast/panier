@@ -70,10 +70,6 @@ function showHistory() {
   }
   follow();
 }
-export function closeThen(dlg, fn) {
-  if (dlg.open) dlg.close();
-  fn();
-}
 
 // Deleting a list and changing its key ask first. more is a second, quieter answer, as
 // Delete for everyone is to Delete; a sheet already open asks its next question in place.

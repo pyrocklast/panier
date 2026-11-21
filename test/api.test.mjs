@@ -62,7 +62,7 @@ test("lists need their token", async () => {
 
 test("changes round-trip in order", async () => {
   const l = await newList();
-  let res = await post(l, ["QUJD", "REVG"]);
+  const res = await post(l, ["QUJD", "REVG"]);
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { latest: 2 });
   const { body } = await get(l, 1);
