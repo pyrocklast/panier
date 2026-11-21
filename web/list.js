@@ -137,7 +137,7 @@ function toggle(id, checked) {
     if (fromList) settling.add(id);
     buzz(12);
     announce(t("{x} ticked", { x: it.text }));
-    act(t("checking {x}", { x: q(it.text) }), [[id, "checked", true], [id, "checkedAt", Date.now()]], { animate: false });
+    act(t("ticking {x}", { x: q(it.text) }), [[id, "checked", true], [id, "checkedAt", Date.now()]], { animate: false });
   } else {
     settling.delete(id);
     const ops = [[id, "checked", false]]; // when it was ticked, and who by, stay for undo
@@ -147,7 +147,7 @@ function toggle(id, checked) {
       ops.push([id, "section", sec], [id, "pos", maxPos(sec) + 1]);
     }
     announce(t("{x} back on the list", { x: it.text }));
-    act(t("unchecking {x}", { x: q(it.text) }), ops, { animate: !wasSettling });
+    act(t("unticking {x}", { x: q(it.text) }), ops, { animate: !wasSettling });
   }
   scheduleSettle();
 }
@@ -727,7 +727,7 @@ function endDrag() {
     settling.delete(id);
     buzz(12);
     announce(t("{x} ticked", { x: it.text }));
-    store.change(t("checking {x}", { x: q(it.text) }), [[id, "checked", true], [id, "checkedAt", Date.now()]]);
+    store.change(t("ticking {x}", { x: q(it.text) }), [[id, "checked", true], [id, "checkedAt", Date.now()]]);
   } else if (!toTick) {
     const ul = li.parentElement, sec = ul.dataset.sec;
     const sibs = [...ul.children], i = sibs.indexOf(li);
@@ -739,7 +739,7 @@ function endDrag() {
       ops.push([id, "checked", false]);
       announce(t("{x} back on the list", { x: it.text }));
     } else if (it.section !== sec) announce(t("{x} moved to {y}", { x: it.text, y: nameOf(sec) }));
-    store.change(t(it.checked ? "unchecking {x}" : "moving {x}", { x: q(it.text) }), ops);
+    store.change(t(it.checked ? "unticking {x}" : "moving {x}", { x: q(it.text) }), ops);
   }
   // Also when nothing changed, such as an item dropped where it started: it comes back into view.
   sync();
@@ -788,7 +788,7 @@ function endSectionDrag() {
   const dropped = ghost.getBoundingClientRect().top;
   const snap = letGo(); // folded: the sections unfold from here
   el.classList.remove("placeholder");
-  if (store.change(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order))) announce(t("Section moved: {x}", { x: nameOf(id) }));
+  if (store.change(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order))) announce(t("Moved section {x}", { x: nameOf(id) }));
   sync();
   render();
   const head = el.querySelector(".sec-head"), page = document.documentElement;

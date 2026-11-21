@@ -37,8 +37,8 @@ const loadQr = () => (qrLib ||= new Promise((resolve, reject) => {
 // to set up another phone.
 export function openPair(all = false) {
   shared = all ? store.allLink() : store.pairingLink();
-  $("#pair-title").textContent = all ? t("Set up another phone") : t("Add someone to this list");
-  $("#pair-text").textContent = all ? t("Scan this code with the other phone, and it has every list this one has.")
+  $("#pair-title").textContent = all ? t("Set up another phone") : t("Add someone");
+  $("#pair-text").textContent = all ? t("Scan this code with the other phone to give it every list on this one.")
     : t("They scan this code with their phone, or open the link you send them.");
   $("#pair-note").textContent = all ? t("This link holds the keys to all your lists: anyone who has it can open them. Keep it to yourself.")
     : t("This link is the key to your list: anyone who has it can open it. Keep a copy in your password manager to recover the list if you lose your phones.");
@@ -91,7 +91,7 @@ $("#copy-link").addEventListener("click", async e => {
 // closed, for everyone. The people who should keep it get the new link.
 $("#rekey-open").addEventListener("click", () => closeThen($("#pair"), () => confirmSheet({
   title: t("Remove someone from {x}?", { x: q(listName()) }),
-  text: t("The list moves to a new key. Everyone who has it now loses it, on every phone but this one, though they keep what they had. Then send the new link to those who should keep it."),
+  text: t("The list moves to a new key. Every other phone loses it, though each keeps what it had. Then send the new link to those who should keep it."),
   ok: t("Give it a new key"),
   run: async () => {
     await store.changeKey();

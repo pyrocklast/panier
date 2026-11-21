@@ -104,11 +104,11 @@ export function layout(storedSections, its, typing = [], inList = i => !i.checke
     all.set(d.id, { ...d, name: st.name ?? d.name, color: colorOk(st.color, d.color), pos: st.pos ?? d.pos, deleted: !!st.deleted });
   }
   for (const st of stored.values()) {
-    if (!all.has(st.id)) all.set(st.id, { id: st.id, name: st.name || t("Untitled"), color: colorOk(st.color, PALETTE[0]), pos: st.pos ?? 100, deleted: st.deleted });
+    if (!all.has(st.id)) all.set(st.id, { id: st.id, name: st.name || t("Untitled section"), color: colorOk(st.color, PALETTE[0]), pos: st.pos ?? 100, deleted: st.deleted });
   }
   const used = new Set(its.filter(inList).map(i => i.section));
   for (const id of typing) used.add(id);
-  for (const id of used) if (!all.has(id)) all.set(id, { id, name: t("Untitled"), color: PALETTE[0], pos: 100, deleted: false });
+  for (const id of used) if (!all.has(id)) all.set(id, { id, name: t("Untitled section"), color: PALETTE[0], pos: 100, deleted: false });
   // The section without a name always comes first.
   const order = (a, b) => !!a.name - !!b.name || a.pos - b.pos || (a.id < b.id ? -1 : 1);
   const shown = [...all.values()].filter(s => !s.deleted || used.has(s.id)).sort(order);
@@ -146,7 +146,7 @@ export function importOps(l) {
     const color = colorOk(sec.color, d ? d.color : PALETTE.find(c => !colours.has(c)) || PALETTE[0]);
     used.add(id);
     colours.add(color);
-    ops.push([key, "name", name || (i === 0 ? "" : d ? d.name : t("Untitled"))], [key, "pos", i + 1], [key, "color", color], [key, "deleted", false]);
+    ops.push([key, "name", name || (i === 0 ? "" : d ? d.name : t("Untitled section"))], [key, "pos", i + 1], [key, "color", color], [key, "deleted", false]);
     sec.items.forEach((it, j) => {
       const text = clean(it.text), nk = text && nameKey(text);
       if (!text || seen.has(nk)) return;

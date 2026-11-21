@@ -71,7 +71,7 @@ export function renderLists() {
   for (const lid of cards.keys()) if (!all.some(e => e.lid === lid)) cards.delete(lid);
   $("#new-list-form").hidden = first;
   $("#setup-form").hidden = !first && !needCode;
-  const msg = notice || (needCode ? t("This server wants its setup code for this.")
+  const msg = notice || (needCode ? t("This server asks for its setup code to make a list.")
     : first ? t("Open the link from a phone that already has a list, or start one with your server's setup code.") : "");
   $("#lists-msg").textContent = msg;
   $("#lists-msg").hidden = !msg;
@@ -149,7 +149,7 @@ export function askDelete(lid) {
   const name = e.name || t("Untitled list"), w = e.with, others = !!(w && (w.names.length || w.nameless));
   confirmSheet({
     title: t("Delete {x}?", { x: q(name) }),
-    text: e.closed ? t("It's closed already: this takes what's left of it off this phone.")
+    text: e.closed ? t("It's already closed: this removes what's left of it from this phone.")
       : others ? t("It goes from this phone only: the others keep it.")
       : t("It goes from this phone. Its link brings it back, if you kept one."),
     ok: t("Delete"),

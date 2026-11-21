@@ -36,7 +36,7 @@ The list is written on the page itself, like paper: one left edge, ruled lines b
 *Settings*, at the top right of a list, turns to a page of the list's own, on its paper. What's there is the same for everyone on the list. The arrow at its top left, Escape or the back gesture go back to the list.
 
 - **Name and colour.** Emptying the name puts the old one back.
-- **Ticked items stay in view for** a day, a week, a month, or always. A week to start with. Nothing is deleted: older ticked items leave the ticked group but are still suggested as you type, and still exported.
+- **Ticked items stay in view** a day, a week, a month, or always: a week to start with. Nothing is deleted: older ticked items leave the ticked group but are still suggested as you type, and still exported.
 - **People:** who's on the list, and *Add someone*.
 - **Data:** the room the list takes on this phone, *Export the list* and *Delete the list*.
 
@@ -49,7 +49,7 @@ A new list is a plain sheet: its items sit under its name, with no heading. *Add
 - **Rename** a section by tapping its heading. Every phone sees the new name. Emptying the name and leaving puts the old one back.
 - **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it, the new colour spreading over it, as it does over the list's paper. Its name is written in a deep shade of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
 - **Add a section** with *Add a section*, below the last one. It gets the first colour not used yet. Enter or `+` adds it, the cross clears what you typed, and the cursor then moves to its *Add item* row.
-- **Delete** a section once nothing is left to tick in it: while you rename it, a cross appears. The items without a heading, at the top, always have their place. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
+- **Delete** a section once nothing is left to tick in it: while you rename it, a cross appears. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
 
 ## Adding items
 
@@ -74,7 +74,6 @@ A new list is a plain sheet: its items sit under its name, with no heading. *Add
 - Ticked items stay in place, greyed out, for 1.5 seconds. Each new tick restarts the wait, so several items ticked in a row leave together and the list doesn't move under your thumb.
 - They then rise off the page, travel to **the ticked group**, taking the size of its smaller rows on the way, and settle into the page there. It lies below the sections, after a dashed tear line. Its boxes fill with the colours of what's been ticked. It shows what was ticked lately, latest first, so you can check what was done: for a week, unless the list's settings say a day, a month, or always. Its heading, such as *3 ticked*, folds it away.
 - **Beside each ticked item**, who ticked it and when: *Isabelle, at 12:45*, *Me, yesterday*, then the day of the week, then the date. Someone who hasn't given a name shows as just the time, and so does everything on a list only on your phone. The time follows the phone's clock, 12 or 24 hours, and screen readers read it after the item's name.
-- Older ticked items are hidden, but still suggested when you type.
 - **Untick** an item by tapping its square: it goes back to the end of its section, or of the first section if its own was deleted. Undo ticks it again, still showing who ticked it and when.
 - **Drag** an item onto the drop zone under the ticked group's heading to tick it, or drag a ticked item into a section to put it back exactly where you drop it.
 
@@ -122,7 +121,7 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 
 - **Your name** shows to the people you share lists with. It's optional, and the server never sees it. The share sheet asks for it until you've given one; Settings changes it.
 - **Who's on a list** shows in its settings and on the share sheet: you, the names people gave, and how many phones gave none. On the lists page, a few quiet words under a list's name say who else has it. Everyone on a list sees who ticked what.
-- **Remove someone**, on the share sheet once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *List closed* and keep what they had, until they delete it from the lists page. Share the new link with those who should keep the list.
+- **Remove someone**, on the share sheet once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *List closed* and keep what they had, until they delete it. Share the new link with those who should keep the list.
 - **A closed list is only read**: nothing can be added, edited, moved or ticked, since none of it could be sent, and its boxes show faint. *Export the list* still saves a copy. So does a list changed with a newer Panier, until this one updates.
 - **Set up another phone**, in Settings, shows one QR code that brings every list on this phone to another; closing it goes back to Settings.
 
@@ -150,7 +149,7 @@ On a phone turned on its side, or a tablet or computer, the page uses the width:
 - **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page.
 - **Data:**
   - One line: how many lists there are and the room they take on this phone. A tap opens each list with the room it takes, to export it alone; each list's own is in its settings too.
-  - Whether the browser keeps them even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep them on this phone* asks again.
+  - Whether the browser keeps them even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep lists on this phone* asks again.
   - *Export all lists*, *Bring in from a file* and *Set up another phone*, above.
 - **About:** the version, the server, and what the server can and can't see.
 
@@ -180,7 +179,7 @@ In suggestions, ↓ and ↑ choose one, → moves to its ×, Enter picks it and 
 
 On the lists page, Alt and an arrow move a list, and Delete deletes it, once asked.
 
-Changes are announced to screen readers. Light and dark follow the phone unless chosen in Settings, and when the phone asks for reduced motion, nothing moves. Text, tick boxes and buttons keep WCAG AA contrast on every list and section colour, in both themes, on a list and on the lists page.
+Changes are announced to screen readers. Text, tick boxes and buttons keep WCAG AA contrast on every list and section colour, in both themes, on a list and on the lists page.
 
 ## Languages
 

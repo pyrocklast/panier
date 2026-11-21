@@ -21,7 +21,7 @@ const FR = {
   "List settings": "Paramètres de la liste",
   "Name and colour": "Nom et couleur",
   "Name": "Nom",
-  "Ticked items stay in view for": "Les articles cochés restent visibles",
+  "Ticked items stay in view": "Les articles cochés restent visibles",
   "A day": "Un jour",
   "A week": "Une semaine",
   "A month": "Un mois",
@@ -35,7 +35,6 @@ const FR = {
   "From this phone, or for everyone": "De ce téléphone, ou pour tout le monde",
   "From this phone": "De ce téléphone",
   "at {x}": "à {x}",
-  "Add someone to this list": "Ajouter quelqu’un à cette liste",
   "Settings": "Paramètres",
   "Lists": "Listes",
   "Start": "Commencer",
@@ -49,18 +48,18 @@ const FR = {
   "Dark": "Sombre",
   "Compact layout": "Affichage compact",
   "Data": "Données",
-  "Keep them on this phone": "Les garder sur ce téléphone",
+  "Keep lists on this phone": "Garder les listes sur ce téléphone",
   "Export the list": "Exporter la liste",
   "Delete the list": "Supprimer la liste",
   "Export all lists": "Exporter toutes les listes",
-  "Set up another phone": "Préparer un autre téléphone",
+  "Set up another phone": "Configurer un autre téléphone",
   "You": "Vous",
   "Your name, shown to the people you share lists with": "Votre nom, que voient les personnes avec qui vous partagez des listes",
   "About": "À propos",
   "Version": "Version",
   "Server": "Serveur",
-  "Your lists are encrypted on your phones, with keys that never leave them. The server keeps them without being able to read them: it can't see your items, your sections, your name or anything you type. It can see when changes are made, roughly how big they are, and the internet address they come from.":
-    "Vos listes sont chiffrées sur vos téléphones, avec des clés qui ne les quittent jamais. Le serveur les conserve sans pouvoir les lire" + nb + ": il ne voit ni vos articles, ni vos sections, ni votre nom, ni rien de ce que vous tapez. Il voit quand des modifications sont faites, leur taille approximative et l’adresse internet d’où elles viennent.",
+  "Your lists are encrypted on your phones, with keys that never leave them. The server stores them but can't read them: it never sees your items, your sections, your name or anything you type. It does see when changes are made, roughly how big they are, and the internet address they come from.":
+    "Vos listes sont chiffrées sur vos téléphones, avec des clés qui ne les quittent jamais. Le serveur les conserve sans pouvoir les lire" + nb + ": il ne voit jamais vos articles, vos sections, votre nom, ni rien de ce que vous tapez. Il voit en revanche quand des modifications sont faites, leur taille approximative et l’adresse internet d’où elles viennent.",
   "Source code": "Code source",
   ", under the MIT licence.": ", sous licence MIT.",
   "They scan this code with their phone, or open the link you send them.": "La personne scanne ce code avec son téléphone, ou ouvre le lien que vous lui envoyez.",
@@ -70,7 +69,7 @@ const FR = {
   "Couldn't copy": "Copie impossible",
   "This link is the key to your list: anyone who has it can open it. Keep a copy in your password manager to recover the list if you lose your phones.":
     "Ce lien est la clé de votre liste" + nb + ": quiconque l’a peut l’ouvrir. Gardez-en une copie dans votre gestionnaire de mots de passe pour retrouver la liste si vous perdez vos téléphones.",
-  "Scan this code with the other phone, and it has every list this one has.": "Scannez ce code avec l’autre téléphone" + nb + ": il aura toutes les listes de celui-ci.",
+  "Scan this code with the other phone to give it every list on this one.": "Scannez ce code avec l’autre téléphone pour lui donner toutes les listes de celui-ci.",
   "This link holds the keys to all your lists: anyone who has it can open them. Keep it to yourself.":
     "Ce lien contient les clés de toutes vos listes" + nb + ": quiconque l’a peut les ouvrir. Gardez-le pour vous.",
 
@@ -82,8 +81,8 @@ const FR = {
   "Remove someone": "Retirer quelqu’un",
   "Delete for everyone": "Supprimer pour tout le monde",
   "Remove someone from {x}?": "Retirer quelqu’un de {x}" + nb + "?",
-  "The list moves to a new key. Everyone who has it now loses it, on every phone but this one, though they keep what they had. Then send the new link to those who should keep it.":
-    "La liste passe à une nouvelle clé. Toutes les personnes qui l’ont la perdent, sur tous les téléphones sauf celui-ci, mais gardent ce qu’elles avaient. Envoyez ensuite le nouveau lien à celles qui doivent la garder.",
+  "The list moves to a new key. Every other phone loses it, though each keeps what it had. Then send the new link to those who should keep it.":
+    "La liste passe à une nouvelle clé. Les autres téléphones la perdent, mais chacun garde ce qu’il avait. Envoyez ensuite le nouveau lien aux personnes qui doivent la garder.",
   "Give it a new key": "Lui donner une nouvelle clé",
   "No connection. Your lists show as this phone last saw them.": "Pas de connexion. Vos listes s’affichent telles que ce téléphone les a vues la dernière fois.",
   "{x} has a new key": "{x} a une nouvelle clé",
@@ -95,7 +94,7 @@ const FR = {
   "Delete {x}?": "Supprimer {x}" + nb + "?",
   "It goes from this phone only: the others keep it.": "Elle disparaît de ce téléphone seulement" + nb + ": les autres la gardent.",
   "It goes from this phone. Its link brings it back, if you kept one.": "Elle disparaît de ce téléphone. Son lien la fait revenir, si vous l’avez gardé.",
-  "It's closed already: this takes what's left of it off this phone.": "Elle est déjà fermée" + nb + ": ceci retire de ce téléphone ce qu’il en reste.",
+  "It's already closed: this removes what's left of it from this phone.": "Elle est déjà fermée" + nb + ": ceci retire de ce téléphone ce qu’il en reste.",
   "Deleted {x} from this phone": "{x} supprimée de ce téléphone",
   "deleting {x}": "supprimer {x}",
   "This server can't make another list from this one.": "Ce serveur ne peut pas créer d’autre liste à partir de celle-ci.",
@@ -116,7 +115,7 @@ const FR = {
     "Ouvrez le lien depuis un téléphone qui a déjà une liste, ou commencez-en une avec le code d’installation de votre serveur.",
   "Your server's setup code, to start the first list": "Le code d’installation de votre serveur, pour commencer la première liste",
   "Your server's setup code": "Le code d’installation de votre serveur",
-  "This server wants its setup code for this.": "Ce serveur demande son code d’installation pour cela.",
+  "This server asks for its setup code to make a list.": "Ce serveur demande son code d’installation pour créer une liste.",
   "There's no list to bring in from {x}.": "Aucune liste à importer depuis {x}.",
   "Brought in {x}": "Importé" + nb + ": {x}",
   "Bring in from Google Keep": "Importer depuis Google Keep",
@@ -129,7 +128,6 @@ const FR = {
   "Essentials": "Essentiels",
   "Look out for": "À l’occasion",
   "Long term": "À long terme",
-  "Untitled": "Sans titre",
   "Untitled section": "Section sans nom",
   "this section": "cette section",
   "Add item": "Ajouter un article",
@@ -144,7 +142,7 @@ const FR = {
   "Added section {x}": "Section ajoutée" + nb + ": {x}",
   "Renamed section to {x}": "Section renommée en {x}",
   "Deleted section {x}": "Section supprimée" + nb + ": {x}",
-  "Section moved: {x}": "Section déplacée" + nb + ": {x}",
+  "Moved section {x}": "Section déplacée" + nb + ": {x}",
   "{x} moved up": "{x} remonte",
   "{x} moved down": "{x} descend",
 
@@ -167,8 +165,8 @@ const FR = {
   "{n} already on the list": ["{n} déjà sur la liste", "{n} déjà sur la liste"],
 
   // Undo and redo: what each step did
-  "checking {x}": "cocher {x}",
-  "unchecking {x}": "décocher {x}",
+  "ticking {x}": "cocher {x}",
+  "unticking {x}": "décocher {x}",
   "putting back {x}": "remettre {x}",
   "changing {x}": "modifier {x}",
   "adding {x}": "ajouter {x}",
@@ -202,8 +200,8 @@ const FR = {
   "No connection. {kept}, to be sent when you're back online.": "Pas de connexion. {kept}, à envoyer dès votre retour en ligne.",
   "The server isn't answering. {kept}, to be sent as soon as it answers.": "Le serveur ne répond pas. {kept}, à envoyer dès qu’il répondra.",
   "List closed": "Liste fermée",
-  "Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone until you delete it, from the lists page.":
-    "Quelqu’un a fermé cette liste, pour tout le monde. Si elle a une nouvelle clé, demandez le nouveau lien. Ce qui est ici reste sur ce téléphone jusqu’à ce que vous la supprimiez, depuis la page des listes.",
+  "Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone until you delete it.":
+    "Quelqu’un a fermé cette liste, pour tout le monde. Si elle a une nouvelle clé, demandez le nouveau lien. Ce qui est ici reste sur ce téléphone jusqu’à ce que vous la supprimiez.",
   "Update Panier": "Mettez Panier à jour",
   "This list was changed with a newer Panier, which updates itself: close the app and open it again. Nothing is sent from here meanwhile.":
     "Cette liste a été modifiée avec une version plus récente de Panier, qui se met à jour toute seule" + nb + ": fermez l’application et rouvrez-la. Rien n’est envoyé d’ici en attendant.",
@@ -218,7 +216,7 @@ const FR = {
   "Asks the browser not to clear them": "Demande au navigateur de ne pas les effacer",
   "One Markdown file, to keep or bring in elsewhere": "Un fichier Markdown, à garder ou à importer ailleurs",
   "Markdown, plain text or Google Keep": "Markdown, texte brut ou Google Keep",
-  "One code brings it every list": "Un code lui apporte toutes vos listes",
+  "One code gives it every list": "Un code lui donne toutes vos listes",
   "{n} items": ["{n} article", "{n} articles"],
   "{n} bytes": "{n} octets",
   "{n} KB": "{n} Ko",

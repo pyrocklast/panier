@@ -232,7 +232,7 @@ test("two phones share changes live", async () => {
   assert.equal(await a.locator("#redo").isVisible(), true, "and now redo can put the delete back");
 
   await share(a);
-  assert.equal(await a.locator("#pair-title").innerText(), "Add someone to this list");
+  assert.equal(await a.locator("#pair-title").innerText(), "Add someone", "named as the action that opens it");
   await unshare(a);
 
   assert.equal(await b.evaluate(() => typeof window.qrcode), "undefined", "the QR code library loads only for pairing");
@@ -2099,7 +2099,7 @@ test("changing a list's key leaves everyone else with it closed, until they open
   await toLists(a);
   await a.locator("#sheets .sheet-open").focus();
   await a.keyboard.press("Delete");
-  assert.equal(await a.locator("#confirm-text").innerText(), "It's closed already: this takes what's left of it off this phone.");
+  assert.equal(await a.locator("#confirm-text").innerText(), "It's already closed: this removes what's left of it from this phone.");
   assert.equal(await a.locator("#confirm-more").isVisible(), false, "there's no one left to delete it for");
   await a.click("#confirm-ok");
   assert.ok(await eventually(async () => (await sheets(a)).length === 0), "the closed list is deleted from this phone");

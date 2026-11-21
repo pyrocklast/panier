@@ -135,10 +135,10 @@
       <ul class="rows" id="data-lists" hidden></ul>
       <p class="sum" id="keep-text"></p>
       <ul class="rows">
-        <li><button type="button" class="row" id="keep-btn" hidden><span>Keep them on this phone</span><span class="row-d">Asks the browser not to clear them</span></button></li>
+        <li><button type="button" class="row" id="keep-btn" hidden><span>Keep lists on this phone</span><span class="row-d">Asks the browser not to clear them</span></button></li>
         <li><button type="button" class="row" id="export-all"><span>Export all lists</span><span class="row-d">One Markdown file, to keep or bring in elsewhere</span></button></li>
         <li><button type="button" class="row" id="import-open"><span>Bring in from a file</span><span class="row-d">Markdown, plain text or Google Keep</span></button></li>
-        <li><button type="button" class="row" id="phone-open"><span>Set up another phone</span><span class="row-d">One code brings it every list</span></button></li>
+        <li><button type="button" class="row" id="phone-open"><span>Set up another phone</span><span class="row-d">One code gives it every list</span></button></li>
       </ul>
       <input type="file" id="import-file" accept=".md,.markdown,.txt,.zip,.json,text/markdown,text/plain,application/zip,application/json" multiple hidden>
     </section>
@@ -148,7 +148,7 @@
         <dt>Version</dt><dd id="about-version"></dd>
         <dt>Server</dt><dd id="about-server"></dd>
       </dl>
-      <p>Your lists are encrypted on your phones, with keys that never leave them. The server keeps them without being able to read them: it can't see your items, your sections, your name or anything you type. It can see when changes are made, roughly how big they are, and the internet address they come from.</p>
+      <p>Your lists are encrypted on your phones, with keys that never leave them. The server stores them but can't read them: it never sees your items, your sections, your name or anything you type. It does see when changes are made, roughly how big they are, and the internet address they come from.</p>
       <p class="note"><a href="https://github.com/pyrocklast/panier" target="_blank" rel="noopener">Source code</a>, under the MIT licence.</p>
     </section>
   </div>
@@ -169,7 +169,7 @@
       <div class="list-colours" id="list-colours"></div>
     </section>
     <section class="set" aria-labelledby="set-ticked">
-      <h3 id="set-ticked">Ticked items stay in view for</h3>
+      <h3 id="set-ticked">Ticked items stay in view</h3>
       <div class="choices" role="radiogroup" aria-labelledby="set-ticked">
         <label><input type="radio" name="ticked" value="1"><span>A day</span></label>
         <label><input type="radio" name="ticked" value="7"><span>A week</span></label>
@@ -197,7 +197,7 @@
 </dialog>
 
 <dialog class="sheet" id="pair" aria-labelledby="pair-title" tabindex="-1" autofocus>
-  <h2 id="pair-title">Add someone to this list</h2>
+  <h2 id="pair-title">Add someone</h2>
   <p id="pair-text">They scan this code with their phone, or open the link you send them.</p>
   <div class="qr" id="qr"></div>
   <div class="actions">

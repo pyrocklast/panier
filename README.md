@@ -8,11 +8,11 @@ Private lists, shared between phones: end-to-end encrypted, with no accounts. It
 
 - **Shared.** Each list with whoever you choose, each on their own phone. Changes show on the other phones within a second.
 - **Several lists.** The weekly shop, the hardware store, the market: each its own sheet on the lists page, each shared with its own people.
-- **Private.** Lists are encrypted on the phones. The server stores them without being able to read them.
+- **Private.** Lists are encrypted on the phones. The server stores them but can't read them.
 - **No accounts.** Another phone joins a list by scanning a QR code from one that has it.
 - **Offline.** It works without signal and catches up when the connection returns.
 - **An app from the browser.** It installs from Firefox, Chrome or Safari, with no app store.
-- **Made for everyday lists.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, ticked items with who ticked each, kept in view as long as each list needs, drag to reorder, and undo for everything.
+- **Made for everyday lists.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, who ticked what and when, drag to reorder, and undo for everything.
 - **Markdown in and out.** A list exports as a Markdown checklist, and any Markdown checklist, a few pasted lines, or checklists from Google Keep come in.
 - **In English and French**, light and dark.
 
@@ -51,7 +51,7 @@ Then, on the phones:
 ## Using it
 
 - **Add:** tap *Add item* at the end of a section and type. Enter adds the item and keeps the field open for the next.
-- **Tick:** tap the square. Ticked items move to the ticked group after a moment, with who ticked them and when, and stay in view for a week, or as long as the list's settings say.
+- **Tick:** tap the square. Ticked items move to the ticked group after a moment, which says who ticked each and when, and stay there for a week, or as the list's settings say.
 - **Edit:** tap the words. Clear them to delete the item.
 - **Move:** hold an item, or a section's name, for half a second, then drag.
 - **Sections:** a new list is a plain sheet. *Add a section*, below the items, adds a heading when it helps; tap a heading to rename it or change its colour.
