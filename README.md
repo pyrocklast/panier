@@ -92,8 +92,8 @@ Then, on the phones:
 | [`worker/`](worker/) | the Cloudflare server |
 | `*.go` | the Go server |
 | [`deploy/install.sh`](deploy/install.sh) | the Raspberry Pi installer |
-| [`test/`](test/) | tests of the API, the app in a browser, and updating |
-| [`docs/`](docs/) | the setup guides and the full user guide |
+| [`test/`](test/) | tests of the API, the app in a browser, and updating; and `efficiency.mjs`, which measures what the app costs |
+| [`docs/`](docs/) | the setup guides, the full user guide, and [how to keep Panier efficient](docs/efficiency.md) |
 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | tests, deploy and release builds |
 
 ## Development
