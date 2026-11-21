@@ -121,7 +121,7 @@ On every push to `main` or `next` and every pull request, GitHub runs the Go tes
 
 ## Next
 
-Bigger features change how lists are stored and shared, so each starts with a short design note, agreed before building, like [docs/roadmap.md](docs/roadmap.md) for several lists and more people:
+Bigger features change how lists are stored and shared, so each starts with a short design note, agreed before building:
 
 - encrypted backups kept on the server;
 - recurring lists or sections, such as a weekly shop;
