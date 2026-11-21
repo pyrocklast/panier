@@ -15,6 +15,8 @@ const FR = {
   "renaming the list {x}": "renommer la liste {x}",
   "Add a section": "Ajouter une section",
   "{n} ticked": ["{n} coché", "{n} cochés"],
+  "Me": "Moi",
+  "at {x}": "à {x}",
   "Add someone to this list": "Ajouter quelqu’un à cette liste",
   "Settings": "Paramètres",
   "Lists": "Listes",
@@ -215,6 +217,16 @@ export function plural(n, one, many) {
   const fr = lang === "fr" && FR[many];
   const form = Array.isArray(fr) ? fr[n <= 1 ? 0 : 1] : n === 1 ? one : many;
   return form.replace("{n}", n);
+}
+// When something happened, in the last few days: "at 12:45" today, then "yesterday",
+// then the day of the week. The clock is the phone's own, 12 or 24 hours.
+const clock = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
+const weekday = new Intl.DateTimeFormat(lang, { weekday: "long" });
+const yesterday = new Intl.RelativeTimeFormat(lang, { numeric: "auto" }).format(-1, "day");
+const dayOf = ms => { const d = new Date(ms); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5; };
+export function when(ms) {
+  const back = dayOf(Date.now()) - dayOf(ms);
+  return back < 1 ? t("at {x}", { x: clock.format(ms) }) : back === 1 ? yesterday : weekday.format(ms);
 }
 // Quotes around a name.
 export const q = s => (lang === "fr" ? "«" + nb + s + nb + "»" : "“" + s + "”");

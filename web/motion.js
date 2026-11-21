@@ -199,9 +199,12 @@ export function fly(o, to, target, small = !!(target && target.closest("#" + TIC
   Object.assign(el.style, { animationDuration: ms + "ms" });
   el.style.setProperty("--trip", ms + "ms");
   el.style.setProperty("--ease", easing);
-  el.classList.toggle("small", !!(o.part && o.part.id === TICKED));
+  const was = !!(o.part && o.part.id === TICKED), by = !ghost && el.querySelector(".by:not(:empty)");
+  el.classList.toggle("small", was);
   el.getBoundingClientRect(); // its size as it sets off, so the change of size shows
   el.classList.toggle("small", small);
+  // Who ticked it shows in the ticked group: it fades in on the way there, and out on the way back.
+  if (by && was !== small) { by.style.display = "block"; by.animate([{ opacity: +was }, { opacity: +small }], { duration: ms, easing, fill: "both" }); }
   if (target) el.style.width = to.width + "px";
   if (target) target.style.opacity = "0";
   const move = `translate(${dx}px, ${dy}px)`;

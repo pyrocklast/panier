@@ -1,7 +1,7 @@
 // The list on screen: its sections and items, and everything done to them.
 
 import * as store from "./store.js";
-import { t, plural, q } from "./i18n.js";
+import { t, plural, q, when } from "./i18n.js";
 import { toMarkdown, pastedItems } from "./md.js";
 import { state, readOnly, listName, listColor, draftsKey } from "./state.js";
 import { DEFAULTS, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, RECENT_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout, sheetOfList } from "./model.js";
@@ -133,7 +133,7 @@ function toggle(id, checked) {
     act(t("checking {x}", { x: q(it.text) }), [[id, "checked", true], [id, "checkedAt", Date.now()]], { animate: false });
   } else {
     settling.delete(id);
-    const ops = [[id, "checked", false], [id, "checkedAt", 0]];
+    const ops = [[id, "checked", false]]; // when it was ticked, and who by, stay for undo
     if (!wasSettling) {
       const sec = isShown(it.section) ? it.section : sections[0].id;
       ops.push([id, "section", sec], [id, "pos", maxPos(sec) + 1]);
@@ -574,8 +574,8 @@ function syncShells() {
 // and only rows that changed place are moved, so a tap doesn't rebuild the whole list
 // and the cursor stays where it is. A row is built anew only for its tint, which plays
 // once, when the row appears.
-const rows = new Map(); // item id → { li, chk, text, shown: the text written in it }
-function rowOf(it, tint) {
+const rows = new Map(); // item id → { li, chk, text, by, shown: the text written in it }
+function rowOf(it, tint, by = "") {
   let r = rows.get(it.id);
   if (r && state.editing === it.id) return r.li; // being edited: left just as it is
   if (!r || tint) rows.set(it.id, (r = itemEl(it.id)));
@@ -592,10 +592,15 @@ function rowOf(it, tint) {
     r.chk.setAttribute("aria-label", it.text);
     r.text.setAttribute("aria-label", ro ? it.text : t("Edit {x}", { x: it.text }));
   }
+  // Who ticked it, read after its name. Back on the list, the words stay, unseen, so they
+  // fade as it goes (motion.js).
+  const read = by ? r.by.id : null;
+  if (by && r.by.textContent !== by) r.by.textContent = by;
+  if (r.chk.getAttribute("aria-describedby") !== read) read ? r.chk.setAttribute("aria-describedby", read) : r.chk.removeAttribute("aria-describedby");
   return r.li;
 }
 
-// A row's parts and what they do; rowOf fills in the item's text, colour and tick.
+// A row's parts and what they do; rowOf fills in the item's text, colour and tick, and who ticked it.
 function itemEl(id) {
   const li = h("li", { "data-id": id });
   const chk = h("input", { type: "checkbox", class: "chk", id: "chk-" + id, dataset: { fk: "chk-" + id } });
@@ -618,9 +623,10 @@ function itemEl(id) {
     if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editItem(text, id); }
     else if (e.key === "Delete") { e.preventDefault(); del(id); }
   });
-  li.append(cell, text);
+  const by = h("span", { class: "by", id: "by-" + id });
+  li.append(cell, text, by);
   bindPress(li, { can: () => !readOnly() && !!li.closest("#list .items, #basket-list"), start: (offY, y, offX, x) => startDrag(li, id, offY, y, offX, x) });
-  return { li, chk, text, shown: null };
+  return { li, chk, text, by, shown: null };
 }
 
 /* ---------- Dragging items and sections ---------- */
@@ -711,7 +717,7 @@ function endDrag() {
     const ops = [[id, "section", sec], [id, "pos", between(prev && prev.pos, next && next.pos)]];
     if (it.checked) { // dragged out of the ticked group, or just ticked: back on the list
       settling.delete(id);
-      ops.push([id, "checked", false], [id, "checkedAt", 0]);
+      ops.push([id, "checked", false]);
       announce(t("{x} back on the list", { x: it.text }));
     } else if (it.section !== sec) announce(t("{x} moved to {y}", { x: it.text, y: nameOf(sec) }));
     store.change(t(it.checked ? "unchecking {x}" : "moving {x}", { x: q(it.text) }), ops);
@@ -807,7 +813,7 @@ function render() {
   if (flashId && !flashQuiet) tint.add(flashId);
   flashQuiet = false;
   const kept = new Set();
-  const fill = (ul, list) => { for (const i of list) kept.add(i.id); setRows(ul, list.map(i => rowOf(i, tint.has(i.id)))); };
+  const fill = (ul, list, note) => { for (const i of list) kept.add(i.id); setRows(ul, list.map(i => rowOf(i, tint.has(i.id), note && note(i)))); };
   for (const s of sections) fill(shells[s.id].ul, shown(s.id));
   const since = Date.now() - RECENT_MS;
   const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= since).sort((a, b) => b.checkedAt - a.checkedAt);
@@ -815,8 +821,15 @@ function render() {
   // "3 ticked": true while the list is in use and after, unlike a basket; the last five days show, newest first
   $("#basket-count").textContent = plural(basket.length, "{n} ticked", "{n} ticked");
   $("#basket-toggle").setAttribute("aria-expanded", String(ui.basketOpen));
+  // Beside each, who ticked it and when: "Isabelle, at 12:45", "Me, yesterday"; on a list
+  // only on this phone, just when.
+  const people = new Map(store.members().map(m => [m.dev, m])), shared = people.size > 1;
+  const byOf = i => {
+    const m = people.get(i.by), who = !m ? "" : m.me ? (shared ? t("Me") : "") : m.name;
+    return who ? who + ", " + when(i.checkedAt) : when(i.checkedAt);
+  };
   const bl = $("#basket-list");
-  fill(bl, basket);
+  fill(bl, basket, byOf);
   for (const id of rows.keys()) if (!kept.has(id)) rows.delete(id);
   bl.hidden = !ui.basketOpen;
   paintDock();

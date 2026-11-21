@@ -163,7 +163,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
    room around its text; the ruled lines still run from the text to the right edge. */
 :is(.item, .add, .sugopt) { margin-inline: -12px; padding-inline: 12px; background-origin: content-box; border-radius: 12px; }
 .items { list-style: none; margin: 0; padding: 0; }
-.item { display: grid; grid-template-columns: 38px minmax(0, 1fr); list-style: none; transition: background-color var(--quick) var(--ease-move); }
+.item { display: grid; grid-template-columns: 38px minmax(0, 1fr) fit-content(40%); list-style: none; transition: background-color var(--quick) var(--ease-move); }
 .item + .item, .items:not(:empty) ~ .add, .sug:not([hidden]) + .add {
   background-image: linear-gradient(var(--line), var(--line));
   background-size: calc(100% - 38px) 1px; background-position: right top; background-repeat: no-repeat;
@@ -267,6 +267,10 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 :is(#basket-list, .small) .text { font-size: 0.875rem; padding-block: 12px; }
 :is(#basket-list, .drop, .small) .box { width: 18px; height: 18px; margin-left: 1.5px; border-radius: 4px; }
 :is(#basket-list, .drop, .small) .box::after { width: 11px; height: 11px; }
+/* Beside each, who ticked it and when, level with its first line */
+.by { display: none; padding-left: 12px; text-align: end; color: var(--muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+#basket-list > .item:not(.editing) > .by:not(:empty) { display: block; }
+:is(#basket-list, .flying) :is(.text, .by) { align-self: baseline; }
 #basket-toggle {
   display: grid; grid-template-columns: 38px auto auto; align-items: center; min-height: 44px; padding: 0 8px 0 0;
   border: 0; border-radius: 12px; background: none; color: var(--muted); font-weight: 700; cursor: pointer;

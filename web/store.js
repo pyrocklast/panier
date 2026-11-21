@@ -194,12 +194,12 @@ class List {
   items() {
     if (!this.view) {
       this.view = new Map();
-      for (const [id, f] of Object.entries(this.s.items)) if (isItem(id)) this.view.set(id, itemOf(id, f));
+      for (const [id, f] of Object.entries(this.s.items)) if (isItem(id)) this.view.set(id, itemOf(id, f, this.s.devs));
       this.touched.clear();
       this.ordered = null;
     }
     if (this.touched.size) {
-      for (const id of this.touched) if (isItem(id)) this.view.set(id, itemOf(id, this.s.items[id]));
+      for (const id of this.touched) if (isItem(id)) this.view.set(id, itemOf(id, this.s.items[id], this.s.devs));
       this.touched.clear();
       this.ordered = null;
     }
@@ -565,7 +565,9 @@ class List {
   }
 }
 
-function itemOf(id, f) {
+// by is the phone that last ticked it: unticking leaves when it was ticked, and who by, as
+// they were, so undoing that puts them back.
+function itemOf(id, f, devs) {
   if (!f.text || (f.deleted && f.deleted[0])) return null;
   return {
     id,
@@ -574,6 +576,7 @@ function itemOf(id, f) {
     pos: f.pos ? f.pos[0] : 0,
     checked: !!(f.checked && f.checked[0]),
     checkedAt: f.checkedAt ? f.checkedAt[0] : 0,
+    by: f.checkedAt ? devs[f.checkedAt[2]] : "",
   };
 }
 

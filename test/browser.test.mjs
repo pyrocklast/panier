@@ -1415,6 +1415,8 @@ test("in French when the phone is in French", async () => {
     assert.ok(!shown.includes(en), "“" + en + "” is in French");
   }
   await online(A, a);
+  await item(a, "Pain").locator(".boxcell").click();
+  assert.ok(await eventually(async () => /^Moi, à \d{1,2}:\d{2}$/.test(await a.locator("#basket-list .by").first().textContent())), "who ticked it, in French");
   await t.close();
 });
 
@@ -1444,6 +1446,45 @@ test("the ticked group shows the last five days, the latest first; older items a
   await a.fill("#add-ess", "pl");
   assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Plums"], "the one from 6 days ago is still suggested");
   await t.close();
+});
+
+test("beside each ticked item, who ticked it and when; on a list only on this phone, just when", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await b.evaluate(async () => (await import("/store.js")).setMyName("Isabelle"));
+  for (const w of ["Milk", "Bread", "Eggs"]) await add(a, "ess", w);
+  await blur(a);
+  assert.ok(await eventually(async () => (await texts(b, "Essentials")).length === 3));
+  await item(a, "Milk").locator(".boxcell").click();
+  await item(b, "Bread").locator(".boxcell").click();
+  // Eggs, ticked a day ago
+  await b.evaluate(() => { window.realNow = Date.now; Date.now = () => window.realNow() - 864e5; });
+  await item(b, "Eggs").locator(".boxcell").click();
+  await b.evaluate(() => { Date.now = window.realNow; });
+  for (const pg of [a, b]) assert.ok(await eventually(async () => (await ticked(pg)).length === 3, 8000));
+  const by = pg => pg.$$eval("#basket-list .item", els => els.map(li => [li.querySelector(".text").textContent, li.querySelector(".by").textContent]));
+  const at = "at \\d{1,2}:\\d{2}(\\s[AP]M)?"; // as the phone tells the time
+  const like = (rows, want) => rows.length === want.length && rows.every(([w, x], i) => w === want[i][0] && new RegExp("^" + want[i][1] + "$").test(x));
+  assert.ok(await eventually(async () => like(await by(a), [["Bread", "Isabelle, " + at], ["Milk", "Me, " + at], ["Eggs", "Isabelle, yesterday"]])), JSON.stringify(await by(a)));
+  assert.ok(like(await by(b), [["Bread", "Me, " + at], ["Milk", at], ["Eggs", "Me, yesterday"]]), "a phone without a name: just when; " + JSON.stringify(await by(b)));
+  // Read after the item's name
+  const said = pg => pg.$$eval("#basket-list .chk", els => els.map(c => document.getElementById(c.getAttribute("aria-describedby")).textContent));
+  assert.deepEqual(await said(a), (await by(a)).map(r => r[1]));
+  // Unticked and back with undo, it's still who ticked it, when they did
+  const was = (await by(a))[0][1];
+  await a.locator("#basket-list .item").filter({ hasText: "Bread" }).locator(".boxcell").click();
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).includes("Bread")));
+  assert.equal(await item(a, "Bread").locator(".chk").getAttribute("aria-describedby"), null, "back on the list, nothing is read after it");
+  await a.click("#undo");
+  assert.ok(await eventually(async () => (await by(a))[0].join() === "Bread," + was));
+  assert.ok(await eventually(async () => (await by(b))[0][1] === was.replace("Isabelle", "Me")), "and the same on the other phone");
+  await t.close();
+
+  const p = await alone();
+  await add(p.page, "ess", "Tea");
+  await item(p.page, "Tea").locator(".boxcell").click();
+  assert.ok(await eventually(async () => new RegExp("^" + at + "$").test(await p.page.locator("#basket-list .by").textContent())), "on a list only on this phone, just when");
+  await p.close();
 });
 
 test("the stored list names each phone once and forgets items deleted over six months ago", async () => {
