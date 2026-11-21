@@ -8,14 +8,14 @@ import { $, reduceMotion } from "./dom.js";
 import * as list from "./list.js";
 import * as lists from "./lists.js";
 import { paintStatus } from "./bar.js";
-import { follow, closeThen } from "./sheets.js";
+import { follow, listInHistory } from "./sheets.js";
 import { peopleChanged } from "./share.js";
 import { keepList, paintListSettings } from "./settings.js";
 import { startOps } from "./model.js";
 
 $("#lists-open").addEventListener("click", () => turn(false, showLists));
-// From the list's settings, asked over the list; once it's gone, the lists page shows.
-$("#delete-open").addEventListener("click", () => closeThen($("#list-settings"), () => lists.askDelete(state.lid)));
+// From the list's settings, asked over them; once it's gone, the lists page shows.
+$("#delete-open").addEventListener("click", () => lists.askDelete(state.lid));
 // Undo is the list's on a list, and on the lists page brings back a list deleted from this phone.
 const undo = () => (state.view === "lists" ? lists.undoRemove() : list.undo());
 const redo = () => { if (state.view === "list") list.redo(); };
@@ -146,8 +146,8 @@ async function init() {
       lists.say(lists.MESSAGES[err.message] || lists.MESSAGES.server);
     }
   }
-  const st = history.state;
-  if (st && st.list && store.lists().some(e => e.lid === st.list)) { showList(st.list); store.refreshAll(); return; }
+  const was = listInHistory(); // reloaded on a list
+  if (was && store.lists().some(e => e.lid === was)) { showList(was); store.refreshAll(); return; }
   begin(null);
 }
 function begin(lid, toLists = false) {

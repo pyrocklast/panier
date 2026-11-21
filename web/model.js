@@ -23,7 +23,7 @@ const colorOk = (c, fallback) => (COLORS.some(([id]) => id === c) ? c : fallback
 export const LIST_COLORS = [["", "White"], ...COLORS.filter(([id]) => id !== "ess")];
 export const listColorOk = c => (LIST_COLORS.some(([id]) => id === c) ? c : "");
 
-export const MAX_ITEM = 120; // three lines on a phone
+export const MAX_ITEM = 300; // a few sentences, about eight lines on a phone
 export const MAX_SECTION = 40; // and the list's name
 export const LIST = "@list"; // where the list's own name is kept, among items and sections
 
@@ -109,7 +109,7 @@ export function layout(storedSections, its, typing = [], inList = i => !i.checke
   const used = new Set(its.filter(inList).map(i => i.section));
   for (const id of typing) used.add(id);
   for (const id of used) if (!all.has(id)) all.set(id, { id, name: t("Untitled"), color: PALETTE[0], pos: 100, deleted: false });
-  // The section without a name, which has no heading, always comes first.
+  // The section without a name always comes first.
   const order = (a, b) => !!a.name - !!b.name || a.pos - b.pos || (a.id < b.id ? -1 : 1);
   const shown = [...all.values()].filter(s => !s.deleted || used.has(s.id)).sort(order);
   // Two phones can each delete one of the last two sections at once: the first of them

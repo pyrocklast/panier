@@ -130,6 +130,7 @@ const FR = {
   "Look out for": "À l’occasion",
   "Long term": "À long terme",
   "Untitled": "Sans titre",
+  "Untitled section": "Section sans nom",
   "this section": "cette section",
   "Add item": "Ajouter un article",
   "Add item to {x}": "Ajouter un article à {x}",
@@ -208,10 +209,12 @@ const FR = {
     "Cette liste a été modifiée avec une version plus récente de Panier, qui se met à jour toute seule" + nb + ": fermez l’application et rouvrez-la. Rien n’est envoyé d’ici en attendant.",
 
   // Settings
-  "{n}, {x} on this phone.": "{n}, {x} sur ce téléphone.",
-  "The browser won't clear them to free up space.": "Le navigateur ne les effacera pas pour libérer de la place.",
-  "If it runs low on space, the browser may clear them; their links bring them back.":
-    "S’il manque de place, le navigateur peut les effacer" + nb + "; leurs liens permettent de les retrouver.",
+  "{n}, {x} on this phone": "{n}, {x} sur ce téléphone",
+  "The browser won't clear your lists to free up space.": "Le navigateur n’effacera pas vos listes pour libérer de la place.",
+  "If this phone runs low on space, the browser may clear your lists; their links bring them back.":
+    "Si ce téléphone manque de place, le navigateur peut effacer vos listes" + nb + "; leurs liens permettent de les retrouver.",
+  "Export": "Exporter",
+  "Export {x}, {y}": "Exporter {x}, {y}",
   "Asks the browser not to clear them": "Demande au navigateur de ne pas les effacer",
   "One Markdown file, to keep or bring in elsewhere": "Un fichier Markdown, à garder ou à importer ailleurs",
   "Markdown, plain text or Google Keep": "Markdown, texte brut ou Google Keep",

@@ -5,8 +5,8 @@ import * as store from "./store.js";
 import { t, plural, lang } from "./i18n.js";
 import { toMarkdown } from "./md.js";
 import { clean, MAX_SECTION, LIST_COLORS, sheetOfList } from "./model.js";
-import { $, download } from "./dom.js";
-import { openSheet, closeThen } from "./sheets.js";
+import { $, h, download } from "./dom.js";
+import { openSheet } from "./sheets.js";
 import { state, nav, readOnly, listName, listColor, tickedDays } from "./state.js";
 import { openPair, people } from "./share.js";
 import { palette } from "./edit.js";
@@ -29,14 +29,21 @@ async function paintSettings() {
   for (const r of document.querySelectorAll('input[name="theme"]')) r.checked = r.value === theme;
   $("#compact-layout").checked = document.documentElement.dataset.layout === "compact";
   $("#my-name").value = store.myName();
-  // The lists, in one line: how many, the room they take here, and whether they're safe;
-  // each list's own size is in its settings.
-  const all = store.lists(), room = all.reduce((n, e) => n + store.storedSize(e.lid), 0);
-  $("#export-all").hidden = $("#phone-open").hidden = $("#keep-text").hidden = !all.length;
+  // The lists, in one line: how many and the room they take here, which opens onto each
+  // with its own, to export it; then whether the browser keeps them.
+  const all = store.lists(), sizes = all.map(e => store.storedSize(e.lid)), room = sizes.reduce((a, b) => a + b, 0);
+  $("#data-open").hidden = $("#export-all").hidden = $("#phone-open").hidden = $("#keep-text").hidden = !all.length;
+  $("#data-sum").textContent = t("{n}, {x} on this phone", { n: plural(all.length, "{n} list", "{n} lists"), x: size(room) });
+  $("#data-lists").replaceChildren(...all.map((e, k) => {
+    const name = e.name || t("Untitled list");
+    return h("li", null, h("button", { type: "button", class: "row", "aria-label": t("Export {x}, {y}", { x: name, y: size(sizes[k]) }), onclick: () => exportOne(e.lid) },
+      h("span", null, name), h("span", { class: "row-d" }, size(sizes[k])), h("span", { class: "row-end" }, t("Export"))));
+  }));
+  unfold(false);
   $("#about-server").textContent = location.host;
   const [kept, keys] = await Promise.all([isKept(), caches.keys().catch(() => [])]);
-  $("#keep-text").textContent = t("{n}, {x} on this phone.", { n: plural(all.length, "{n} list", "{n} lists"), x: size(room) }) + " " +
-    (kept ? t("The browser won't clear them to free up space.") : t("If it runs low on space, the browser may clear them; their links bring them back."));
+  $("#keep-text").textContent = kept ? t("The browser won't clear your lists to free up space.")
+    : t("If this phone runs low on space, the browser may clear your lists; their links bring them back.");
   $("#keep-btn").hidden = kept !== false;
   const k = keys.find(k => k.startsWith("panier-") && !k.startsWith("panier-static-"));
   $("#about-version").textContent = k ? k.slice(7) : "dev";
@@ -62,11 +69,17 @@ for (const r of document.querySelectorAll('input[name="theme"]')) {
 $("#my-name").addEventListener("change", e => store.setMyName(clean(e.target.value, MAX_SECTION)));
 $("#my-name").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
 $("#keep-btn").addEventListener("click", async () => { await keepList(); paintSettings(); });
-$("#phone-open").addEventListener("click", () => closeThen($("#settings"), () => openPair(true)));
+$("#phone-open").addEventListener("click", () => openPair(true)); // over Settings, which it closes back onto
 
 function exportAll() {
   download("Panier", toMarkdown(store.lists().map(e => sheetOfList(store.peek(e.lid)))));
 }
+function exportOne(lid) {
+  const l = store.peek(lid);
+  download(l.name || t("Untitled list"), toMarkdown([sheetOfList(l)]));
+}
+const unfold = open => { $("#data-open").setAttribute("aria-expanded", String(open)); $("#data-lists").hidden = !open; };
+$("#data-open").addEventListener("click", () => unfold($("#data-lists").hidden));
 
 $("#export-all").addEventListener("click", exportAll);
 

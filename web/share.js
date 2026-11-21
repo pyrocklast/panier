@@ -68,8 +68,8 @@ function paintPeople() {
   $("#members").textContent = people();
   $("#rekey-open").hidden = !store.members().some(m => !m.me); // removing someone needs someone to remove
 }
-// From the list's settings, the sheet takes their place over the list.
-$("#pair-open").addEventListener("click", () => closeThen($("#list-settings"), () => openPair()));
+// From the list's settings, over them: closing it goes back to them.
+$("#pair-open").addEventListener("click", () => openPair());
 $("#pair-name-input").addEventListener("change", e => store.setMyName(clean(e.target.value, MAX_SECTION)));
 $("#pair-name-input").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
 $("#pair-close").addEventListener("click", () => $("#pair").close());

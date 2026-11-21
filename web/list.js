@@ -23,8 +23,9 @@ const ui = { sugSec: null, sug: [], sugIndex: -1, sugCol: 0, basketOpen: true };
 let wasReadOnly = false; // as the list on screen was last drawn
 
 const find = id => items.find(i => i.id === id);
-// A section by name; the one without a name, at the top, goes by the list's.
-const nameOf = id => { const s = sectionInfo.get(id); return s ? s.name || listName() : t("this section"); };
+// A section by name; the one without a name, alone at the top, goes by the list's, and
+// beside others says it has none.
+const nameOf = id => { const s = sectionInfo.get(id); return s ? s.name || (sections.length > 1 ? t("Untitled section") : listName()) : t("this section"); };
 const colorOf = id => (sectionInfo.has(id) ? sectionInfo.get(id).color : "muted");
 const isShown = id => sections.some(s => s.id === id);
 const inList = i => !i.checked || settling.has(i.id);
@@ -39,7 +40,10 @@ function computeSections() {
   const typing = Object.entries(shells).filter(([, sh]) => sh.input.value.trim()).map(([id]) => id);
   const l = layout(store.sections(), items, typing, inList);
   sectionInfo = l.all;
-  sections = l.shown;
+  // Once sections have names, the one without has a place only while it holds something
+  // to tick, under a heading like theirs, to be named: nothing new goes outside a section.
+  const holds = id => typing.includes(id) || items.some(i => i.section === id && inList(i));
+  sections = l.shown.some(s => s.name) ? l.shown.filter(s => s.name || holds(s.id)) : l.shown;
 }
 
 /* ---------- Changes ---------- */
@@ -138,7 +142,8 @@ function toggle(id, checked) {
     settling.delete(id);
     const ops = [[id, "checked", false]]; // when it was ticked, and who by, stay for undo
     if (!wasSettling) {
-      const sec = isShown(it.section) ? it.section : sections[0].id;
+      // Back in its section, if it still has one; the one without a name counts, and shows again.
+      const own = sectionInfo.get(it.section), sec = own && (isShown(it.section) || !own.name) && !own.deleted ? it.section : sections[0].id;
       ops.push([id, "section", sec], [id, "pos", maxPos(sec) + 1]);
     }
     announce(t("{x} back on the list", { x: it.text }));
@@ -266,7 +271,7 @@ function renameSection(id, name) {
   const info = sectionInfo.get(id);
   const fallback = (DEFAULTS.find(d => d.id === id) || {}).name;
   announce(t("Renamed section to {x}", { x: name }));
-  act(t("renaming section {x}", { x: q(info.name) }), [["#" + id, "name", name, fallback]], { leaving: true });
+  act(t("renaming section {x}", { x: q(info.name || t("Untitled section")) }), [["#" + id, "name", name, fallback]], { leaving: true });
 }
 // A section can only be deleted once it has nothing to tick, and the last one stays.
 const canDelete = id => sections.length > 1 && !items.some(i => i.section === id && inList(i));
@@ -367,7 +372,7 @@ function joinItem(id, text) {
 
 function editSection(span, id, x, y) {
   if (readOnly()) return;
-  const orig = nameOf(id);
+  const orig = sectionInfo.get(id).name; // the one without a name starts empty
   edit(span, {
     key: "#" + id, row: span.closest(".sec-head"), orig, max: MAX_SECTION, x, y,
     below: palette(orig, COLORS, colorOf(id), (c, label) => recolour(id, c, label)),
@@ -513,7 +518,7 @@ function buildShell(id) {
     escape: () => (ui.sugSec === id ? closeSug() : clearAdd(id)),
   });
   const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Ticked before"), hidden: true });
-  const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id } });
+  const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id, placeholder: t("Untitled section") } });
   name.addEventListener("click", e => {
     if (state.suppressClick) { state.suppressClick = false; return; }
     if (state.editing !== "#" + id) editSection(name, id, e.clientX, e.clientY);
@@ -525,7 +530,7 @@ function buildShell(id) {
   });
   const head = h("h2", { class: "sec-head" }, name);
   const el = h("section", { class: "sec", "data-sec": id, "aria-labelledby": "h-" + id }, head, ul, sug, form);
-  bindPress(head, { look: el, can: () => !readOnly() && sections.length > 1, start: (offY, y) => startSectionDrag(id, y) });
+  bindPress(head, { look: el, can: () => !readOnly() && sections.length > 1 && !!sectionInfo.get(id).name, start: (offY, y) => startSectionDrag(id, y) });
   input.addEventListener("input", () => {
     saveDraft(id, input.value.trim() ? input.value : "");
     updateSug(id);
@@ -570,10 +575,13 @@ function syncShells() {
     sh.el.style.setProperty("--sec", "var(--" + s.color + ")");
     if (sh.el.dataset.color !== s.color) sh.el.dataset.color = s.color;
     if (state.editing !== "#" + s.id && sh.name.textContent !== s.name) sh.name.textContent = s.name;
-    // A section without a name shows no heading: its items sit under the list's name.
-    sh.el.classList.toggle("plain", !s.name);
-    if (s.name) sh.el.setAttribute("aria-labelledby", "h-" + s.id); else sh.el.removeAttribute("aria-labelledby");
-    sh.name.setAttribute("aria-label", readOnly() ? s.name : t("{x}, rename", { x: s.name }));
+    // A section without a name, alone, shows no heading: its items sit under the list's
+    // name. Beside others, it has one like theirs, which says so, to be named; it stays first.
+    const plain = !s.name && sections.length === 1, called = s.name || t("Untitled section");
+    sh.el.classList.toggle("unnamed", !s.name);
+    sh.el.classList.toggle("plain", plain);
+    if (!plain) sh.el.setAttribute("aria-labelledby", "h-" + s.id); else sh.el.removeAttribute("aria-labelledby");
+    sh.name.setAttribute("aria-label", readOnly() ? called : t("{x}, rename", { x: called }));
     sh.input.setAttribute("aria-label", s.name ? t("Add item to {x}", { x: s.name }) : t("Add item"));
     if (list.children[i] !== sh.el) list.insertBefore(sh.el, list.children[i] || null);
   });
@@ -765,7 +773,7 @@ function placeSection(y) {
   const list = $("#list");
   let before = null;
   for (const c of list.children) {
-    if (c === state.drag.el || c.classList.contains("plain")) continue; // the section without a name stays first
+    if (c === state.drag.el || c.classList.contains("unnamed")) continue; // the section without a name stays first
     const r = c.getBoundingClientRect();
     if (y < r.top + r.height / 2) { before = c; break; }
   }
@@ -800,7 +808,7 @@ function endSectionDrag() {
 function moveSection(id, dir) {
   if (readOnly()) return;
   const order = sections.map(s => s.id), i = order.indexOf(id), j = i + dir;
-  if (j < 0 || j >= order.length || !sections[j].name) return; // the section without a name stays first
+  if (j < 0 || j >= order.length || !sections[i].name || !sections[j].name) return; // the section without a name stays first
   [order[i], order[j]] = [order[j], order[i]];
   announce(t(dir < 0 ? "{x} moved up" : "{x} moved down", { x: nameOf(id) }));
   act(t("moving section {x}", { x: q(nameOf(id)) }), orderOps(order), { focusKey: "name-" + id });

@@ -40,11 +40,11 @@ The list is written on the page itself, like paper: one left edge, ruled lines b
 - **People:** who's on the list, and *Add someone*.
 - **Data:** the room the list takes on this phone, *Export the list* and *Delete the list*.
 
-A closed list's settings can only be read, but it can still be exported or deleted.
+The share sheet and the question before deleting open over the settings, and close back onto them. A closed list's settings can only be read, but it can still be exported or deleted.
 
 ## Sections
 
-A new list is a plain sheet: its items sit under its name, with no heading. *Add a section* adds headings when they help: the items without one stay first, above them. Lists made before plain sheets keep the three sections they started with, *Essentials*, *Look out for* and *Long term*.
+A new list is a plain sheet: its items sit under its name, with no heading. *Add a section* adds headings when they help. The items already there stay first, under a heading of their own that quietly says *Untitled section*; tap it to name it. Once there are sections, nothing new goes outside one: when nothing is left to tick in the part without a name, it goes, and an item put back brings it back. Lists made before plain sheets keep the three sections they started with, *Essentials*, *Look out for* and *Long term*.
 
 - **Rename** a section by tapping its heading. Every phone sees the new name. Emptying the name and leaving puts the old one back.
 - **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it, the new colour spreading over it, as it does over the list's paper. Its name is written in a deep shade of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
@@ -53,7 +53,7 @@ A new list is a plain sheet: its items sit under its name, with no heading. *Add
 
 ## Adding items
 
-- Every section ends with an *Add item* row. Tap it, or its `+`, and type. An item holds up to 120 characters, about three lines.
+- Every section ends with an *Add item* row. Tap it, or its `+`, and type. An item holds up to 300 characters, a few sentences.
 - **Enter** or `+` adds the item and keeps the field open for the next one.
 - **Leaving the field** adds what you typed, so nothing is lost, and what you tapped to leave stays where it is on screen. A notification or switching apps doesn't cut it short. Text left in the field when the app closes is added the next time it opens.
 - **The cross** at the end of the row throws away what you typed, and the cursor stays in the field. Escape does the same from a keyboard, once any suggestions are closed.
@@ -124,7 +124,7 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 - **Who's on a list** shows in its settings and on the share sheet: you, the names people gave, and how many phones gave none. On the lists page, a few quiet words under a list's name say who else has it. Everyone on a list sees who ticked what.
 - **Remove someone**, on the share sheet once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *List closed* and keep what they had, until they delete it from the lists page. Share the new link with those who should keep the list.
 - **A closed list is only read**: nothing can be added, edited, moved or ticked, since none of it could be sent, and its boxes show faint. *Export the list* still saves a copy. So does a list changed with a newer Panier, until this one updates.
-- **Set up another phone**, in Settings, shows one QR code that brings every list on this phone to another.
+- **Set up another phone**, in Settings, shows one QR code that brings every list on this phone to another; closing it goes back to Settings.
 
 ## Sync and offline
 
@@ -149,7 +149,8 @@ On a phone turned on its side, or a tablet or computer, the page uses the width:
 - **You:** your name, shown to the people you share lists with.
 - **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page.
 - **Data:**
-  - One line: how many lists there are, the room they take on this phone (each list's own is in its settings), and whether the browser keeps them even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep them on this phone* asks again.
+  - One line: how many lists there are and the room they take on this phone. A tap opens each list with the room it takes, to export it alone; each list's own is in its settings too.
+  - Whether the browser keeps them even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep them on this phone* asks again.
   - *Export all lists*, *Bring in from a file* and *Set up another phone*, above.
 - **About:** the version, the server, and what the server can and can't see.
 
