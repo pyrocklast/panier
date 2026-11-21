@@ -647,8 +647,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   #pair > .qr { grid-column: 1; grid-row: 1 / span 6; align-self: start; }
 }
 
-/* Compact layout, chosen in Settings: every row 44 px, tighter gaps, titles of 20 px.
-   Everything you tap stays at least 44 px tall. */
+/* Compact layout, chosen in Settings: every row 44 px, tighter gaps, titles of 20 px, on
+   every page and sheet. Everything you tap stays at least 44 px tall. */
 [data-layout="compact"] main.wrap { padding-top: 12px; gap: 12px; }
 [data-layout="compact"] #list { gap: 20px; }
 [data-layout="compact"] :is(.list-top, .lists-top) { margin: 0; }
@@ -665,3 +665,17 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 [data-layout="compact"] .add-input { height: 44px; }
 [data-layout="compact"] .sugopt { min-height: 44px; }
 [data-layout="compact"] .basket { gap: 6px; margin-top: 8px; padding-top: 12px; }
+[data-layout="compact"] .sec-left { padding-top: 4px; }
+[data-layout="compact"] .page-head { margin-bottom: 4px; }
+[data-layout="compact"] .set { padding-block: 12px; }
+[data-layout="compact"] :is(.set h3, .set p:not(:last-child)) { margin-bottom: 8px; }
+[data-layout="compact"] .rows { margin-top: 0; }
+[data-layout="compact"] .row { min-height: 44px; padding-block: 6px; } /* two lines, or one */
+[data-layout="compact"] :is(.setup, .field) { gap: 6px; }
+[data-layout="compact"] :is(.setup input, .field input, .btn) { height: 44px; }
+[data-layout="compact"] .switch { margin-top: 8px; padding-top: 2px; }
+[data-layout="compact"] .list-colours .palette { margin-top: 4px; }
+[data-layout="compact"] .choices + .note { margin-top: 8px; }
+[data-layout="compact"] .sheet:not(.page) { padding: 20px; }
+[data-layout="compact"] .close { top: 10px; right: 10px; } /* level with the title, as before */
+[data-layout="compact"] .actions { margin-top: 12px; }
