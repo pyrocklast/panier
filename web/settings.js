@@ -2,12 +2,12 @@
 // a page over the list. Each opens from Settings at the top right of the page it's about.
 
 import * as store from "./store.js";
-import { t, lang } from "./i18n.js";
+import { t, plural, lang } from "./i18n.js";
 import { toMarkdown } from "./md.js";
 import { clean, MAX_SECTION, LIST_COLORS, sheetOfList } from "./model.js";
-import { $, h, download } from "./dom.js";
+import { $, download } from "./dom.js";
 import { openSheet, closeThen } from "./sheets.js";
-import { nav, readOnly, listName, listColor, tickedDays } from "./state.js";
+import { state, nav, readOnly, listName, listColor, tickedDays } from "./state.js";
 import { openPair, people } from "./share.js";
 import { palette } from "./edit.js";
 import * as list from "./list.js";
@@ -29,14 +29,14 @@ async function paintSettings() {
   for (const r of document.querySelectorAll('input[name="theme"]')) r.checked = r.value === theme;
   $("#compact-layout").checked = document.documentElement.dataset.layout === "compact";
   $("#my-name").value = store.myName();
-  const all = store.lists();
-  $("#sizes").replaceChildren(...all.map(e => h("li", {}, h("span", {}, e.name || t("Untitled list")), h("span", {}, size(store.storedSize(e.lid))))));
-  $("#export-all").hidden = $("#phone-open").hidden = !all.length;
+  // The lists, in one line: how many, the room they take here, and whether they're safe;
+  // each list's own size is in its settings.
+  const all = store.lists(), room = all.reduce((n, e) => n + store.storedSize(e.lid), 0);
+  $("#export-all").hidden = $("#phone-open").hidden = $("#keep-text").hidden = !all.length;
   $("#about-server").textContent = location.host;
   const [kept, keys] = await Promise.all([isKept(), caches.keys().catch(() => [])]);
-  $("#keep-text").textContent = kept
-    ? t("Kept on this phone: the browser won't clear your lists to free up space.")
-    : t("If this phone runs low on space, the browser may clear your lists; their links bring them back.");
+  $("#keep-text").textContent = t("{n}, {x} on this phone.", { n: plural(all.length, "{n} list", "{n} lists"), x: size(room) }) + " " +
+    (kept ? t("The browser won't clear them to free up space.") : t("If it runs low on space, the browser may clear them; their links bring them back."));
   $("#keep-btn").hidden = kept !== false;
   const k = keys.find(k => k.startsWith("panier-") && !k.startsWith("panier-static-"));
   $("#about-version").textContent = k ? k.slice(7) : "dev";
@@ -83,6 +83,8 @@ export function paintListSettings() {
   const days = tickedDays();
   for (const r of document.querySelectorAll('input[name="ticked"]')) { r.checked = +r.value === days; r.disabled = ro; }
   $("#list-people").textContent = people();
+  $("#list-size").textContent = t("{x} on this phone.", { x: size(store.storedSize(state.lid)) });
+  $("#delete-what").textContent = store.status().closed ? t("From this phone") : t("From this phone, or for everyone");
 }
 const fromListButton = () => $("#list-settings-open");
 const closeListSettings = () => nav.turn(false, () => $("#list-settings").close(), fromListButton);

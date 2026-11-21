@@ -475,6 +475,8 @@ test("the list has a name, at the top, between the way back and its settings, wh
 
   await listSettings(a);
   assert.equal(await a.getAttribute("#list-settings-close", "aria-label"), "Courses", "back to the list, by its name");
+  assert.match(await a.locator("#list-size").innerText(), /^\d+ (bytes|KB) on this phone\.$/, "the room it takes here");
+  assert.equal(await a.locator("#delete-what").innerText(), "From this phone, or for everyone");
   await a.fill("#list-rename", "");
   await a.press("#list-rename", "Enter");
   assert.equal(await a.inputValue("#list-rename"), "Courses", "an emptied name goes back to the old one");
@@ -1391,9 +1393,9 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   await a.locator('#settings .choices label', { hasText: "Light" }).click();
   assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), rgbText(desk), "and back");
 
-  assert.deepEqual(await a.locator("#sizes li span:first-child").allInnerTexts(), ["Shopping list"], "the space each list takes");
-  assert.match(await a.locator("#sizes li span:last-child").innerText(), /\d+ (bytes|KB)/);
-  assert.ok(await eventually(async () => /browser/.test(await a.locator("#keep-text").innerText())));
+  assert.ok(await eventually(async () => /^1 list, \d+ (bytes|KB) on this phone\. .*browser/.test(await a.locator("#keep-text").innerText())), "the lists in one line: how many, the room they take here, whether they're safe");
+  const rows = await a.locator("#settings .row:visible").evaluateAll(r => r.map(b => b.getBoundingClientRect().toJSON()));
+  assert.ok(rows.length >= 3 && rows.every(r => Math.abs(r.width - rows[0].width) < 1 && Math.abs(r.left - rows[0].left) < 1 && r.height >= 44), "what's done now and then, in rows that line up");
   const [all] = await Promise.all([a.waitForEvent("download"), a.click("#export-all")]);
   assert.match(all.suggestedFilename(), /^panier-\d{4}-\d{2}-\d{2}\.md$/, "every list in one file");
   assert.match(readFileSync(await all.path(), "utf8"), /^# Shopping list\n/);
@@ -2060,6 +2062,7 @@ test("changing a list's key leaves everyone else with it closed, until they open
   assert.equal(await a.locator("#list-colours .swatch").count(), 0, "nor recoloured");
   assert.ok(await a.locator('input[name="ticked"]').first().isDisabled(), "nor its ticked items kept longer");
   assert.equal(await a.locator("#export-btn").isVisible(), true, "but it can still be exported");
+  assert.equal(await a.locator("#delete-what").innerText(), "From this phone", "and deleted from this phone");
   await backToList(a);
   await a.click("#status-pill");
   assert.equal(await a.locator("#status-detail button").count(), 0, "nor deleted from the list itself");

@@ -29,6 +29,11 @@ const FR = {
   "After that, they're still suggested as you type.": "Ensuite, ils restent proposés pendant la saisie.",
   "People": "Personnes",
   "Add someone": "Ajouter quelqu’un",
+  "A code to scan, or a link to send": "Un code à scanner, ou un lien à envoyer",
+  "{x} on this phone.": "{x} sur ce téléphone.",
+  "A Markdown file": "Un fichier Markdown",
+  "From this phone, or for everyone": "De ce téléphone, ou pour tout le monde",
+  "From this phone": "De ce téléphone",
   "at {x}": "à {x}",
   "Add someone to this list": "Ajouter quelqu’un à cette liste",
   "Settings": "Paramètres",
@@ -203,9 +208,14 @@ const FR = {
     "Cette liste a été modifiée avec une version plus récente de Panier, qui se met à jour toute seule" + nb + ": fermez l’application et rouvrez-la. Rien n’est envoyé d’ici en attendant.",
 
   // Settings
-  "Kept on this phone: the browser won't clear your lists to free up space.": "Gardées sur ce téléphone" + nb + ": le navigateur n’effacera pas vos listes pour libérer de la place.",
-  "If this phone runs low on space, the browser may clear your lists; their links bring them back.":
-    "Si ce téléphone manque de place, le navigateur peut effacer vos listes" + nb + "; leurs liens permettent de les retrouver.",
+  "{n}, {x} on this phone.": "{n}, {x} sur ce téléphone.",
+  "The browser won't clear them to free up space.": "Le navigateur ne les effacera pas pour libérer de la place.",
+  "If it runs low on space, the browser may clear them; their links bring them back.":
+    "S’il manque de place, le navigateur peut les effacer" + nb + "; leurs liens permettent de les retrouver.",
+  "Asks the browser not to clear them": "Demande au navigateur de ne pas les effacer",
+  "One Markdown file, to keep or bring in elsewhere": "Un fichier Markdown, à garder ou à importer ailleurs",
+  "Markdown, plain text or Google Keep": "Markdown, texte brut ou Google Keep",
+  "One code brings it every list": "Un code lui apporte toutes vos listes",
   "{n} items": ["{n} article", "{n} articles"],
   "{n} bytes": "{n} octets",
   "{n} KB": "{n} Ko",

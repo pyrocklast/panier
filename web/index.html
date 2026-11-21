@@ -131,15 +131,14 @@
     </section>
     <section class="set" aria-labelledby="set-data">
       <h3 id="set-data">Data</h3>
-      <p id="keep-text"></p>
-      <ul class="sizes" id="sizes"></ul>
-      <div class="buttons">
-        <button type="button" class="btn" id="keep-btn" hidden>Keep them on this phone</button>
-        <button type="button" class="btn" id="export-all">Export all lists</button>
-        <button type="button" class="btn" id="import-open">Bring in from a file</button>
-        <input type="file" id="import-file" accept=".md,.markdown,.txt,.zip,.json,text/markdown,text/plain,application/zip,application/json" multiple hidden>
-        <button type="button" class="btn" id="phone-open">Set up another phone</button>
-      </div>
+      <p class="sum" id="keep-text"></p>
+      <ul class="rows">
+        <li><button type="button" class="row" id="keep-btn" hidden><span>Keep them on this phone</span><span class="row-d">Asks the browser not to clear them</span></button></li>
+        <li><button type="button" class="row" id="export-all"><span>Export all lists</span><span class="row-d">One Markdown file, to keep or bring in elsewhere</span></button></li>
+        <li><button type="button" class="row" id="import-open"><span>Bring in from a file</span><span class="row-d">Markdown, plain text or Google Keep</span></button></li>
+        <li><button type="button" class="row" id="phone-open"><span>Set up another phone</span><span class="row-d">One code brings it every list</span></button></li>
+      </ul>
+      <input type="file" id="import-file" accept=".md,.markdown,.txt,.zip,.json,text/markdown,text/plain,application/zip,application/json" multiple hidden>
     </section>
     <section class="set" aria-labelledby="set-about">
       <h3 id="set-about">About</h3>
@@ -179,15 +178,18 @@
     </section>
     <section class="set" aria-labelledby="set-people">
       <h3 id="set-people">People</h3>
-      <p id="list-people"></p>
-      <div class="buttons"><button type="button" class="btn" id="pair-open">Add someone</button></div>
+      <p class="sum" id="list-people"></p>
+      <ul class="rows">
+        <li><button type="button" class="row" id="pair-open"><span>Add someone</span><span class="row-d">A code to scan, or a link to send</span></button></li>
+      </ul>
     </section>
     <section class="set" aria-labelledby="set-list-data">
       <h3 id="set-list-data">Data</h3>
-      <div class="buttons">
-        <button type="button" class="btn" id="export-btn">Export the list</button>
-        <button type="button" class="btn" id="delete-open">Delete the list</button>
-      </div>
+      <p class="sum" id="list-size"></p>
+      <ul class="rows">
+        <li><button type="button" class="row" id="export-btn"><span>Export the list</span><span class="row-d">A Markdown file</span></button></li>
+        <li><button type="button" class="row danger" id="delete-open"><span>Delete the list</span><span class="row-d" id="delete-what">From this phone, or for everyone</span></button></li>
+      </ul>
     </section>
   </div>
 </dialog>

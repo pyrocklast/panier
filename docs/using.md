@@ -38,7 +38,7 @@ The list is written on the page itself, like paper: one left edge, ruled lines b
 - **Name and colour.** Emptying the name puts the old one back.
 - **Ticked items stay in view for** a day, a week, a month, or always. A week to start with. Nothing is deleted: older ticked items leave the ticked group but are still suggested as you type, and still exported.
 - **People:** who's on the list, and *Add someone*.
-- **Data:** *Export the list* and *Delete the list*.
+- **Data:** the room the list takes on this phone, *Export the list* and *Delete the list*.
 
 A closed list's settings can only be read, but it can still be exported or deleted.
 
@@ -144,13 +144,12 @@ On a phone turned on its side, or a tablet or computer, the page uses the width:
 
 ## Settings
 
-*Settings*, at the top right of the lists page, opens a page of its own; the arrow at its top left, Escape or the phone's back gesture close it. Settings are chosen on each phone.
+*Settings*, at the top right of the lists page, opens a page of its own; the arrow at its top left, Escape or the phone's back gesture close it. Settings are chosen on each phone. Here and in a list's settings, what's done now and then is a ruled row, as on a list, with a quiet line saying what it does.
 
 - **You:** your name, shown to the people you share lists with.
 - **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page.
 - **Data:**
-  - Whether the browser keeps the lists even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep them on this phone* asks again.
-  - How much space each list takes on this phone.
+  - One line: how many lists there are, the room they take on this phone (each list's own is in its settings), and whether the browser keeps them even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep them on this phone* asks again.
   - *Export all lists*, *Bring in from a file* and *Set up another phone*, above.
 - **About:** the version, the server, and what the server can and can't see.
 
