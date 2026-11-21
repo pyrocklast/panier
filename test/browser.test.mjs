@@ -1456,7 +1456,7 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   const sheet = () => a.evaluate(() => Math.round(document.querySelector(".sheet-open").getBoundingClientRect().height));
   const roomy = await sheet();
   await a.locator("#settings .switch").click();
-  assert.ok(await sheet() < roomy - 40, "the compact layout: each list in one line");
+  assert.ok(await sheet() <= roomy - 20, "the compact layout: each list's sheet shorter, its lines closer");
   await a.click("#settings-close"); await turned(a);
   await a.locator("#sheets .sheet-open").first().click(); await turned(a);
   const row = () => a.evaluate(() => Math.round(document.querySelector("#list .item").getBoundingClientRect().height));
@@ -1883,7 +1883,8 @@ test("on a phone on its side, what's ticked lies beside the list, and an item dr
   assert.ok(qr.y + qr.height <= 400 && qr.x + qr.width <= title.x, "the share sheet fits, its code beside its words");
   await unshare(a);
   await toLists(a);
-  assert.equal(await a.locator(".sheet-first").first().isVisible(), !LAYOUT, "the lists page shows each list's first things, unless compact");
+  assert.equal(await a.locator(".sheet-first").first().isVisible(), true, "the lists page shows each list's first things");
+  assert.equal(await a.locator(".sheet-item").first().evaluate(e => e.getBoundingClientRect().height), LAYOUT ? 24 : 30, "on lines closer together when compact");
   const sheets = await a.locator("#sheets .sheet-card").evaluateAll(els => els.map(e => e.getBoundingClientRect().width));
   assert.ok(sheets[0] < 892 / 3, "with more sheets to a row");
   await a.click("#settings-open"); await turned(a);
