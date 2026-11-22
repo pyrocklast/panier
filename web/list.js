@@ -456,7 +456,7 @@ function paintSug(sec, list) {
   const sh = shells[sec], query = splitQty(sh.input.value).name;
   const active = ui.sugSec === sec ? ui.sugIndex : -1;
   const keep = e => e.preventDefault(); // the cursor stays in the field
-  sh.sug.replaceChildren(...list.map((it, i) => h("li", { role: "row", class: "sugopt" + (i === active ? " active" : ""), onpointerdown: keep, onmousedown: keep },
+  sh.sug.replaceChildren(...list.map((it, i) => h("div", { role: "row", class: "sugopt" + (i === active ? " active" : ""), onpointerdown: keep, onmousedown: keep },
     h("span", {
       role: "gridcell", class: "sug-pick", id: sugCellId(sec, i, 0), "aria-selected": String(i === active && !ui.sugCol),
       onclick: () => revive(it.id, sec, fromHint(it.text, sh.input.value)),
@@ -516,7 +516,7 @@ function buildShell(id) {
     clear: () => clearAdd(id),
     escape: () => (ui.sugSec === id ? closeSug() : clearAdd(id)),
   });
-  const sug = h("ul", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Ticked before"), hidden: true });
+  const sug = h("div", { class: "sug", id: "sug-" + id, role: "grid", "aria-label": t("Ticked before"), hidden: true });
   const name = h("span", { class: "sec-name", id: "h-" + id, role: "button", tabindex: "0", dataset: { fk: "name-" + id, placeholder: t("Untitled section") } });
   name.addEventListener("click", e => {
     if (state.suppressClick) { state.suppressClick = false; return; }
@@ -834,7 +834,6 @@ function render() {
   if (state.view !== "list" || !store.current()) return; // the lists page shows; the list draws when it's back
   const name = store.listName() || "", title = $("#list-name"); // without one, it says so (app.css)
   if (state.editing !== LIST && title.textContent !== name) title.textContent = name;
-  title.setAttribute("aria-label", listName());
   document.title = name || "Panier";
   wasReadOnly = readOnly();
   $("#app").classList.toggle("readonly", wasReadOnly);

@@ -47,6 +47,7 @@ The share sheet and the question before deleting open over the settings, and clo
 A new list is a plain sheet: its items sit under its name, with no heading. *Add a section* adds headings when they help. The items already there stay first, under a heading of their own that quietly says *Untitled section*; tap it to name it. Once there are sections, nothing new goes outside one: when nothing is left to tick in the part without a name, it goes, and an item put back brings it back.
 
 - **Rename** a section by tapping its heading. Every phone sees the new name. Emptying the name and leaving puts the old one back.
+- **Fold** a section with the chevron at the end of its heading: it shows only its name, and under it what's left to tick, which a tap opens again. It folds on this phone only, and stays folded when the app opens again. Moving an item into it with the keyboard opens it, so the item stays in view.
 - **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it, the new colour spreading over it, as it does over the list's paper. Its name is written in a deep shade of the colour above a line of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
 - **Add a section** with *Add a section*, below the last one. It gets the first colour not used yet. Enter or `+` adds it, the cross clears what you typed, and the cursor then moves to its *Add item* row.
 - **Delete** a section once nothing is left to tick in it: while you rename it, a cross appears. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
@@ -93,7 +94,7 @@ A new list is a plain sheet: its items sit under its name, with no heading. *Add
 
 ## Undo and redo
 
-- Every change can be undone. The undo button appears at the bottom right after the first change, and hides while you type. Redo joins it once something has been undone.
+- Every change to a list's items and sections can be undone, and so can a list taken off the phone; the list's other settings and your name can't. The undo button appears at the bottom right after the first change, and hides while you type. Redo joins it once something has been undone.
 - For a few seconds after deleting an item, a section or a suggestion, or taking a list off the phone, the undo button shows its name, so you know what a tap brings back.
 - Each person undoes only their own changes. If someone else has changed something since, their change stands, and undo says who, by the name they gave.
 
