@@ -386,6 +386,69 @@ test("changes made offline are sent later, the status says so, and the app opens
   await t.close();
 });
 
+// Fills the browser's storage for this phone to the last byte, with keys starting "junk".
+const fillStorage = pg => pg.evaluate(() => {
+  for (const len of [100000, 10000, 1000, 100, 10, 1]) {
+    const s = "x".repeat(len);
+    try { for (let i = 0; ; i++) localStorage.setItem("junk" + len + "-" + i, s); } catch (_) {}
+  }
+});
+const holds = async (pg, text) => JSON.stringify(await stored(pg)).includes(text); // what the phone has saved of its open list
+
+test("with the phone's storage full, the status says so rather than \"saved\", and what waited is saved once there's room", async () => {
+  const t = await pair();
+  const { b, B } = t;
+  await fillStorage(b);
+  await offline(B, b);
+  await add(b, "long", "Bike lights for the winter, the bright ones that charge by USB");
+  await blur(b);
+  assert.ok(await eventually(() => b.locator("#status").isVisible(), 4000), "the status appears");
+  assert.equal(await b.locator("#status-text").innerText(), "Phone storage full");
+  await b.click("#status-pill");
+  const detail = await b.locator("#status-detail").innerText();
+  assert.match(detail, /lost if the app closes/);
+  assert.doesNotMatch(detail, /saved on this phone/, "nothing claims to be saved");
+  assert.equal(await holds(b, "Bike lights"), false, "it really isn't");
+  await b.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith("junk")) localStorage.removeItem(k); });
+  await add(b, "long", "Pump"); // the next change finds room, and the list is written whole
+  await blur(b);
+  assert.ok(await eventually(() => holds(b, "Bike lights")), "what waited in memory is saved");
+  assert.ok(await eventually(async () => (await b.locator("#status-text").innerText()) === "Offline"), "the status is back to being offline");
+  await online(B, b);
+  await t.close();
+});
+
+test("with the server not answering, the status says so and the change waits; it's sent once it answers", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await b.route("**/api/**", r => r.abort());
+  await add(b, "long", "Bike lights");
+  await blur(b);
+  assert.ok(await eventually(() => b.locator("#status").isVisible(), 6000), "the status appears");
+  assert.equal(await b.locator("#status-text").innerText(), "Can't reach the server");
+  await b.click("#status-pill");
+  assert.match(await b.locator("#status-detail").innerText(), /1 change is saved on this phone, to be sent as soon as it answers/);
+  await b.unroute("**/api/**");
+  // The live connection isn't routed, so it stayed up; the app tries again when the connection changes.
+  await b.evaluate(() => dispatchEvent(new Event("online")));
+  assert.ok(await eventually(async () => (await texts(a, "Long term")).join() === "Bike lights", 10000), "sent once the server answers");
+  await t.close();
+});
+
+test("a list the server has no room for says List full, and keeps the change on the phone", async () => {
+  const t = await pair();
+  const { b } = t;
+  await b.route("**/api/lists/*/changes", r => (r.request().method() === "POST" ? r.fulfill({ status: 507, body: "this list is full\n" }) : r.continue()));
+  await add(b, "long", "Bike lights");
+  await blur(b);
+  assert.ok(await eventually(() => b.locator("#status").isVisible(), 6000), "the status appears");
+  assert.equal(await b.locator("#status-text").innerText(), "List full");
+  await b.click("#status-pill");
+  assert.match(await b.locator("#status-detail").innerText(), /no room left for this list\. 1 change is saved on this phone/);
+  assert.ok(await eventually(() => holds(b, "Bike lights")), "kept on the phone");
+  await t.close();
+});
+
 test("the server stores no item names", { skip: !process.env.STORE }, async () => {
   const t = await pair();
   const words = ["Camembert", "Baguette tradition", "Persil frais"];

@@ -131,6 +131,7 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 - Only the list on screen listens. While Panier is out of sight, it stops listening, so it uses no network or battery in the background. Coming back, it catches up in a fraction of a second.
 - Without a connection, the app keeps working. A pill at the bottom left shows *Offline*; tap it to see how many changes are waiting. They are sent when the connection returns. *Can't reach the server* means the phone is online but the server isn't answering.
 - *List full* means the server has no room left for the list (32 MB, many years of use). Changes are kept on the phone.
+- *Phone storage full* means the browser has no room left on this phone to save the lists. Changes still reach the server while online, but those made offline are lost if the app closes. Settings shows the room each list takes; deleting one frees it, and what was waiting is saved then.
 
 ## Sideways and on wider screens
 

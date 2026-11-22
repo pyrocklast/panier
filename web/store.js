@@ -38,6 +38,17 @@ const listeners = new Set();
 export const subscribe = fn => { listeners.add(fn); };
 const emit = kind => listeners.forEach(fn => fn(kind));
 
+// Writes to the phone's storage. When it has no room, what couldn't be written stays only
+// in memory, and the status says so (bar.js) rather than claim it's saved; each later
+// change tries again, and taking a list off this phone frees room for the others.
+const unkept = new Set(); // keys the storage had no room for
+function keep(key, value) {
+  const was = unkept.size;
+  try { localStorage.setItem(key, value); unkept.delete(key); } catch (_) { unkept.add(key); }
+  if (!was !== !unkept.size) emit("status");
+}
+export const storageFull = () => unkept.size > 0;
+
 /* ---------- The index ---------- */
 
 function loadIndex() {
@@ -52,7 +63,7 @@ let indexTimer = 0;
 function saveIndexNow() {
   clearTimeout(indexTimer);
   indexTimer = 0;
-  try { localStorage.setItem(INDEX, JSON.stringify(index)); } catch (_) {}
+  keep(INDEX, JSON.stringify(index));
 }
 const saveIndex = () => { if (!indexTimer) indexTimer = setTimeout(saveIndexNow, 400); };
 
@@ -150,7 +161,7 @@ class List {
     clearTimeout(this.saveTimer);
     this.saveTimer = 0;
     if (this.gone || this.unsaved) return; // taken off this phone, replaced by a copy, or a copy not yet in place
-    try { localStorage.setItem(ENTRY + this.lid, JSON.stringify(this.s)); } catch (_) {}
+    keep(ENTRY + this.lid, JSON.stringify(this.s));
   }
   save() {
     if (!this.saveTimer) this.saveTimer = setTimeout(() => this.saveNow(), 400);
@@ -729,18 +740,20 @@ export function remove(lid) {
   l.gone = true;
   let raw = null;
   try { raw = localStorage.getItem(ENTRY + lid); localStorage.removeItem(ENTRY + lid); } catch (_) {}
+  unkept.delete(ENTRY + lid);
   const [entry] = index.lists.splice(at, 1);
   if (index.open === lid) index.open = null;
   if (cur === l) cur = null;
   loaded.delete(lid);
   saveIndexNow();
+  for (const o of loaded.values()) if (unkept.has(ENTRY + o.lid)) o.saveNow(); // the room it took
   emit("lists");
   return { entry, at, raw };
 }
 export function restore(r) {
   if (!r || entryOf(r.entry.lid)) return;
   index.lists.splice(Math.min(r.at, index.lists.length), 0, r.entry);
-  try { if (r.raw) localStorage.setItem(ENTRY + r.entry.lid, r.raw); } catch (_) {}
+  if (r.raw) keep(ENTRY + r.entry.lid, r.raw);
   saveIndexNow();
   get(r.entry.lid).refresh();
   emit("lists");
