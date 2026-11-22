@@ -62,17 +62,20 @@ const stored = pg => pg.evaluate(() => JSON.parse(localStorage.getItem("panier2:
 const openKey = pg => pg.evaluate(() => { const ix = JSON.parse(localStorage.getItem("panier2")); return ix.lists.find(e => e.lid === ix.open).key; });
 
 // A list made with the setup link opens with its name to type, as a plain sheet. The
-// tests name it as lists used to be called, and give it the three sections lists
-// started with before plain sheets, which most of them use.
+// tests name it, and give it three sections, which most of them use: the one without a
+// name, named, then two more, each written out as sections added on screen are.
 async function started(pg) {
   await pg.locator("#list-name.editing").waitFor();
-  await pg.keyboard.type((await pg.evaluate(() => document.documentElement.lang)) === "fr" ? "Liste de courses" : "Shopping list");
+  const fr = (await pg.evaluate(() => document.documentElement.lang)) === "fr";
+  await pg.keyboard.type(fr ? "Liste de courses" : "Shopping list");
   await pg.keyboard.press("Enter");
-  await pg.evaluate(async () => {
-    const store = await import("/store.js"), { DEFAULTS } = await import("/model.js"), list = await import("/list.js");
-    store.change(null, [["#ess", "name", DEFAULTS[0].name], ["#look", "deleted", false], ["#long", "deleted", false]]);
+  await pg.evaluate(async names => {
+    const store = await import("/store.js"), list = await import("/list.js");
+    store.change(null, [["#ess", "name", names[0]],
+      ["#look", "name", names[1]], ["#look", "color", "look"], ["#look", "pos", 2], ["#look", "deleted", false],
+      ["#long", "name", names[2]], ["#long", "color", "long"], ["#long", "pos", 3], ["#long", "deleted", false]]);
     list.repaint();
-  });
+  }, fr ? ["Essentiels", "À l’occasion", "À long terme"] : ["Essentials", "Look out for", "Long term"]);
   // Sent before anyone joins, so another phone has the sections from its first download.
   assert.ok(await eventually(() => pg.evaluate(async () => (await import("/store.js")).status().waiting === 0)), "the list's start is sent");
 }
@@ -1857,7 +1860,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await t.close();
 });
 
-test("a new list is a plain sheet, named first; sections come when added, and lists made before keep their three", async () => {
+test("a new list is a plain sheet, named first, that writes only its name and format; sections come when added", async () => {
   const errors = [];
   const { ctx, page: a } = await phone(errors);
   await a.goto(BASE + "/#setup=" + SETUP.toLowerCase());
@@ -1909,11 +1912,11 @@ test("a new list is a plain sheet, named first; sections come when added, and li
   await toLists(a);
   await newList(a, "Pharmacy");
   assert.equal(await a.locator("#list .sec-head:visible").count(), 0, "a list made later starts plain too");
-  // A list made before plain sheets, which wrote no start into itself, keeps its three.
-  await toLists(a);
-  await a.evaluate(async () => (await import("/store.js")).createList({}));
-  await a.locator("#sheets .sheet-open", { hasText: "Untitled list" }).click(); await turned(a);
-  assert.deepEqual(await names(a), ["Essentials", "Look out for", "Long term"]);
+  assert.ok(await eventually(async () => !!(await stored(a)).items["@list"]), "saved");
+  const st = await stored(a);
+  assert.deepEqual(Object.keys(st.items).filter(k => !k.startsWith("@m/")), ["@list"], "it writes no section");
+  assert.deepEqual(Object.keys(st.items["@list"]).sort(), ["format", "name"], "only its name and format");
+  assert.equal(st.items["@list"].format[0], 2, "format 2, which an app from before waits to read");
   await ctx.close();
   assert.deepEqual(errors, []);
 });
@@ -2040,7 +2043,7 @@ test("lists come in from Markdown, from plain text, and from several pasted line
   await listSettings(a);
   const [dl] = await Promise.all([a.waitForEvent("download"), a.click("#export-list")]);
   await backToList(a);
-  assert.equal(readFileSync(await dl.path(), "utf8"), md.replace("## Essentials\n", "## Essentials <!-- ink -->\n"), "and exports as it came in");
+  assert.equal(readFileSync(await dl.path(), "utf8"), md.replace("## Essentials\n", "## Essentials <!-- rose -->\n"), "and exports as it came in, a section without a colour taking the first not used");
 
   await toLists(a);
   const txt = "Essentials\n- [ ] 2 eggs\n\nLook out for\n- [ ] Ripe avocados\n- [x] Milk\n";
@@ -2049,15 +2052,17 @@ test("lists come in from Markdown, from plain text, and from several pasted line
   assert.equal(await a.locator("#list-name").innerText(), "", "no setup code the second time, and with no title in the file, an untitled list");
   assert.deepEqual(await names(a), ["Essentials", "Look out for"]);
   assert.deepEqual(await texts(a, "Essentials"), ["2 eggs"]);
-  await a.fill("#add-ess", "mi");
-  assert.deepEqual(await a.locator("#sug-ess .t").allInnerTexts(), ["Milk"]);
+  // Each section it reads is a new one, found here by its name.
+  const sec = (await section(a, "Essentials").getAttribute("data-sec")), field = "#add-" + sec;
+  await a.fill(field, "mi");
+  assert.deepEqual(await a.locator("#sug-" + sec + " .t").allInnerTexts(), ["Milk"]);
 
-  await a.fill("#add-ess", "Jam");
-  await a.focus("#add-ess");
+  await a.fill(field, "Jam");
+  await a.focus(field);
   await paste(a, "- [ ] Butter\n- [ ] 2 eggs\nCheese\n");
   assert.deepEqual(await texts(a, "Essentials"), ["2 eggs", "Butter", "Cheese"], "one item a line");
-  assert.equal(await a.inputValue("#add-ess"), "Jam", "and what was typed stays");
-  await a.fill("#add-ess", "");
+  assert.equal(await a.inputValue(field), "Jam", "and what was typed stays");
+  await a.fill(field, "");
   assert.ok(await eventually(async () => (await live(a)) === "Added 2 items, 1 already on the list"));
   await blur(a);
   await a.click("#undo");

@@ -5,16 +5,14 @@
 import { t, lang } from "./i18n.js";
 import { newId } from "./store.js";
 
-// The three sections lists started with before plain sheets, and which lists made then
-// still have unless renamed: their names aren't stored until changed. Imports match them
-// by name. They can be renamed, recoloured or deleted like any other.
-export const DEFAULTS = [
-  { id: "ess", name: t("Essentials"), en: "Essentials", color: "ess", pos: 1 },
-  { id: "look", name: t("Look out for"), en: "Look out for", color: "look", pos: 2 },
-  { id: "long", name: t("Long term"), en: "Long term", color: "long", pos: 3 },
-];
+// A list holds the sections written into it, and one more, implied: the section without a
+// name, in ink, where a plain sheet's items go. implied() is what that section is until a
+// field of it is written, so undo can put it back.
+export const PLAIN = { id: "ess", name: "", color: "ess", pos: 0 };
+export const implied = (id, field) => (id === PLAIN.id ? PLAIN[field] : undefined);
 // Section colours, in palette order; each is a colour in app.css, light and dark. Ink,
-// the colour of Essentials and of the app's buttons, comes first; then eight hues.
+// the colour of the section without a name and of the app's buttons, comes first; then
+// eight hues.
 export const COLORS = [["ess", "Ink"], ["green", "Green"], ["teal", "Teal"], ["blue", "Blue"], ["long", "Indigo"], ["plum", "Plum"], ["rose", "Rose"], ["look", "Amber"], ["olive", "Olive"]];
 export const PALETTE = ["teal", "rose", "green", "blue", "olive", "plum", "look", "long", "ess"]; // new sections take the first unused
 const colorOk = (c, fallback) => (COLORS.some(([id]) => id === c) ? c : fallback);
@@ -28,10 +26,9 @@ export const MAX_SECTION = 40; // and the list's name
 export const LIST = "@list"; // where the list's own name is kept, among items and sections
 export const listTitle = name => name || t("Untitled list"); // what a list is called on screen
 
-// A new list is a plain sheet: one section without a name, which shows no heading, and
-// the other two the old start had, deleted. Each new list writes this into itself, so
-// lists made before keep their three sections.
-export const startOps = (name = "") => [["#ess", "name", ""], ["#look", "deleted", true], ["#long", "deleted", true], ...(name ? [[LIST, "name", name]] : [])];
+// A new list is a plain sheet: it writes only its name, if it has one, and its format. An
+// app that reads only format 1 still implies three sections, so it waits for its update.
+export const startOps = (name = "") => [[LIST, "format", 2], ...(name ? [[LIST, "name", name]] : [])];
 
 // How many days ticked items stay in view in the ticked group, chosen for each list and
 // the same for everyone on it: a day, a week, a month, or always (0). Afterwards they're
@@ -99,11 +96,8 @@ export function between(a, b) {
 // which items are still to tick, which on screen includes those just ticked.
 export function layout(storedSections, its, typing = [], inList = i => !i.checked) {
   const stored = new Map(storedSections.map(s => [s.id, s]));
-  const all = new Map();
-  for (const d of DEFAULTS) {
-    const st = stored.get(d.id) || {};
-    all.set(d.id, { ...d, name: st.name ?? d.name, color: colorOk(st.color, d.color), pos: st.pos ?? d.pos, deleted: !!st.deleted });
-  }
+  const all = new Map(), p = stored.get(PLAIN.id) || {};
+  all.set(PLAIN.id, { ...PLAIN, name: p.name ?? PLAIN.name, color: colorOk(p.color, PLAIN.color), pos: p.pos ?? PLAIN.pos, deleted: !!p.deleted });
   for (const st of stored.values()) {
     if (!all.has(st.id)) all.set(st.id, { id: st.id, name: st.name || t("Untitled section"), color: colorOk(st.color, PALETTE[0]), pos: st.pos ?? 100, deleted: st.deleted });
   }
@@ -130,10 +124,9 @@ export function sheetOfList({ name, color, sections: stored, items: its }) {
 }
 
 // The changes that make a list as read from Markdown, on top of a new list's start: its
-// sections in order, items before the first heading in the section without a name, the
-// three of the old start kept when a section has one of their names, the others
-// deleted; each name once; what was ticked before kept out of the ticked group, to be
-// suggested.
+// sections in order, the first without a name being the list's own, where items before
+// the first heading go; each name once; what was ticked before kept out of the ticked
+// group, to be suggested.
 export function importOps(l) {
   const ops = [], used = new Set(), colours = new Set(), seen = new Set();
   const old = Date.now() - BEFORE_MS;
@@ -142,12 +135,11 @@ export function importOps(l) {
   if (listColorOk(l.color)) ops.push([LIST, "color", l.color]);
   l.sections.forEach((sec, i) => {
     const name = sec.name ? clean(sec.name, MAX_SECTION) : "";
-    const d = DEFAULTS.find(d => !used.has(d.id) && (name ? [d.name, d.en].some(x => keyOf(x) === keyOf(name)) : true));
-    const id = d ? d.id : newId(), key = "#" + id;
-    const color = colorOk(sec.color, d ? d.color : PALETTE.find(c => !colours.has(c)) || PALETTE[0]);
+    const own = !name && !used.has(PLAIN.id), id = own ? PLAIN.id : newId(), key = "#" + id;
+    const color = colorOk(sec.color, own ? PLAIN.color : PALETTE.find(c => !colours.has(c)) || PALETTE[0]);
     used.add(id);
     colours.add(color);
-    ops.push([key, "name", name || (i === 0 ? "" : d ? d.name : t("Untitled section"))], [key, "pos", i + 1], [key, "color", color], [key, "deleted", false]);
+    ops.push([key, "name", name || (own ? "" : t("Untitled section"))], [key, "pos", i + 1], [key, "color", color], [key, "deleted", false]);
     sec.items.forEach((it, j) => {
       const text = clean(it.text), nk = text && nameKey(text);
       if (!text || seen.has(nk)) return;
@@ -158,6 +150,5 @@ export function importOps(l) {
       n++;
     });
   });
-  if (l.sections.length) for (const d of DEFAULTS) if (!used.has(d.id)) ops.push(["#" + d.id, "deleted", true]);
   return { ops, n };
 }

@@ -4,7 +4,7 @@ import * as store from "./store.js";
 import { t, plural, q, when } from "./i18n.js";
 import { pastedItems } from "./md.js";
 import { state, readOnly, listName, listColor, tickedDays, draftsKey } from "./state.js";
-import { DEFAULTS, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, BEFORE_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout } from "./model.js";
+import { implied, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, BEFORE_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout } from "./model.js";
 import { $, h, icon, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, reduceMotion } from "./dom.js";
 import { whenTapEnds, bindPress, beginDrag } from "./press.js";
 import { float, landAll, snapshot, glide, fly, shift, shuffle, foldAway, foldOver, dye, MOTION } from "./motion.js";
@@ -270,9 +270,8 @@ function addSection(raw) {
 }
 function renameSection(id, name) {
   const info = sectionInfo.get(id);
-  const fallback = (DEFAULTS.find(d => d.id === id) || {}).name;
   announce(t("Renamed section to {x}", { x: name }));
-  act(t("renaming section {x}", { x: q(info.name || t("Untitled section")) }), [["#" + id, "name", name, fallback]], { leaving: true });
+  act(t("renaming section {x}", { x: q(info.name || t("Untitled section")) }), [["#" + id, "name", name, implied(id, "name")]], { leaving: true });
 }
 // A section can only be deleted once it has nothing to tick, and the last one stays.
 const canDelete = id => sections.length > 1 && !items.some(i => i.section === id && inList(i));
@@ -411,9 +410,8 @@ export function recolourList(c, label) {
 }
 export const setTicked = days => act(null, [[LIST, "ticked", days, 7]], { animate: false });
 function recolour(id, color, label) {
-  const fallback = (DEFAULTS.find(d => d.id === id) || {}).color;
   announce(t("{x} is now {y}", { x: nameOf(id), y: t(label).toLowerCase() }));
-  dye(() => act(t("changing the colour of {x}", { x: q(nameOf(id)) }), [["#" + id, "color", color, fallback]], { animate: false }));
+  dye(() => act(t("changing the colour of {x}", { x: q(nameOf(id)) }), [["#" + id, "color", color, implied(id, "color")]], { animate: false }));
 }
 
 /* ---------- Suggestions from everything ticked before ---------- */
@@ -767,7 +765,7 @@ function endDrag() {
 
 // Sections are reordered folded down to their headings, so even long ones are easy to
 // move. Each gets a new position in the new order, all in one step.
-const orderOps = order => order.map((id, k) => ["#" + id, "pos", k + 1, (DEFAULTS.find(d => d.id === id) || {}).pos]);
+const orderOps = order => order.map((id, k) => ["#" + id, "pos", k + 1, implied(id, "pos")]);
 function startSectionDrag(id, y) {
   landAll();
   const el = shells[id].el;

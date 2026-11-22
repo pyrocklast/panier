@@ -46,7 +46,7 @@
   --muted: light-dark(oklch(0.37 0.015 150), oklch(0.85 0.012 150));   /* quiet text, still 7:1 (WCAG AAA) */
   --line: light-dark(oklch(0.91 0.008 90), oklch(0.29 0.008 150));      /* ruled lines, under names and between items */
   --tear: light-dark(oklch(0.84 0.012 90), oklch(0.36 0.010 150));      /* the tear line above what's ticked */
-  --ess: var(--ink); /* ink: Essentials, and the app's buttons */
+  --ess: var(--ink); /* ink: the first section of a plain sheet, and the app's buttons */
   --danger: light-dark(oklch(0.37 0.140 27), oklch(0.88 0.070 25));
   --float: 0 14px 34px -10px light-dark(rgb(20 30 25 / 0.28), rgb(0 0 0 / 0.6)), 0 0 0 1px light-dark(rgb(20 30 25 / 0.06), #2f3733);
   --ff: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
