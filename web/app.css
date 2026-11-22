@@ -139,7 +139,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sec, .basket-list { overflow: clip; overflow-clip-margin: 16px; }
 .sec-head {
   margin: 0; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; font-size: inherit;
-  background: linear-gradient(var(--sec), var(--sec)) left bottom / 100% 2px no-repeat; /* a rule in its colour */
+  background: linear-gradient(var(--sec), var(--sec)) left bottom / 100% 1px no-repeat; /* a rule in its colour */
 }
 .sec-name {
   flex: 1; min-width: 0; padding: 12px 0; font-weight: 700; overflow-wrap: anywhere; cursor: text; outline: none;
