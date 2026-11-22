@@ -2284,24 +2284,6 @@ test("a list changed with a newer Panier is left alone", async () => {
   await t.close();
 });
 
-test("what the version before several lists left on the phone is cleared, and the settings stay", async () => {
-  const errors = [];
-  const { ctx, page: a } = await phone(errors);
-  await a.goto(BASE + "/");
-  await a.evaluate(() => {
-    localStorage.setItem("panier", JSON.stringify({ key: "an old list's key", items: {}, outbox: [] }));
-    for (const k of ["panier-drafts", "panier-basket-open", "panier-dragged-once", "panier-style"]) localStorage.setItem(k, "1");
-    localStorage.setItem("panier-theme", "dark");
-  });
-  await a.reload();
-  await a.locator("#lists").waitFor();
-  const left = await a.evaluate(() => Object.keys(localStorage));
-  assert.deepEqual(left.filter(k => ["panier", "panier-drafts", "panier-basket-open", "panier-dragged-once", "panier-style"].includes(k)), [], "the old version's data is gone");
-  assert.ok(left.includes("panier-theme"), "and the settings stay");
-  await ctx.close();
-  assert.deepEqual(errors, []);
-});
-
 test("changes this app couldn't have written are passed over, and the list keeps syncing", async () => {
   const t = await pair();
   const { a, b } = t;

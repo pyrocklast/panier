@@ -16,10 +16,6 @@
 
 const INDEX = "panier2"; // this phone's id and name, and its lists
 const ENTRY = "panier2:"; // one list, by its id on this phone
-// The version before several lists kept its one list, key included, under these names.
-// Every list has come back by import, so what it left is cleared; this line can go once
-// every phone has opened this version.
-try { for (const k of ["panier", "panier-drafts", "panier-basket-open", "panier-dragged-once", "panier-style"]) localStorage.removeItem(k); } catch (_) {}
 const FORMAT = 1; // what this app reads; a list can ask for more with "@list" "format"
 const MAX_UNDO = 100;
 const text = new TextEncoder();
