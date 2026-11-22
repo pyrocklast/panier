@@ -465,8 +465,10 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   .head-btn { margin-left: auto; }
 }
 .lists-msg { margin: 0; }
-.sheets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
-@media (min-width: 34rem) { .sheets { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Two sheets to a row on a phone, three on a wider screen; with large text, as many as
+   their names leave room for, down to one */
+.sheets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr)); grid-auto-rows: 1fr; gap: 12px; }
+@media (min-width: 34rem) { .sheets { grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); } }
 .sheet-card {
   --paper: var(--white); --rule: var(--line); --deep: var(--ink); --quiet: var(--muted); --hued: var(--ink); /* plain, without a colour */
   display: flex; min-width: 0; border-radius: 12px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;

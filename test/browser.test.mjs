@@ -1479,7 +1479,7 @@ test("a section let go stays where it was dropped, and unfolds from there", asyn
   await t.close();
 });
 
-test("with large text, a page's title has a row of its own, its words whole", async () => {
+test("with large text, a page's title has a row of its own, its words whole, and each list's sheet too", async () => {
   const p = await alone(), a = p.page;
   // Each word of the title on one line, and where the title sits against Settings.
   const look = (title, btn) => a.evaluate(([title, btn]) => {
@@ -1493,8 +1493,11 @@ test("with large text, a page's title has a row of its own, its words whole", as
   assert.deepEqual(await look("#list-name", "#list-settings-open"), { whole: true, under: true }, "under them when there isn't");
   await toLists(a);
   assert.deepEqual(await look(".lists-top h1", "#settings-open"), { whole: true, under: true }, "and the same on the lists page");
+  const share = () => a.evaluate(() => document.querySelector("#sheets .sheet-card").offsetWidth / document.querySelector("#sheets").offsetWidth);
+  assert.equal(await share(), 1, "where each list's sheet has a row of its own");
   await a.setViewportSize({ width: 390, height: 844 });
   assert.deepEqual(await look(".lists-top h1", "#settings-open"), { whole: true, under: false });
+  assert.ok(await share() < 0.5, "two to a row at the usual size");
   await p.close();
 });
 
