@@ -1479,6 +1479,28 @@ test("a section let go stays where it was dropped, and unfolds from there", asyn
   await t.close();
 });
 
+test("with large text, a page's title has a row of its own, its words whole, and each list's sheet too", async () => {
+  const p = await alone(), a = p.page;
+  // Each word of the title on one line, and where the title sits against Settings.
+  const look = (title, btn) => a.evaluate(([title, btn]) => {
+    const el = document.querySelector(title), t = el.firstChild, b = document.querySelector(btn).getBoundingClientRect();
+    let i = 0;
+    const whole = t.data.split(" ").every(w => { const r = document.createRange(); r.setStart(t, i); r.setEnd(t, i + w.length); i += w.length + 1; return r.getClientRects().length === 1; });
+    return { whole, under: el.getBoundingClientRect().top >= b.bottom - 1 };
+  }, [title, btn]);
+  assert.deepEqual(await look("#list-name", "#list-settings-open"), { whole: true, under: false }, "beside the arrow and Settings when there's room");
+  await a.setViewportSize({ width: 195, height: 422 }); // a 390 px phone at 200 %
+  assert.deepEqual(await look("#list-name", "#list-settings-open"), { whole: true, under: true }, "under them when there isn't");
+  await toLists(a);
+  assert.deepEqual(await look(".lists-top h1", "#settings-open"), { whole: true, under: true }, "and the same on the lists page");
+  const share = () => a.evaluate(() => document.querySelector("#sheets .sheet-card").offsetWidth / document.querySelector("#sheets").offsetWidth);
+  assert.equal(await share(), 1, "where each list's sheet has a row of its own");
+  await a.setViewportSize({ width: 390, height: 844 });
+  assert.deepEqual(await look(".lists-top h1", "#settings-open"), { whole: true, under: false });
+  assert.ok(await share() < 0.5, "two to a row at the usual size");
+  await p.close();
+});
+
 test("settings: appearance, keeping the list, its size, export, and about", { skip: !!LAYOUT }, async () => {
   const t = await pair();
   const { a } = t;
@@ -1537,16 +1559,9 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   await a.locator('#settings .choices label', { hasText: "Light" }).click();
   assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), rgbText(desk), "and back");
 
-  assert.match(await a.locator("#data-sum").innerText(), /^1 list, \d+ (bytes|KB) on this phone$/, "the lists in one line: how many, the room they take here");
-  assert.ok(await eventually(async () => /browser/.test(await a.locator("#keep-text").innerText())), "and whether they're safe");
-  assert.equal(await a.locator("#data-lists").isVisible(), false, "each list's own, folded away");
-  await a.click("#data-open");
-  assert.equal(await a.getAttribute("#data-open", "aria-expanded"), "true");
-  assert.deepEqual(await a.locator("#data-lists .row > :first-child").allInnerTexts(), ["Shopping list"], "a tap on the line opens each list, with the room it takes");
-  assert.match(await a.locator("#data-lists .row-d").innerText(), /^\d+ (bytes|KB)$/);
-  const [one] = await Promise.all([a.waitForEvent("download"), a.locator("#data-lists .row").click()]);
-  assert.match(one.suggestedFilename(), /^shopping-list-\d{4}-\d{2}-\d{2}\.md$/, "and exports it alone");
-  await a.click("#data-open");
+  assert.ok(await eventually(async () => /^1 list, \d+ (bytes|KB) on this phone\. .*browser/.test(await a.locator("#data-sum").innerText())),
+    "the lists in one line: how many, the room they take here, and whether they're safe");
+  assert.equal(await a.locator("#settings .row", { hasText: "Shopping list" }).count(), 0, "each list exports from its own settings, not from here");
   const rows = await a.locator("#settings .row:visible").evaluateAll(r => r.map(b => b.getBoundingClientRect().toJSON()));
   assert.ok(rows.length >= 3 && rows.every(r => Math.abs(r.width - rows[0].width) < 1 && Math.abs(r.left - rows[0].left) < 1 && r.height >= 44), "what's done now and then, in rows that line up");
   const [all] = await Promise.all([a.waitForEvent("download"), a.click("#export-all")]);
@@ -1981,7 +1996,8 @@ test("lists are reordered by dragging, and deleted once asked, on the lists page
   await dragTo(a, a.locator("#sheets .sheet-card").nth(1), toZone);
   await a.locator("#confirm").waitFor();
   assert.equal(await a.locator("#confirm-title").innerText(), "Delete “Shopping list”?", "dropped at the foot, it asks first");
-  assert.equal(await a.locator("#confirm-text").innerText(), "It goes from this phone. Its link brings it back, if you kept one.");
+  assert.equal(await a.locator("#confirm-text").innerText(), "Undo brings it back until Panier closes; after that, only its link does, if you kept one.");
+  assert.equal(await a.locator("#confirm-ok").innerText(), "Delete from this phone", "each answer says which deletion it is");
   await a.click("#confirm-cancel");
   assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "and nothing goes until it's answered");
   await dragTo(a, a.locator("#sheets .sheet-card").nth(1), toZone);
@@ -2225,9 +2241,11 @@ test("changing a list's key leaves everyone else with it closed, until they open
   assert.ok(await eventually(async () => (await b.locator("#sheets .sheet-card").nth(1).locator(".sheet-with").innerText()) === "with 1 other phone"));
   await dragTo(b, b.locator("#sheets .sheet-card").nth(1), async () => (await b.locator("#remove-drop").boundingBox()).y + 20);
   await b.locator("#confirm").waitFor();
-  assert.equal(await b.locator("#confirm-text").innerText(), "It goes from this phone only: the others keep it.");
+  assert.equal(await b.locator("#confirm-text").innerText(), "The others keep it. On this phone, Undo brings it back until Panier closes; after that, its link does.");
+  assert.equal(await b.locator("#confirm-more").innerText(), "Delete for everyone");
   await b.click("#confirm-more");
   assert.equal(await b.locator("#confirm-title").innerText(), "Delete “Shopping list” for everyone?", "for everyone, it asks again");
+  assert.equal(await b.locator("#confirm-text").innerText(), "It goes from the server, and from every phone that has it as soon as they open it. Neither Undo nor its link can bring it back.", "saying nothing brings it back");
   await b.click("#confirm-ok");
   assert.ok(await eventually(async () => (await counts(b)).join() === "Closed"), "deleting it takes it off this phone");
   assert.ok(await eventually(async () => (await a.locator("#status-text").innerText()) === "List closed", 8000), "and closes it for everyone");
@@ -2244,7 +2262,7 @@ test("changing a list's key leaves everyone else with it closed, until they open
   await toLists(a);
   await a.locator("#sheets .sheet-open").focus();
   await a.keyboard.press("Delete");
-  assert.equal(await a.locator("#confirm-text").innerText(), "It's already closed: this removes what's left of it from this phone.");
+  assert.equal(await a.locator("#confirm-text").innerText(), "It's already closed. Undo brings back what's left of it until Panier closes; after that, it's gone.");
   assert.equal(await a.locator("#confirm-more").isVisible(), false, "there's no one left to delete it for");
   await a.click("#confirm-ok");
   assert.ok(await eventually(async () => (await sheets(a)).length === 0), "the closed list is deleted from this phone");

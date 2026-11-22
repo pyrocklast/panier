@@ -117,7 +117,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 /* Names and rows are tapped, held and dragged rather than selected */
 :is(.list-head, .sec-head, .item) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 /* A page's top row, a list's as the lists page's: the way back, the title, Settings */
-:is(.list-top, .lists-top) { display: flex; align-items: flex-start; gap: 4px; margin: -4px 0 0; }
+:is(.list-top, .lists-top) { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; margin: -4px 0 0; container-type: inline-size; }
 .list-head { flex: 1; min-width: 0; margin: 0; display: flex; font-size: 1.625rem; line-height: 1.4; color: var(--title); }
 /* At the left of a page's title, the way back up: an arrow, as the phone draws it */
 .head-back {
@@ -256,7 +256,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 :is(.add, .add-sec).typing .add-plus { cursor: pointer; } /* it adds what's typed */
 
 /* Suggestions */
-.sug { list-style: none; margin: 0; padding: 4px 0; box-shadow: inset 0 1px 0 var(--line); }
+.sug { padding: 4px 0; box-shadow: inset 0 1px 0 var(--line); }
 .items:empty + .sug { box-shadow: none; }
 .sugopt { display: flex; min-height: 46px; color: var(--muted); }
 .sugopt.active { background-color: var(--press); }
@@ -265,7 +265,7 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sug-x-cell { display: flex; flex: none; }
 .sug-x { width: 48px; padding: 0; border: 0; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .sug-x-cell[aria-selected="true"] .sug-x { color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); border-radius: 12px; }
-@media (hover: hover) { .sugopt:hover, .ib:hover, .head-btn:hover, .head-back:hover, .row:hover, .fold:hover, .fold-sec:hover { background-color: var(--press); } .bin:hover, .sug-x:hover { color: var(--danger); } }
+@media (hover: hover) { .sugopt:hover, .ib:hover, .head-btn:hover, .head-back:hover, .row:hover, .fold-sec:hover { background-color: var(--press); } .bin:hover, .sug-x:hover { color: var(--danger); } }
 .sugopt .t { color: var(--ink); overflow-wrap: anywhere; }
 .sugopt mark { background: none; color: inherit; font-weight: 700; }
 
@@ -458,9 +458,17 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .lists { --press: light-dark(oklch(0.86 0.010 85), oklch(0.21 0.006 150)); } /* pressed into the desk, not lighter than it */
 /* The same top row as a list's: the title on the left, at the right its Settings */
 .lists-top h1 { flex: 1; min-width: 0; margin: 0; padding: 4px 0; font-size: 1.625rem; line-height: 1.4; }
+/* On both top rows, short of room, with large text or on a narrow screen, the title has a
+   row of its own, under the way back and Settings, so its words stay whole */
+@container (max-width: 17em) {
+  :is(.list-head, .lists-top h1) { order: 1; flex-basis: 100%; }
+  .head-btn { margin-left: auto; }
+}
 .lists-msg { margin: 0; }
-.sheets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
-@media (min-width: 34rem) { .sheets { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Two sheets to a row on a phone, three on a wider screen; with large text, as many as
+   their names leave room for, down to one */
+.sheets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr)); grid-auto-rows: 1fr; gap: 12px; }
+@media (min-width: 34rem) { .sheets { grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); } }
 .sheet-card {
   --paper: var(--white); --rule: var(--line); --deep: var(--ink); --quiet: var(--muted); --hued: var(--ink); /* plain, without a colour */
   display: flex; min-width: 0; border-radius: 12px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
@@ -591,22 +599,13 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .set .sum { color: var(--muted); }
 .rows { list-style: none; margin: 4px -12px 0; padding: 0; }
 .row {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; gap: 2px 16px; width: 100%; min-height: 60px; box-sizing: border-box;
+  display: grid; align-content: center; gap: 2px; width: 100%; min-height: 60px; box-sizing: border-box;
   padding: 10px 12px; border: 0; border-radius: 12px; color: var(--ink); font: inherit; text-align: left; overflow-wrap: anywhere; cursor: pointer;
   background: linear-gradient(var(--line), var(--line)) center top / calc(100% - 24px) 1px no-repeat;
 }
-.row > * { grid-column: 1; }
-.row > .row-end { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--muted); font-size: 0.875rem; } /* what a tap does, where the row says it of something */
 .row:active { background-color: var(--press); }
 .row:focus-visible { outline-offset: -2px; }
 .row-d { color: var(--muted); font-size: 0.875rem; }
-/* A line that opens what it sums up */
-.fold {
-  display: flex; align-items: center; gap: 6px; min-height: 44px; margin: -10px -12px 2px; padding: 0 12px; border: 0; border-radius: 12px;
-  background: none; color: var(--muted); font: inherit; text-align: left; cursor: pointer;
-}
-#data-lists { margin-bottom: 12px; }
-#data-lists:not([hidden]) { animation: appear var(--arrive) var(--ease-arrive); }
 .row.danger > :first-child { color: var(--danger); }
 .set .note { color: var(--muted); font-size: 0.875rem; }
 .set a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; text-underline-offset: 3px; } /* tall enough to tap */

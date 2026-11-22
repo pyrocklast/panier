@@ -15,18 +15,18 @@ Everything the app does, in detail. The [README](../README.md) has the short ver
 A phone holds any number of lists, each shared with its own people. The app opens on the list last used.
 
 - **Moving around:** the arrow at the top left of a page goes back up, one level at a time, as does the phone's back gesture: from a list's settings to the list, from a list or Settings to the lists page. *Settings*, at the top right, holds the settings of what's on screen: a list's on a list, the app's on the lists page. What you do every time, ticking and adding, is on the list itself; what you do now and then is a level further.
-- **The lists page** is reached with the arrow at the top left of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to tick, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
+- **The lists page** is reached with the arrow at the top left of a list, or the phone's back gesture. The lists lie there side by side, two to a row, three on a wider screen, and with large text as many as leave their names room, down to one, each a sheet of its own paper, lying on a desk a shade deeper: its name, who else has it, the first three things to tick, and how many there are, as this phone last saw them. Lists not on screen catch up as the page shows.
 - **Open** a list with a tap. The page turns quietly into it: the desk takes the list's colour as the list's words open out of its sheet. Going back, with the arrow or the back gesture, they draw back into it.
 - **New list:** type a name on the blank strip under the sheets; the new list opens ready to write on. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
 - **Move** a list: hold it, then drag it to its new place; the others glide aside. From a keyboard, Alt and an arrow move it one place earlier or later.
-- **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, in the list's settings. It always asks first. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
+- **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, in the list's settings. It always asks first, and says what brings it back. *Delete from this phone* leaves it with the others: Undo, at the bottom right, brings it back until Panier closes, and its link after that. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*, and neither Undo nor its link brings it back.
 - **Settings**, at the top right of the lists page, are the app's, for this phone.
 
 ## The page
 
 The list is written on the page itself, like paper: one left edge, ruled lines between items and under section names, and an underline where you type. Only what is lifted off the page has a shadow: something being dragged, the undo button, the sheets, which rise onto the page as it dims behind them.
 
-- **The list's name** is the title at the top, between the arrow back and *Settings*. A new list is named as it's made, where its name goes; one without a name says *Untitled list*. It's renamed in the list's settings, and also names the exported file.
+- **The list's name** is the title at the top, between the arrow back and *Settings*. With large text, when they leave it too little room, it has a row of its own under them, so its words stay whole; the lists page does the same with its title. A new list is named as it's made, where its name goes; one without a name says *Untitled list*. It's renamed in the list's settings, and also names the exported file.
 - **The list's colour** is chosen in its settings, under its name: white and eight hues. The paper is warm paper dyed with the colour, the ruled lines a deeper dye, the title a deep shade of it, and the writing leans its way. The browser's bars follow, and the app opens in the colour without a flash of white.
 - **The eight colours weigh the same.** Each is a single hue, and every tone of it, from paper to tick box, is that hue at a lightness set by what it's for, so no colour shouts or fades beside another, in light or dark.
 - Every phone sees the name and colour, and undo puts the old ones back.
@@ -47,6 +47,7 @@ The share sheet and the question before deleting open over the settings, and clo
 A new list is a plain sheet: its items sit under its name, with no heading. *Add a section* adds headings when they help. The items already there stay first, under a heading of their own that quietly says *Untitled section*; tap it to name it. Once there are sections, nothing new goes outside one: when nothing is left to tick in the part without a name, it goes, and an item put back brings it back.
 
 - **Rename** a section by tapping its heading. Every phone sees the new name. Emptying the name and leaving puts the old one back.
+- **Fold** a section with the chevron at the end of its heading: it shows only its name, and under it what's left to tick, which a tap opens again. It folds on this phone only, and stays folded when the app opens again. Moving an item into it with the keyboard opens it, so the item stays in view.
 - **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it, the new colour spreading over it, as it does over the list's paper. Its name is written in a deep shade of the colour above a line of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
 - **Add a section** with *Add a section*, below the last one. It gets the first colour not used yet. Enter or `+` adds it, the cross clears what you typed, and the cursor then moves to its *Add item* row.
 - **Delete** a section once nothing is left to tick in it: while you rename it, a cross appears. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
@@ -93,7 +94,7 @@ A new list is a plain sheet: its items sit under its name, with no heading. *Add
 
 ## Undo and redo
 
-- Every change can be undone. The undo button appears at the bottom right after the first change, and hides while you type. Redo joins it once something has been undone.
+- Every change to a list's items and sections can be undone, and so can a list taken off the phone; the list's other settings and your name can't. The undo button appears at the bottom right after the first change, and hides while you type. Redo joins it once something has been undone.
 - For a few seconds after deleting an item, a section or a suggestion, or taking a list off the phone, the undo button shows its name, so you know what a tap brings back.
 - Each person undoes only their own changes. If someone else has changed something since, their change stands, and undo says who, by the name they gave.
 
@@ -149,8 +150,7 @@ On a phone turned on its side, or a tablet or computer, the page uses the width:
 - **You:** your name, shown to the people you share lists with.
 - **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page.
 - **Data:**
-  - One line: how many lists there are and the room they take on this phone. A tap opens each list with the room it takes, to export it alone; each list's own is in its settings too.
-  - Whether the browser keeps them even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep lists on this phone* asks again.
+  - One line: how many lists there are, the room they take on this phone, and whether the browser keeps them even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep lists on this phone* asks again.
   - *Export all lists*, *Bring in from a file* and *Set up another phone*, above.
 - **About:** the version, the server, and what the server can and can't see.
 

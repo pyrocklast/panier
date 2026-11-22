@@ -126,7 +126,6 @@ Bigger features change how lists are stored and shared, so each starts with a sh
 - encrypted backups kept on the server;
 - recurring lists or sections, such as a weekly shop;
 - sub-sections, such as fruit and vegetables, or cleaning;
-- folding a section;
 - compacting the server's log of changes.
 
 ## Licence

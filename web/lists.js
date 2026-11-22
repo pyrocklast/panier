@@ -140,23 +140,23 @@ function moveSheet(lid, dir) {
 
 // A list is deleted only once asked: on the lists page, dropped on the zone at the foot or
 // with the Delete key, or with Delete the list, in the list's own settings, which a
-// screen reader on a phone can reach. From this phone, the others keep it and its link
-// brings it back, and undo does too, until the app closes. For everyone, it asks again,
-// as nothing brings it back.
+// screen reader on a phone can reach. Each way says what brings it back: from this phone,
+// undo until the app closes, then its link, unless closed; for everyone, nothing, so it
+// asks again.
 export function askDelete(lid) {
   const e = store.entryOf(lid);
   if (!e) return;
   const name = listTitle(e.name), w = e.with, others = !!(w && (w.names.length || w.nameless));
   confirmSheet({
     title: t("Delete {x}?", { x: q(name) }),
-    text: e.closed ? t("It's already closed: this removes what's left of it from this phone.")
-      : others ? t("It goes from this phone only: the others keep it.")
-      : t("It goes from this phone. Its link brings it back, if you kept one."),
-    ok: t("Delete"),
+    text: e.closed ? t("It's already closed. Undo brings back what's left of it until Panier closes; after that, it's gone.")
+      : others ? t("The others keep it. On this phone, Undo brings it back until Panier closes; after that, its link does.")
+      : t("Undo brings it back until Panier closes; after that, only its link does, if you kept one."),
+    ok: t("Delete from this phone"),
     run: () => { $("#confirm").close(); removeList(lid); },
     more: e.closed ? null : { label: t("Delete for everyone"), run: () => confirmSheet({
       title: t("Delete {x} for everyone?", { x: q(name) }),
-      text: t("It goes from the server, and from every phone that has it as soon as they open it. This can't be undone."),
+      text: t("It goes from the server, and from every phone that has it as soon as they open it. Neither Undo nor its link can bring it back."),
       ok: t("Delete for everyone"),
       run: async () => {
         await store.deleteForEveryone(lid);

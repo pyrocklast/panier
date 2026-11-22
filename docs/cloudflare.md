@@ -23,7 +23,7 @@ Allow about 20 minutes.
 
 ## 2. A setup code
 
-Make up a setup code: it lets whoever has it create lists on your server. Use at least 16 letters, digits and hyphens; a password manager can generate one. You type it once, on the first phone.
+Make up a setup code: it lets whoever has it create lists on your server. Use at least 12 letters, digits and hyphens; a password manager can generate one. You type it once, on the first phone.
 
 ## 3. GitHub
 

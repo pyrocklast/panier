@@ -4,8 +4,8 @@
 import * as store from "./store.js";
 import { t, plural, lang } from "./i18n.js";
 import { toMarkdown } from "./md.js";
-import { clean, MAX_SECTION, LIST_COLORS, sheetOfList, listTitle } from "./model.js";
-import { $, h, download } from "./dom.js";
+import { clean, MAX_SECTION, LIST_COLORS, sheetOfList } from "./model.js";
+import { $, download } from "./dom.js";
 import { openSheet } from "./sheets.js";
 import { state, nav, readOnly, listName, listColor, tickedDays } from "./state.js";
 import { openPair, people } from "./share.js";
@@ -29,17 +29,11 @@ async function paintSettings() {
   for (const r of document.querySelectorAll('input[name="theme"]')) r.checked = r.value === theme;
   $("#compact-layout").checked = document.documentElement.dataset.layout === "compact";
   $("#my-name").value = store.myName();
-  // The lists, in one line: how many and the room they take here, which opens onto each
-  // with its own, to export it; then whether the browser keeps them.
-  const all = store.lists(), sizes = all.map(e => store.storedSize(e.lid)), room = sizes.reduce((a, b) => a + b, 0);
-  $("#data-open").hidden = $("#export-all").hidden = $("#phone-open").hidden = $("#keep-text").hidden = !all.length;
-  $("#data-sum").textContent = t("{n}, {x} on this phone", { n: plural(all.length, "{n} list", "{n} lists"), x: size(room) });
-  $("#data-lists").replaceChildren(...all.map((e, k) => {
-    const name = listTitle(e.name);
-    return h("li", null, h("button", { type: "button", class: "row", "aria-label": t("Export {x}, {y}", { x: name, y: size(sizes[k]) }), onclick: () => exportOne(e.lid) },
-      h("span", null, name), h("span", { class: "row-d" }, size(sizes[k])), h("span", { class: "row-end" }, t("Export"))));
-  }));
-  unfold(false);
+  // The lists, in one line: how many, the room they take here, and whether the browser
+  // keeps them. Each list's own is in its settings, with its export.
+  const all = store.lists(), room = all.reduce((n, e) => n + store.storedSize(e.lid), 0);
+  $("#data-sum").hidden = $("#export-all").hidden = $("#phone-open").hidden = !all.length;
+  $("#data-size").textContent = t("{n}, {x} on this phone.", { n: plural(all.length, "{n} list", "{n} lists"), x: size(room) });
   $("#about-server").textContent = location.host;
   const [kept, keys] = await Promise.all([isKept(), caches.keys().catch(() => [])]);
   $("#keep-text").textContent = kept ? t("The browser won't clear your lists to free up space.")
@@ -75,19 +69,12 @@ $("#my-name").addEventListener("keydown", e => { if (e.key === "Enter") e.target
 $("#keep-btn").addEventListener("click", async () => { await keepList(); paintSettings(); });
 $("#phone-open").addEventListener("click", () => openPair(true)); // over Settings, which it closes back onto
 
-// Every list in one file, or one list on its own, from Data or from its settings.
-function exportAll() {
-  download("Panier", toMarkdown(store.lists().map(e => sheetOfList(store.peek(e.lid)))));
-}
-function exportOne(lid) {
-  const sheet = sheetOfList(store.peek(lid));
+// Every list in one file, from Settings; or the open one, from its settings.
+$("#export-all").addEventListener("click", () => download("Panier", toMarkdown(store.lists().map(e => sheetOfList(store.peek(e.lid))))));
+$("#export-list").addEventListener("click", () => {
+  const sheet = sheetOfList(store.peek(state.lid));
   download(sheet.name, toMarkdown([sheet]));
-}
-const unfold = open => { $("#data-open").setAttribute("aria-expanded", String(open)); $("#data-lists").hidden = !open; };
-$("#data-open").addEventListener("click", () => unfold($("#data-lists").hidden));
-
-$("#export-all").addEventListener("click", exportAll);
-$("#export-list").addEventListener("click", () => exportOne(state.lid));
+});
 
 /* ---------- A list's settings ---------- */
 
