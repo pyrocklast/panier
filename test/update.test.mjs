@@ -52,7 +52,10 @@ test("a new version takes over in the same launch, once you've stopped typing", 
     await page.keyboard.press("Enter");
     await page.fill("#add-ess", "Milk");
     await page.press("#add-ess", "Enter");
-    assert.ok(await eventually(async () => (await page.evaluate(() => caches.keys())).includes("panier-old")));
+    // Installed, not just started: its cache exists as soon as it starts filling it, and a
+    // deploy before it's full would leave nothing to update from.
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    assert.ok((await page.evaluate(() => caches.keys())).includes("panier-old"));
     assert.ok((await page.evaluate(() => caches.keys())).includes("panier-static-dev"), "fonts and icons have a cache of their own");
 
     // Deploy: the new build replaces the old one while the app stays open.
