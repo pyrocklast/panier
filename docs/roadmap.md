@@ -51,23 +51,51 @@ Space isn't the problem: the server's limit of 32 MB a list would take decades t
 
 ## Items under items
 
-**Status:** planned, not started.
+**Status:** design note below, to agree before building. Then the parts marked *on screen* are tried in two or three directions, side by side.
 
 **Why.** Some lists have items with parts: a recipe and its ingredients, a room and its jobs, a bag and what goes in it. Sections group items, but across the whole list, and one level only. Markdown checklists indent items under others; today Panier flattens them as they come in.
 
-**The idea.** An item can hold items, indented under it. Each stores the item it's under, merged field by field like its section and place, the latest winning. One level is likely enough, and simpler to show and to drag.
+**Decided.** One level. An item can't be ticked while anything under it is left to tick, and once nothing is, it waits for its own tap. What's under it stays under it once ticked, struck through, and goes to the ticked group with it. The same name can sit under two items. Deleting an item deletes what's under it.
 
-**What the design note must settle**
-- **How deep:** one level, or more.
-- **Conflicts:** two phones putting two items each under the other at once; an item put under one that's deleted, or moved to another section, meanwhile. It needs a rule each phone reaches alone, such as: an item whose own item is under another, deleted, or in another section sits at the top of its section.
-- **Ticking:** whether ticking an item ticks what's under it, whether it ticks itself once they all are, and how they travel to the ticked group and back: together, or one by one.
-- **Moving in and out:** dragging sideways; from a keyboard, Alt+→ and Alt+←, beside Alt+↑ and Alt+↓; Enter in an empty item under another, which brings it out, as in notes apps; splitting and joining with Enter and Backspace.
-- **Deleting:** whether what's under an item goes with it, in one undo.
-- **The same name twice:** *Eggs* under two recipes. Today a name already on the list is highlighted instead of added, and suggestions and merging go by name.
-- **Showing it:** the indent, at every text size and in the compact layout; a folded section's line, and the first three items on the lists page; what a screen reader says of each item's level.
-- **Coming in and going out:** indented Markdown checklists, and Google Keep's indents, if Takeout keeps them.
-- **Older apps:** whether one that doesn't know them shows them flat, or says *Update Panier to open it*.
-- **Tests:** two phones nesting at once; deleting an item as another goes under it; Markdown out and back in.
+**Storing it.** One new field on an item, `under`: the id of the item it's under, or nothing. It's merged like every other field, the latest write winning. Among the items under the same one, `pos` orders them, as it orders items in a section. An item under another is always in that one's section: moving the item above, or its section, takes them along without writing to each. Going under, an item also writes that section as its own, for the rule below.
+
+**One level, whatever happens.** An item shows under another only if that one is on the list and under nothing itself. Two phones can put two items each under the other at once, or one can delete an item as the other puts something under it: the items concerned then sit at their own place in their own section. Every phone reaches the same view on its own, and nothing is lost.
+
+**Ticking**
+- An item with something left to tick under it can't be ticked. Its box says so (*on screen*), and a screen reader hears how many are left, such as *2 of 3 left*.
+- Ticked, an item under another stays where it is, struck through, as long as the one above is on the list. Once all are ticked, the box above opens.
+- Ticking it, by tap or by dragging it to the ticked group, sends it and all under it there together, after the usual 1.5 seconds. There they stay under it, latest first by when it was ticked, and leave the group with it.
+- Unticking an item under a ticked one puts both back on the list, in one step to undo. Unticking the one above puts it back with what's under it, still ticked.
+- A ticked item with something unticked under it, which only two phones acting at once can make, shows unticked until that's ticked too.
+- Who ticked each, and when, shows beside it, as now.
+
+**The same name twice.** Today's rules apply among the items under the same item, and among the items under none: a name already there is highlighted rather than added, and typing a name ticked before brings it back where it's typed, the latest ticked of that name. *Eggs* under Pancakes and *Eggs* under Omelette are two items. Suggestions show each name once.
+
+**Deleting.** Deleting an item deletes what's under it, in one step to undo. Deleting an item under another deletes just that one, as now.
+
+**Moving in and out**
+- **Dragging:** an item let go about a box's width right of the item above goes under it; let go further left, it comes out. An item with items under it carries them, and can't go under another.
+- **Keyboard:** Alt+→ puts the item under the one above; Alt+← brings it out, just after its item. Alt+↑ and Alt+↓ move it among the items under the same one, and out of it at either end.
+- **Without dragging or a keyboard** (*on screen*): another way in and out, for a screen reader on a phone, or anyone who can't drag, such as two buttons while the item is edited.
+- **Adding straight under an item** (*on screen*), rather than adding then moving each one: for instance a quiet *Add item* row at the end of what's under an item, or the section's *Add item* row moved under its last item.
+- **Splitting and joining:** Enter splits an item into two under the same item, and what's under it stays with the first part. Backspace at the start joins an item onto the one above at its own level; one with items under it doesn't join.
+- Each move in or out is one step to undo.
+
+**Showing it**
+- What's under an item is indented by about a box's width, its ruled lines starting there, at every text size and in both layouts (*on screen*).
+- It's a list inside the item's row, so screen readers say its level, as for any list within a list.
+- A folded section's line, and the first three things on a list's sheet, name only items under nothing. The count, such as *5 to tick*, counts every item left to tick.
+
+**Coming in and going out.** Export writes what's under an item indented by two spaces: `  - [ ] Eggs`. Import and pasting put an indented line under the line above it, and deeper indents at the same one level. Google Keep's indents come in too, if Takeout keeps them: to check with a real export.
+
+**Older apps.** They take in fields they don't know as they are, so an older Panier shows items under others as ordinary items in their section until it updates. So the list's format doesn't change, and no list is shut to an older app. An item it ticks before what's under it shows unticked, by the rule above.
+
+**Tests**
+- Putting an item under another and back, by drag and by keyboard, with undo.
+- Ticking: the box above opens only once all under it are ticked; they go to the ticked group together, and come back together.
+- Two phones each putting one item under the other at once; one deleting an item as the other puts something under it; one ticking an item as the other adds under it.
+- The same name under two items, and a name ticked before coming back where it's typed.
+- Markdown out and back in, and pasting indented lines.
 
 ## Colour in a folded section's line
 
