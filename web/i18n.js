@@ -124,9 +124,6 @@ const FR = {
   "{n} lists": ["{n} liste", "{n} listes"],
 
   // Sections
-  "Essentials": "Essentiels",
-  "Look out for": "À l’occasion",
-  "Long term": "À long terme",
   "Untitled section": "Section sans nom",
   "this section": "cette section",
   "Add item": "Ajouter un article",
