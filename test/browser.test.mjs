@@ -1974,7 +1974,8 @@ test("lists are reordered by dragging, and deleted once asked, on the lists page
   await dragTo(a, a.locator("#sheets .sheet-card").nth(1), toZone);
   await a.locator("#confirm").waitFor();
   assert.equal(await a.locator("#confirm-title").innerText(), "Delete “Shopping list”?", "dropped at the foot, it asks first");
-  assert.equal(await a.locator("#confirm-text").innerText(), "It goes from this phone. Its link brings it back, if you kept one.");
+  assert.equal(await a.locator("#confirm-text").innerText(), "Undo brings it back until Panier closes; after that, only its link does, if you kept one.");
+  assert.equal(await a.locator("#confirm-ok").innerText(), "Delete from this phone", "each answer says which deletion it is");
   await a.click("#confirm-cancel");
   assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "and nothing goes until it's answered");
   await dragTo(a, a.locator("#sheets .sheet-card").nth(1), toZone);
@@ -2218,9 +2219,11 @@ test("changing a list's key leaves everyone else with it closed, until they open
   assert.ok(await eventually(async () => (await b.locator("#sheets .sheet-card").nth(1).locator(".sheet-with").innerText()) === "with 1 other phone"));
   await dragTo(b, b.locator("#sheets .sheet-card").nth(1), async () => (await b.locator("#remove-drop").boundingBox()).y + 20);
   await b.locator("#confirm").waitFor();
-  assert.equal(await b.locator("#confirm-text").innerText(), "It goes from this phone only: the others keep it.");
+  assert.equal(await b.locator("#confirm-text").innerText(), "The others keep it. On this phone, Undo brings it back until Panier closes; after that, its link does.");
+  assert.equal(await b.locator("#confirm-more").innerText(), "Delete for everyone");
   await b.click("#confirm-more");
   assert.equal(await b.locator("#confirm-title").innerText(), "Delete “Shopping list” for everyone?", "for everyone, it asks again");
+  assert.equal(await b.locator("#confirm-text").innerText(), "It goes from the server, and from every phone that has it as soon as they open it. Neither Undo nor its link can bring it back.", "saying nothing brings it back");
   await b.click("#confirm-ok");
   assert.ok(await eventually(async () => (await counts(b)).join() === "Closed"), "deleting it takes it off this phone");
   assert.ok(await eventually(async () => (await a.locator("#status-text").innerText()) === "List closed", 8000), "and closes it for everyone");
@@ -2237,7 +2240,7 @@ test("changing a list's key leaves everyone else with it closed, until they open
   await toLists(a);
   await a.locator("#sheets .sheet-open").focus();
   await a.keyboard.press("Delete");
-  assert.equal(await a.locator("#confirm-text").innerText(), "It's already closed: this removes what's left of it from this phone.");
+  assert.equal(await a.locator("#confirm-text").innerText(), "It's already closed. Undo brings back what's left of it until Panier closes; after that, it's gone.");
   assert.equal(await a.locator("#confirm-more").isVisible(), false, "there's no one left to delete it for");
   await a.click("#confirm-ok");
   assert.ok(await eventually(async () => (await sheets(a)).length === 0), "the closed list is deleted from this phone");

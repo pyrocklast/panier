@@ -87,14 +87,18 @@ const FR = {
   "No connection. Your lists show as this phone last saw them.": "Pas de connexion. Vos listes s’affichent telles que ce téléphone les a vues la dernière fois.",
   "{x} has a new key": "{x} a une nouvelle clé",
   "Delete {x} for everyone?": "Supprimer {x} pour tout le monde" + nb + "?",
-  "It goes from the server, and from every phone that has it as soon as they open it. This can't be undone.":
-    "Elle disparaît du serveur, et de chaque téléphone qui l’a dès qu’il l’ouvre. C’est définitif.",
+  "It goes from the server, and from every phone that has it as soon as they open it. Neither Undo nor its link can bring it back.":
+    "Elle disparaît du serveur, et de chaque téléphone qui l’a dès qu’il l’ouvre. Ni Annuler ni son lien ne pourront la faire revenir.",
   "Delete": "Supprimer",
+  "Delete from this phone": "Supprimer de ce téléphone",
   "Deleted {x} for everyone": "{x} supprimée pour tout le monde",
   "Delete {x}?": "Supprimer {x}" + nb + "?",
-  "It goes from this phone only: the others keep it.": "Elle disparaît de ce téléphone seulement" + nb + ": les autres la gardent.",
-  "It goes from this phone. Its link brings it back, if you kept one.": "Elle disparaît de ce téléphone. Son lien la fait revenir, si vous l’avez gardé.",
-  "It's already closed: this removes what's left of it from this phone.": "Elle est déjà fermée" + nb + ": ceci retire de ce téléphone ce qu’il en reste.",
+  "The others keep it. On this phone, Undo brings it back until Panier closes; after that, its link does.":
+    "Les autres la gardent. Sur ce téléphone, Annuler la fait revenir tant que Panier reste ouvert" + nb + "; ensuite, son lien.",
+  "Undo brings it back until Panier closes; after that, only its link does, if you kept one.":
+    "Annuler la fait revenir tant que Panier reste ouvert" + nb + "; ensuite, seul son lien le peut, si vous l’avez gardé.",
+  "It's already closed. Undo brings back what's left of it until Panier closes; after that, it's gone.":
+    "Elle est déjà fermée. Annuler fait revenir ce qu’il en reste tant que Panier reste ouvert" + nb + "; ensuite, elle est perdue.",
   "Deleted {x} from this phone": "{x} supprimée de ce téléphone",
   "This server can't make another list from this one.": "Ce serveur ne peut pas créer d’autre liste à partir de celle-ci.",
   "someone else": "quelqu’un d’autre",

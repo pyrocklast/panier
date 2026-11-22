@@ -19,7 +19,7 @@ A phone holds any number of lists, each shared with its own people. The app open
 - **Open** a list with a tap. The page turns quietly into it: the desk takes the list's colour as the list's words open out of its sheet. Going back, with the arrow or the back gesture, they draw back into it.
 - **New list:** type a name on the blank strip under the sheets; the new list opens ready to write on. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
 - **Move** a list: hold it, then drag it to its new place; the others glide aside. From a keyboard, Alt and an arrow move it one place earlier or later.
-- **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, in the list's settings. It always asks first. *Delete* takes it off this phone: the others keep it, its link brings it back, and so does Undo, at the bottom right. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*. That can't be undone.
+- **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, in the list's settings. It always asks first, and says what brings it back. *Delete from this phone* leaves it with the others: Undo, at the bottom right, brings it back until Panier closes, and its link after that. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*, and neither Undo nor its link brings it back.
 - **Settings**, at the top right of the lists page, are the app's, for this phone.
 
 ## The page
