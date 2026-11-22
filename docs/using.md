@@ -26,7 +26,7 @@ A phone holds any number of lists, each shared with its own people. The app open
 
 The list is written on the page itself, like paper: one left edge, ruled lines between items and under section names, and an underline where you type. Only what is lifted off the page has a shadow: something being dragged, the undo button, the sheets, which rise onto the page as it dims behind them.
 
-- **The list's name** is the title at the top, between the arrow back and *Settings*. A new list is named as it's made, where its name goes; one without a name says *Untitled list*. It's renamed in the list's settings, and also names the exported file.
+- **The list's name** is the title at the top, between the arrow back and *Settings*. With large text, when they leave it too little room, it has a row of its own under them, so its words stay whole; the lists page does the same with its title. A new list is named as it's made, where its name goes; one without a name says *Untitled list*. It's renamed in the list's settings, and also names the exported file.
 - **The list's colour** is chosen in its settings, under its name: white and eight hues. The paper is warm paper dyed with the colour, the ruled lines a deeper dye, the title a deep shade of it, and the writing leans its way. The browser's bars follow, and the app opens in the colour without a flash of white.
 - **The eight colours weigh the same.** Each is a single hue, and every tone of it, from paper to tick box, is that hue at a lightness set by what it's for, so no colour shouts or fades beside another, in light or dark.
 - Every phone sees the name and colour, and undo puts the old ones back.

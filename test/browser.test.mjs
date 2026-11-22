@@ -1479,6 +1479,25 @@ test("a section let go stays where it was dropped, and unfolds from there", asyn
   await t.close();
 });
 
+test("with large text, a page's title has a row of its own, its words whole", async () => {
+  const p = await alone(), a = p.page;
+  // Each word of the title on one line, and where the title sits against Settings.
+  const look = (title, btn) => a.evaluate(([title, btn]) => {
+    const el = document.querySelector(title), t = el.firstChild, b = document.querySelector(btn).getBoundingClientRect();
+    let i = 0;
+    const whole = t.data.split(" ").every(w => { const r = document.createRange(); r.setStart(t, i); r.setEnd(t, i + w.length); i += w.length + 1; return r.getClientRects().length === 1; });
+    return { whole, under: el.getBoundingClientRect().top >= b.bottom - 1 };
+  }, [title, btn]);
+  assert.deepEqual(await look("#list-name", "#list-settings-open"), { whole: true, under: false }, "beside the arrow and Settings when there's room");
+  await a.setViewportSize({ width: 195, height: 422 }); // a 390 px phone at 200 %
+  assert.deepEqual(await look("#list-name", "#list-settings-open"), { whole: true, under: true }, "under them when there isn't");
+  await toLists(a);
+  assert.deepEqual(await look(".lists-top h1", "#settings-open"), { whole: true, under: true }, "and the same on the lists page");
+  await a.setViewportSize({ width: 390, height: 844 });
+  assert.deepEqual(await look(".lists-top h1", "#settings-open"), { whole: true, under: false });
+  await p.close();
+});
+
 test("settings: appearance, keeping the list, its size, export, and about", { skip: !!LAYOUT }, async () => {
   const t = await pair();
   const { a } = t;
