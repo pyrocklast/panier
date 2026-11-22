@@ -193,6 +193,11 @@ const FR = {
   "Offline": "Hors ligne",
   "Can't reach the server": "Serveur injoignable",
   "Back online": "De retour en ligne",
+  "Phone storage full": "Stockage du téléphone plein",
+  "This phone has no room left to save your lists. Changes still reach the server. Settings shows what takes the room; deleting a list frees it.":
+    "Ce téléphone n’a plus de place pour enregistrer vos listes. Les modifications arrivent quand même au serveur. Les Paramètres montrent ce qui prend la place" + nb + "; supprimer une liste en libère.",
+  "This phone has no room left to save your lists, so changes made now are lost if the app closes before they're sent. Settings shows what takes the room; deleting a list frees it.":
+    "Ce téléphone n’a plus de place pour enregistrer vos listes" + nb + ": les modifications faites maintenant sont perdues si l’application se ferme avant leur envoi. Les Paramètres montrent ce qui prend la place" + nb + "; supprimer une liste en libère.",
   "{n} changes are saved on this phone": ["{n} modification est enregistrée sur ce téléphone", "{n} modifications sont enregistrées sur ce téléphone"],
   "Changes you make are saved on this phone": "Vos modifications sont enregistrées sur ce téléphone",
   "The server has no room left for this list. {kept}.": "Le serveur n’a plus de place pour cette liste. {kept}.",

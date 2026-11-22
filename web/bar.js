@@ -41,6 +41,7 @@ function statusInfo() {
   const { online, full, closed, waiting } = store.status();
   if (closed) return { text: t("List closed"), detail: t("Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone until you delete it.") };
   if (store.newerFormat()) return { text: t("Update Panier"), detail: t("This list was changed with a newer Panier, which updates itself: close the app and open it again. Nothing is sent from here meanwhile.") };
+  if (store.storageFull()) return noRoom(online && !full);
   if (online && !full) return null;
   const kept = waiting
     ? plural(waiting, "{n} change is saved on this phone", "{n} changes are saved on this phone")
@@ -49,8 +50,12 @@ function statusInfo() {
   if (!navigator.onLine) return { text: t("Offline"), detail: t("No connection. {kept}, to be sent when you're back online.", { kept }) };
   return { text: t("Can't reach the server"), detail: t("The server isn't answering. {kept}, to be sent as soon as it answers.", { kept }) };
 }
-// On the lists page, only being offline is worth saying: the lists show as last seen.
-const listsStatus = () => (!navigator.onLine && store.lists().length
+// The phone's storage is full: changes are kept in memory only, and reach the server if sent.
+const noRoom = sent => ({ text: t("Phone storage full"), detail: sent
+  ? t("This phone has no room left to save your lists. Changes still reach the server. Settings shows what takes the room; deleting a list frees it.")
+  : t("This phone has no room left to save your lists, so changes made now are lost if the app closes before they're sent. Settings shows what takes the room; deleting a list frees it.") });
+// On the lists page, only a full storage or being offline is worth saying: the lists show as last seen.
+const listsStatus = () => (store.storageFull() ? noRoom(navigator.onLine) : !navigator.onLine && store.lists().length
   ? { text: t("Offline"), detail: t("No connection. Your lists show as this phone last saw them.") } : null);
 export function paintStatus() {
   const now = () => (state.view === "lists" ? listsStatus() : state.view === "list" ? statusInfo() : null);
@@ -58,7 +63,7 @@ export function paintStatus() {
   const el = $("#status");
   if (!info) {
     clearTimeout(statusTimer); statusTimer = 0;
-    if (statusShown) announce(t("Back online"));
+    if (statusShown && statusShown !== t("Phone storage full")) announce(t("Back online"));
     statusShown = "";
     el.hidden = true;
     $("#status-detail").hidden = true;

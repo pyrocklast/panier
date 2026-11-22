@@ -43,11 +43,11 @@
   --press: light-dark(oklch(0.95 0.008 90), oklch(0.25 0.007 150));
   --ink: light-dark(oklch(0.25 0.012 150), oklch(0.93 0.008 95));
   --title: var(--ink);                                                  /* the list's name */
-  --muted: light-dark(oklch(0.47 0.015 150), oklch(0.72 0.012 150));
+  --muted: light-dark(oklch(0.37 0.015 150), oklch(0.85 0.012 150));   /* quiet text, still 7:1 (WCAG AAA) */
   --line: light-dark(oklch(0.91 0.008 90), oklch(0.29 0.008 150));      /* ruled lines, under names and between items */
   --tear: light-dark(oklch(0.84 0.012 90), oklch(0.36 0.010 150));      /* the tear line above what's ticked */
   --ess: var(--ink); /* ink: Essentials, and the app's buttons */
-  --danger: light-dark(#c0392b, #ff8a80);
+  --danger: light-dark(oklch(0.37 0.140 27), oklch(0.88 0.070 25));
   --float: 0 14px 34px -10px light-dark(rgb(20 30 25 / 0.28), rgb(0 0 0 / 0.6)), 0 0 0 1px light-dark(rgb(20 30 25 / 0.06), #2f3733);
   --ff: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
   --page: 34rem; /* the page's width, wider on a wide screen */
@@ -80,8 +80,8 @@
   --dye: oklch(0.62 calc(0.13 * var(--k)) var(--h));
   --paper: light-dark(color-mix(in oklab, var(--dye) 24%, oklch(0.985 0.012 85)), color-mix(in oklab, var(--dye) 24%, oklch(0.19 0.006 150)));
   --rule: light-dark(color-mix(in oklab, var(--dye) 40%, oklch(0.985 0.012 85)), color-mix(in oklab, var(--dye) 33%, oklch(0.19 0.006 150)));
-  --deep: light-dark(oklch(0.42 0.100 var(--h)), oklch(0.86 0.085 var(--h)));
-  --quiet: light-dark(oklch(0.46 0.050 var(--h)), oklch(0.76 0.045 var(--h)));
+  --deep: light-dark(oklch(0.35 0.090 var(--h)), oklch(0.90 0.075 var(--h)));
+  --quiet: light-dark(oklch(0.37 0.040 var(--h)), oklch(0.85 0.040 var(--h)));
   --hued: light-dark(oklch(0.25 0.018 var(--h)), oklch(0.93 0.012 var(--h)));
 }
 :root[data-list] {
@@ -139,13 +139,14 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sec, .basket-list { overflow: clip; overflow-clip-margin: 16px; }
 .sec-head {
   margin: 0; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; font-size: inherit;
-  background: linear-gradient(var(--line), var(--line)) left bottom / 100% 1px no-repeat;
+  background: linear-gradient(var(--sec), var(--sec)) left bottom / 100% 1px no-repeat; /* a rule in its colour */
 }
 .sec-name {
   flex: 1; min-width: 0; padding: 12px 0; font-weight: 700; overflow-wrap: anywhere; cursor: text; outline: none;
 }
-/* A section's name is written in a deep tone of its colour, so its boxes belong to it */
-.sec[data-color]:not([data-color="ess"]) .sec-name { color: light-dark(oklch(0.42 0.090 var(--h)), oklch(0.85 0.075 var(--h))); }
+/* A section's name is written in a deep tone of its colour, so its boxes belong to it; deep
+   enough for 7:1 on every paper, the rule under it carrying the colour at full strength */
+.sec[data-color]:not([data-color="ess"]) .sec-name { color: light-dark(oklch(0.32 0.090 var(--h)), oklch(0.91 0.070 var(--h))); }
 .sec-head .bin { width: 44px; height: 44px; margin-right: -12px; }
 /* Folded on this phone: the heading, and under it what's left, in a line to tap open */
 .fold-sec {
@@ -243,9 +244,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
   color: var(--ink); font: inherit;
 }
 .add-input::placeholder { color: var(--hint, var(--muted)); }
-/* A section's Add item reads in a deep shade of its colour; ink's stays grey, so it
+/* A section's Add item reads in a deep tone of its colour, at 7:1; ink's stays grey, so it
    doesn't pass for an item */
-.sec { --hint: color-mix(in oklab, var(--sec) 75%, var(--ink)); }
+.sec { --hint: light-dark(oklch(0.37 0.090 var(--h)), oklch(0.87 0.075 var(--h))); }
 .sec[data-color="ess"] { --hint: var(--muted); }
 .add-input:focus { box-shadow: inset 0 -2px 0 var(--sec); }
 /* Once you type, a cross at the end of the row throws the text away, in the same place

@@ -42,6 +42,7 @@ store.subscribe(kind => {
     else lists.renderLists();
     return;
   }
+  if (kind === "status" && state.view === "lists") return paintStatus(); // the phone's storage filled up, or has room again
   if (state.view !== "list") return;
   if (kind === "remote") {
     list.refreshFromStore();

@@ -80,7 +80,9 @@ Check that it works both on mobile data and on your home Wi-Fi.
 
 ## Updating
 
-Run the install script again. It downloads the latest release and keeps your lists.
+Run the install script again. It downloads the latest release, published with every change to Panier, and keeps your lists on the Pi.
+
+A phone that started using Panier before 12 Nov 2026, when it learned to hold several lists, opens the update with no list: open the list's saved link on it once, and the list comes back.
 
 ## If something doesn't work
 

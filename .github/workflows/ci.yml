@@ -5,8 +5,6 @@ on:
     branches: [main, next] # next is the test copy: it deploys to a separate Worker, panier-next
   pull_request:
   workflow_dispatch:
-  release:
-    types: [published]
 
 permissions:
   contents: read
@@ -21,11 +19,12 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@v4
+          cache: false # the standard library only: nothing to cache
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: test -z "$(gofmt -l .)"
@@ -59,12 +58,13 @@ jobs:
           - { name: "Cloudflare Worker, Chromium", server: worker, browser: chromium }
           - { name: "Go server, Firefox, compact layout", server: go, browser: firefox, layout: compact }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         if: matrix.server == 'go'
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@v4
+          cache: false # the standard library only: nothing to cache
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Install Playwright and ${{ matrix.browser }}
@@ -112,8 +112,8 @@ jobs:
       SETUP_CODE: ${{ secrets.PANIER_SETUP_CODE }}
       DOMAIN: ${{ secrets.PANIER_DOMAIN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Deploy to Cloudflare
@@ -147,21 +147,24 @@ jobs:
           npx --yes "$WRANGLER" deploy "${ENV_ARGS[@]}" --secrets-file "$RUNNER_TEMP/secrets.json" ${DOMAIN:+--domains "$DOMAIN"} 2>&1 \
             | sed -E -e 's#[A-Za-z0-9.-]+\.workers\.dev#<your address>.workers.dev#g' -e 's#[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+#<email>#g'
 
+  # Every change to main that passes the tests is published for the Raspberry Pi too, as a
+  # release the installer downloads (deploy/install.sh), named after its day and commit.
   release:
-    if: github.event_name == 'release'
+    if: github.event_name == 'push' && github.ref_name == 'main'
     needs: [checks, browser]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          cache: false # the standard library only: nothing to cache
       - name: Build for the Raspberry Pi and PCs
-        env:
-          TAG: ${{ github.event.release.tag_name }}
         run: |
+          TAG="v$(date -u +%Y.%m.%d)-${GITHUB_SHA::7}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
           sed -i "s/^const VERSION = \"dev\";/const VERSION = \"$TAG\";/" web/sw.js
           grep -q "^const VERSION = \"$TAG\";" web/sw.js
           STATIC=$(find web/vendor web/fonts web/icon.svg web/icon-192.png -type f | sort | xargs cat | sha256sum | cut -c1-8)
@@ -174,8 +177,7 @@ jobs:
           build arm 6 armv6      # Raspberry Pi Zero and 1
           build amd64 "" amd64
           cd dist && sha256sum panier-* > SHA256SUMS
-      - name: Attach the files to the release
+      - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" dist/* --clobber
+        run: gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "$TAG" --generate-notes
