@@ -128,17 +128,29 @@ fi
 if [ -f /etc/panier/ddns.conf ]; then
 	cat >/usr/local/bin/panier-ddns <<'EOF'
 #!/bin/sh
-# Keeps the dynamic DNS record pointing at this home's public IPv4 address,
-# using the DynDNS2 protocol. It only contacts the provider when the address changes.
+# Keeps the dynamic DNS record pointing at this home's public IPv4 address, using the
+# DynDNS2 protocol. It learns the address from api.ipify.org, and contacts the provider
+# only when it changes, as providers may block a client that sends the same one again
+# and again. If ipify can't be reached, it says so, and updates at most once an hour
+# without the address, which the provider then reads from the request.
 set -eu
 . /etc/panier/ddns.conf
 state=/var/lib/panier-ddns/ip
-ip=$(curl -4 -fsS --max-time 15 https://api.ipify.org) || exit 0
-[ "$ip" = "$(cat "$state" 2>/dev/null || true)" ] && exit 0
-answer=$(curl -fsS --max-time 30 --netrc-file /etc/panier/ddns.netrc \
-	"https://$DDNS_SERVER/nic/update?system=dyndns&hostname=$DDNS_HOST&myip=$ip") || exit 1
+if ip=$(curl -4 -fsS --max-time 15 https://api.ipify.org); then
+	[ "$ip" = "$(cat "$state" 2>/dev/null || true)" ] && exit 0
+	myip="&myip=$ip"
+else
+	echo "Couldn't learn this home's address from api.ipify.org; updating at most once an hour meanwhile." >&2
+	[ -n "$(find "$state" -mmin -60 2>/dev/null)" ] && exit 0
+	myip=""
+fi
+answer=$(curl -4 -fsS --max-time 30 --netrc-file /etc/panier/ddns.netrc \
+	"https://$DDNS_SERVER/nic/update?system=dyndns&hostname=$DDNS_HOST$myip") || exit 1
 case "$answer" in
-good* | nochg*) echo "$ip" >"$state"; echo "$DDNS_HOST now points to $ip" ;;
+good* | nochg*)
+	case "$answer" in *" "*) ip=${answer#* } ;; esac # the address it now has, if it says
+	echo "$ip" >"$state"
+	echo "$DDNS_HOST points to ${ip:-this home}" ;;
 *) echo "The provider refused the update: $answer" >&2; exit 1 ;;
 esac
 EOF

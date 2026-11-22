@@ -522,6 +522,47 @@ func TestFilesAreGzipped(t *testing.T) {
 	}
 }
 
+func TestFilesHaveETags(t *testing.T) {
+	web := fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>Panier</title>")}, "sw.js": {Data: []byte("const VERSION = \"a\";")}, "icon.png": {Data: []byte("png")}}
+	ts := httptest.NewServer(staticFiles(web))
+	defer ts.Close()
+	tr := &http.Transport{DisableCompression: true}
+	get := func(ts *httptest.Server, path, enc, tag string) *http.Response {
+		req, _ := http.NewRequest("GET", ts.URL+path, nil)
+		req.Header.Set("Accept-Encoding", enc)
+		if tag != "" {
+			req.Header.Set("If-None-Match", tag)
+		}
+		res, err := tr.RoundTrip(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		io.Copy(io.Discard, res.Body)
+		res.Body.Close()
+		return res
+	}
+	tags := map[string]bool{}
+	for _, c := range []struct{ path, enc string }{{"/sw.js", "gzip"}, {"/sw.js", ""}, {"/", "gzip"}, {"/", ""}, {"/icon.png", "gzip"}} {
+		tag := get(ts, c.path, c.enc, "").Header.Get("ETag")
+		if tag == "" || tags[tag] {
+			t.Fatalf("%s (%q): ETag %q, one of its own for each file and encoding", c.path, c.enc, tag)
+		}
+		tags[tag] = true
+		if res := get(ts, c.path, c.enc, tag); res.StatusCode != http.StatusNotModified {
+			t.Fatalf("%s (%q) again: %d, want 304", c.path, c.enc, res.StatusCode)
+		}
+		if res := get(ts, c.path, c.enc, `"other"`); res.StatusCode != http.StatusOK {
+			t.Fatalf("%s (%q), changed since: %d, want 200", c.path, c.enc, res.StatusCode)
+		}
+	}
+	web["sw.js"] = &fstest.MapFile{Data: []byte("const VERSION = \"b\";")}
+	ts2 := httptest.NewServer(staticFiles(web))
+	defer ts2.Close()
+	if tag := get(ts2, "/sw.js", "gzip", "").Header.Get("ETag"); tags[tag] {
+		t.Fatalf("a new release's sw.js has a new ETag: %q", tag)
+	}
+}
+
 func TestCreateByVouching(t *testing.T) {
 	ts := newTestServer(t, t.TempDir())
 	create(t, ts)
