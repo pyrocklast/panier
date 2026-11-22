@@ -36,7 +36,7 @@ First a server, then the phones.
 | Cost | free | the Pi and the domain |
 | Upkeep | none | a small computer at home, always on |
 | Address | `panier.<subdomain>.workers.dev`, or your own domain | your own domain |
-| Updates | automatic: every change to `main`, once the tests pass | run the install script again; it fetches the latest release, which is published by hand, so it can lag behind `main` |
+| Updates | automatic: every change to `main`, once the tests pass | run the install script again; it fetches the latest release, published with every change to `main` once the tests pass |
 | Who could change the app | Cloudflare, and anyone in your Cloudflare or GitHub account | anyone with access to your Pi, or to this project's releases |
 | Time to set up | about 20 minutes | about an hour |
 | Guide | [docs/cloudflare.md](docs/cloudflare.md) | [docs/raspberry-pi.md](docs/raspberry-pi.md) |
@@ -98,7 +98,7 @@ Then, on the phones:
 
 ## Development
 
-With Go 1.22 or later:
+With Go 1.27 or later (from Go 1.21, `go` fetches it for you):
 
 ```sh
 go run . -data ./data              # serves http://127.0.0.1:8080
@@ -117,7 +117,7 @@ BASE=http://127.0.0.1:8080 SETUP=<code> STORE=./data node --test test/browser.te
 
 `BROWSER=firefox` runs the browser tests in Firefox, and `LAYOUT=compact` in the compact layout. [`test/update.test.mjs`](test/update.test.mjs) explains how to run the update test.
 
-On every push to `main` or `next` and every pull request, GitHub runs the Go tests, the update test, and the API and browser tests on both servers in Chromium, and on the Go server in Firefox. When they pass on `main`, it deploys to Cloudflare; on `next`, to a test copy of its own, *Panier next*, which installs beside Panier with lists of its own, so changes are tried on real phones before they're merged. Publishing a release (tag `v…`) builds the Go server for the Raspberry Pi (`arm64`, `armv7`, `armv6`) and `amd64`, with checksums.
+On every push to `main` or `next` and every pull request, GitHub runs the Go tests, the update test, and the API and browser tests on both servers in Chromium, and on the Go server in Firefox. When they pass on `main`, it deploys to Cloudflare and publishes a release, named after the day and the commit, with the Go server built for the Raspberry Pi (`arm64`, `armv7`, `armv6`) and `amd64`, and checksums; on `next`, it deploys to a test copy of its own, *Panier next*, which installs beside Panier with lists of its own, so changes are tried on real phones before they're merged.
 
 ## Next
 
