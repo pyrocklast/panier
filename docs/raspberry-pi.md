@@ -98,4 +98,4 @@ A phone that started using Panier before 12 Nov 2026, when it learned to hold se
 - `/usr/local/bin/panier`, run by the `panier` service as its own user, listening only on the Pi itself
 - `/var/lib/panier`: the setup code, and each list's access-token hash and encrypted changes. Nothing in it is readable without a pairing link.
 - `/etc/caddy/Caddyfile`: HTTPS for your address. No access logs are kept.
-- `/etc/panier`: the dynamic DNS login (readable by root only), used by `panier-ddns`, which checks your public IP every five minutes through api.ipify.org and only contacts your DNS provider when it changes
+- `/etc/panier`: the dynamic DNS login (readable by root only), used by `panier-ddns`, which checks your public IP every five minutes through api.ipify.org and only contacts your DNS provider when it changes, as providers may block a client that sends the same address again and again. If ipify can't be reached, it says so in `journalctl -u panier-ddns` and updates at most once an hour, letting the provider read the address.
