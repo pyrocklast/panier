@@ -149,8 +149,7 @@ On a phone turned on its side, or a tablet or computer, the page uses the width:
 - **You:** your name, shown to the people you share lists with.
 - **Appearance:** same as the phone, light or dark, and *Compact layout*: shorter rows (44 px instead of 52), smaller gaps and titles, and only each list's name and count on the lists page.
 - **Data:**
-  - One line: how many lists there are and the room they take on this phone. A tap opens each list with the room it takes, to export it alone; each list's own is in its settings too.
-  - Whether the browser keeps them even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep lists on this phone* asks again.
+  - One line: how many lists there are, the room they take on this phone, and whether the browser keeps them even when the phone runs low on space. Panier asks for this when you start or join a list: Firefox asks you once, Chrome decides for itself. If they aren't kept, *Keep lists on this phone* asks again.
   - *Export all lists*, *Bring in from a file* and *Set up another phone*, above.
 - **About:** the version, the server, and what the server can and can't see.
 

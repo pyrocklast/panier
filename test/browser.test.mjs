@@ -1537,16 +1537,9 @@ test("settings: appearance, keeping the list, its size, export, and about", { sk
   await a.locator('#settings .choices label', { hasText: "Light" }).click();
   assert.equal(await a.getAttribute('meta[name="theme-color"][media*="light"]', "content"), rgbText(desk), "and back");
 
-  assert.match(await a.locator("#data-sum").innerText(), /^1 list, \d+ (bytes|KB) on this phone$/, "the lists in one line: how many, the room they take here");
-  assert.ok(await eventually(async () => /browser/.test(await a.locator("#keep-text").innerText())), "and whether they're safe");
-  assert.equal(await a.locator("#data-lists").isVisible(), false, "each list's own, folded away");
-  await a.click("#data-open");
-  assert.equal(await a.getAttribute("#data-open", "aria-expanded"), "true");
-  assert.deepEqual(await a.locator("#data-lists .row > :first-child").allInnerTexts(), ["Shopping list"], "a tap on the line opens each list, with the room it takes");
-  assert.match(await a.locator("#data-lists .row-d").innerText(), /^\d+ (bytes|KB)$/);
-  const [one] = await Promise.all([a.waitForEvent("download"), a.locator("#data-lists .row").click()]);
-  assert.match(one.suggestedFilename(), /^shopping-list-\d{4}-\d{2}-\d{2}\.md$/, "and exports it alone");
-  await a.click("#data-open");
+  assert.ok(await eventually(async () => /^1 list, \d+ (bytes|KB) on this phone\. .*browser/.test(await a.locator("#data-sum").innerText())),
+    "the lists in one line: how many, the room they take here, and whether they're safe");
+  assert.equal(await a.locator("#settings .row", { hasText: "Shopping list" }).count(), 0, "each list exports from its own settings, not from here");
   const rows = await a.locator("#settings .row:visible").evaluateAll(r => r.map(b => b.getBoundingClientRect().toJSON()));
   assert.ok(rows.length >= 3 && rows.every(r => Math.abs(r.width - rows[0].width) < 1 && Math.abs(r.left - rows[0].left) < 1 && r.height >= 44), "what's done now and then, in rows that line up");
   const [all] = await Promise.all([a.waitForEvent("download"), a.click("#export-all")]);
