@@ -93,7 +93,7 @@ Then, on the phones:
 | `*.go` | the Go server |
 | [`deploy/install.sh`](deploy/install.sh) | the Raspberry Pi installer |
 | [`test/`](test/) | tests of the API, the app in a browser, and updating; and `efficiency.mjs`, which measures what the app costs |
-| [`docs/`](docs/) | the setup guides, the full user guide, and [how to keep Panier efficient](docs/efficiency.md) |
+| [`docs/`](docs/) | the setup guides, the full user guide, [how to keep Panier efficient](docs/efficiency.md), and [the roadmap](docs/roadmap.md) |
 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | tests, deploy and release builds |
 
 ## Development

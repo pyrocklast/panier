@@ -71,6 +71,7 @@ What the first run found, to start from:
 - **Every update downloads all the app's files,** about 88 KB gzipped, even those that didn't change.
 - **Adding an item on a long list** takes about 120 ms on the slow phone, against about 60 to 100 ms for a tick. Adding animates the list, and measures every row before and after, ticked rows included.
 - **The lists page** sends one request for each list. That's fine at eight lists, but it grows with every list.
+- **A new phone joining downloads a list's whole history,** about 1 MB for a year of shopping. That showed the list after 8.7 seconds on the slow phone. Snapshots, on the [roadmap](roadmap.md), would fix it.
 
 ## Results
 
