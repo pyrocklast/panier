@@ -51,7 +51,7 @@ Space isn't the problem: the server's limit of 32 MB a list would take decades t
 
 ## Items under items
 
-**Status:** design note below, to agree before building. Then the parts marked *on screen* are tried in two or three directions, side by side.
+**Status:** a big maybe, set aside for later. The design note below keeps what's been decided; it isn't agreed, and nothing is built. If it's picked up, the note is agreed first, then the parts marked *on screen* are tried in two or three directions, side by side.
 
 **Why.** Some lists have items with parts: a recipe and its ingredients, a room and its jobs, a bag and what goes in it. Sections group items, but across the whole list, and one level only. Markdown checklists indent items under others; today Panier flattens them as they come in.
 
