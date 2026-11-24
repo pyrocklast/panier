@@ -1356,7 +1356,7 @@ test("Enter adds just what was typed; a suggestion comes back when tapped, witho
   await t.close();
 });
 
-test("a section folds on this phone only, to its heading and a line of what's left, and stays folded", async () => {
+test("a section folds on this phone only, to one row saying what's left, which opens from anywhere on it, and stays folded", async () => {
   const t = await pair();
   const { a, b } = t;
   for (const w of ["Milk", "Bread"]) await add(a, "ess", w);
@@ -1365,23 +1365,36 @@ test("a section folds on this phone only, to its heading and a line of what's le
   const ess = a.locator('#list .sec[data-sec="ess"]'), fold = ess.locator(".fold-sec");
   assert.equal(await fold.getAttribute("aria-label"), "Essentials", "its chevron is named after it");
   assert.equal(await fold.getAttribute("aria-expanded"), "true");
-  assert.equal(await ess.locator(".sec-left").isVisible(), false, "open, no line under its heading");
+  const [chev, name] = [await fold.boundingBox(), await ess.locator(".sec-name").boundingBox()];
+  assert.ok(chev.x + chev.width <= name.x + 1 && chev.x < 20, "the chevron comes first, where the tick boxes are");
+  assert.equal(await ess.locator(".fold-left").isVisible(), false, "open, it says nothing more");
   await fold.click();
   assert.ok(await eventually(async () => !(await ess.locator(".items").isVisible()) && !(await ess.locator(".add").isVisible())), "its items and Add item row fold away");
   assert.equal(await fold.getAttribute("aria-expanded"), "false");
-  assert.equal(await ess.locator(".sec-left").innerText(), "Milk, Bread", "a line under its heading says what's left");
+  assert.ok(await eventually(async () => (await ess.locator(".fold-left").innerText()) === "Milk, Bread"), "one row says what's left");
+  assert.equal(await ess.locator(".fold-count").innerText(), "2 to tick", "and how many");
+  assert.equal(await ess.locator(".fold-name").innerText(), "Essentials", "under its name");
+  const row = await fold.boundingBox(), sec = await ess.boundingBox();
+  assert.ok(row.height >= (LAYOUT ? 52 : 60) && row.width >= sec.width, "the whole heading is the row, to tap");
   await add(b, "ess", "Eggs");
-  assert.ok(await eventually(async () => (await ess.locator(".sec-left").innerText()) === "Milk, Bread, Eggs"), "what another phone adds shows in the line");
+  assert.ok(await eventually(async () => (await ess.locator(".fold-left").innerText()) === "Milk, Bread, Eggs"), "what another phone adds shows in it");
+  assert.equal(await ess.locator(".fold-count").innerText(), "3 to tick");
   assert.equal(await b.locator('#list .sec[data-sec="ess"] .items').isVisible(), true, "on the other phone, it stays open");
   await a.reload();
   await a.locator("#app:not([hidden])").waitFor();
   assert.equal(await ess.locator(".items").isVisible(), false, "it stays folded when the app opens again");
-  await ess.locator(".sec-left").click();
-  assert.ok(await eventually(() => ess.locator(".items").isVisible()), "a tap on the line opens it");
+  await ess.locator(".fold-name").click();
+  assert.ok(await eventually(() => ess.locator(".items").isVisible()), "a tap on its name opens it");
+  assert.equal(await a.locator(".sec-name.editing").count(), 0, "rather than rename it");
   assert.equal(await fold.getAttribute("aria-expanded"), "true");
   await fold.focus();
   await a.keyboard.press("Enter");
   assert.ok(await eventually(async () => (await fold.getAttribute("aria-expanded")) === "false"), "the chevron folds it from the keyboard too");
+  assert.equal(await a.evaluate(() => document.activeElement.dataset.fk), "fold-ess", "and the cursor stays on it, now the row");
+  await a.keyboard.press("Enter");
+  assert.ok(await eventually(async () => (await fold.getAttribute("aria-expanded")) === "true"), "which opens it again");
+  await a.keyboard.press("Enter");
+  assert.ok(await eventually(async () => (await fold.getAttribute("aria-expanded")) === "false"));
   await item(a, "Torch").locator(".chk").focus();
   await a.keyboard.press("Alt+ArrowUp");
   assert.ok(await eventually(async () => (await texts(a, "Essentials")).join() === "Milk,Bread,Eggs,Torch"), "Alt+↑ moves an item into a folded section");
@@ -1403,7 +1416,7 @@ test("items go into a folded section without opening it, and drags pass over it"
   await ess.locator(".fold-sec").click();
   await still(a);
   await a.locator("#basket-list .item").filter({ hasText: "Bread" }).locator(".boxcell").click();
-  assert.ok(await eventually(async () => (await ess.locator(".sec-left").innerText()) === "Milk, Bread"), "unticked, it goes back into its folded section's line");
+  assert.ok(await eventually(async () => (await ess.locator(".fold-left").innerText()) === "Milk, Bread"), "unticked, it goes back into its folded section's row");
   assert.equal(await ess.locator(".items").isVisible(), false, "which stays folded");
   assert.ok(await eventually(async () => (await a.locator(".flying").count()) === 0));
   await ess.locator(".fold-sec").click();
@@ -1411,7 +1424,10 @@ test("items go into a folded section without opening it, and drags pass over it"
   await still(a);
   await dragTo(a, item(a, "Milk"), async () => { const r = await a.locator('#list .sec[data-sec="long"] .add').boundingBox(); return r.y + r.height / 2; });
   assert.ok(await eventually(async () => (await texts(a, "Long term")).join() === "Tent,Milk"), "dragged past a folded section, it lands in the next open one");
-  assert.equal(await look.locator(".sec-left").innerText(), "Torch", "and the folded one keeps what it had");
+  assert.equal(await look.locator(".fold-left").innerText(), "Torch", "and the folded one keeps what it had");
+  await look.locator(".fold-sec").focus();
+  await a.keyboard.press("Alt+ArrowUp");
+  assert.ok(await eventually(async () => (await a.locator("#list .sec").evaluateAll(els => els.map(e => e.dataset.sec))).join() === "look,ess,long"), "folded, Alt+↑ on its row moves the section");
   await p.close();
 });
 
@@ -2375,6 +2391,7 @@ test("deleting a list nobody else has closes it on the server, unless someone jo
   await b.goto(BASE + "/#k=" + t.key);
   await b.locator("#app").waitFor();
   assert.ok(await eventually(async () => (await members(b)).length === 2), "someone joins meanwhile");
+  assert.ok(await eventually(() => b.evaluate(async () => (await import("/store.js")).status().waiting === 0)), "and the server has it");
   await online(t.A, a);
   assert.ok(await eventually(async () => (await index(a)).leaving.length === 0), "back online, it goes");
   assert.equal(await a.locator("#lists-msg").innerText(), "“Shopping list” stays on the server: someone had joined it.", "and says the list was kept");

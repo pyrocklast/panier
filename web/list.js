@@ -527,18 +527,25 @@ function buildShell(id) {
     if (e.key === "Enter" || e.key === " " || e.key === "F2") { e.preventDefault(); editSection(name, id); }
     else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); moveSection(id, e.key === "ArrowUp" ? -1 : 1); }
   });
-  // Folded, on this phone, a section shows its heading and, under it, what's left in it:
-  // the chevron folds and unfolds it, and so does a tap on that line.
+  // The chevron comes first, where the tick boxes are, and folds the section on this
+  // phone. Folded, it grows into the whole heading, one row: the name, under it what's
+  // left, and how many, so a tap anywhere on it opens the section, and the cursor stays
+  // on it either way. The name renames only once it's open (app.css).
   const chev = icon("chev");
   chev.classList.add("chev");
-  const fold = h("button", { type: "button", class: "fold-sec", "aria-controls": "items-" + id }, chev);
+  const foldName = h("span", { class: "fold-name", "aria-hidden": "true" }), left = h("span", { class: "fold-left", id: "left-" + id });
+  const count = h("span", { class: "fold-count", id: "count-" + id });
+  const fold = h("button", { type: "button", class: "fold-sec", "aria-controls": "items-" + id, dataset: { fk: "fold-" + id } },
+    chev, h("span", { class: "fold-text" }, foldName, count, left));
   fold.addEventListener("click", () => {
     if (state.suppressClick) { state.suppressClick = false; return; }
     foldSection(id, !ui.folded.has(id));
   });
-  const left = h("p", { class: "sec-left", onclick: () => foldSection(id, false) });
-  const head = h("h2", { class: "sec-head" }, name, fold);
-  const el = h("section", { class: "sec", "data-sec": id, "aria-labelledby": "h-" + id }, head, left, ul, sug, form);
+  fold.addEventListener("keydown", e => { // folded, the name is hidden: the section moves from here
+    if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); moveSection(id, e.key === "ArrowUp" ? -1 : 1); }
+  });
+  const head = h("h2", { class: "sec-head" }, fold, name);
+  const el = h("section", { class: "sec", "data-sec": id, "aria-labelledby": "h-" + id }, head, ul, sug, form);
   bindPress(head, { look: el, can: () => !readOnly() && sections.length > 1 && !!sectionInfo.get(id).name, start: (offY, y) => startSectionDrag(id, y) });
   input.addEventListener("input", () => {
     saveDraft(id, input.value.trim() ? input.value : "");
@@ -571,7 +578,7 @@ function buildShell(id) {
     e.preventDefault();
     paintSug(id, ui.sug);
   });
-  const sh = { el, ul, input, form, sug, name, fold, left };
+  const sh = { el, ul, input, form, sug, name, fold, foldName, left, count };
   return sh;
 }
 function syncShells() {
@@ -593,6 +600,8 @@ function syncShells() {
     sh.el.classList.toggle("folded", folded);
     sh.fold.setAttribute("aria-expanded", String(!folded));
     sh.fold.setAttribute("aria-label", called);
+    if (sh.foldName.textContent !== called) sh.foldName.textContent = called;
+    if (folded) sh.fold.setAttribute("aria-describedby", "count-" + s.id + " left-" + s.id); else sh.fold.removeAttribute("aria-describedby");
     if (!plain) sh.el.setAttribute("aria-labelledby", "h-" + s.id); else sh.el.removeAttribute("aria-labelledby");
     sh.name.setAttribute("aria-label", readOnly() ? called : t("{x}, rename", { x: called }));
     sh.input.setAttribute("aria-label", s.name ? t("Add item to {x}", { x: s.name }) : t("Add item"));
@@ -849,8 +858,10 @@ function render() {
   for (const s of sections) {
     const sh = shells[s.id], list = shown(s.id);
     fill(sh.ul, list);
-    const left = sh.el.classList.contains("folded") ? list.map(i => i.text).join(", ") : "";
+    const folded = sh.el.classList.contains("folded"), left = folded ? list.map(i => i.text).join(", ") : "";
+    const count = !folded ? "" : list.length ? plural(list.length, "{n} to tick", "{n} to tick") : t("Nothing to tick");
     if (sh.left.textContent !== left) sh.left.textContent = left;
+    if (sh.count.textContent !== count) sh.count.textContent = count;
   }
   const from = since();
   const basket = items.filter(i => i.checked && !settling.has(i.id) && i.checkedAt >= from).sort((a, b) => b.checkedAt - a.checkedAt);

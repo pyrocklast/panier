@@ -111,9 +111,9 @@ export function glide(snap) {
     const o = snap.items.get(n.li.dataset.id);
     kept.add(n.li.dataset.id);
     if (!o || !seen(o.rect)) { if (seen(n.rect) && near(n.rect) && !typed.has(n.li)) appear(n.li); }
-    else if (!seen(n.rect)) { // into the folded ticked group, or a folded section's line of what's left
+    else if (!seen(n.rect)) { // into the folded ticked group, or a folded section's row
       const sec = n.li.closest(".sec");
-      fly(o, sec ? sec.querySelector(".sec-left").getBoundingClientRect() : head, null, !sec);
+      fly(o, sec ? sec.querySelector(".fold-sec").getBoundingClientRect() : head, null, !sec);
     }
     else if (!near(o.rect) && !near(n.rect)) continue;
     else if (n.li.classList.contains("placeholder")) { if (Math.abs(o.rect.top - n.rect.top) > 0.5) opens(n.li); }

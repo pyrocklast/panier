@@ -51,8 +51,8 @@ The share sheet and the question before deleting open over the settings, and clo
 
 A new list is a plain sheet: its items sit under its name, with no heading. *Add a section* adds headings when they help. The items already there stay first, under a heading of their own that quietly says *Untitled section*; tap it to name it. Once there are sections, nothing new goes outside one: when nothing is left to tick in the part without a name, it goes, and an item put back brings it back.
 
-- **Rename** a section by tapping its heading. Every phone sees the new name. Emptying the name and leaving puts the old one back.
-- **Fold** a section with the chevron at the end of its heading: it shows only its name, and under it what's left to tick, which a tap opens again. It folds on this phone only, and stays folded when the app opens again. Moving an item into it with the keyboard opens it, so the item stays in view.
+- **Rename** a section by tapping its name, while it's open. Every phone sees the new name. Emptying the name and leaving puts the old one back.
+- **Fold** a section with the chevron at the start of its heading, where the tick boxes are. Folded, the section is one row: its name, under it what's left to tick, and how many. A tap anywhere on the row opens it again. It folds on this phone only, and stays folded when the app opens again. Moving an item into it with the keyboard opens it, so the item stays in view.
 - **Colour.** While you rename a section, its colours show under the name: ink and eight hues. A tap recolours it, the new colour spreading over it, as it does over the list's paper. Its name is written in a deep shade of the colour above a line of the colour, its tick boxes in the colour, its items in ink that leans a little towards it, and its *Add item* row in a deep shade (grey for ink, so it doesn't pass for an item).
 - **Add a section** with *Add a section*, below the last one. It gets the first colour not used yet. Enter or `+` adds it, the cross clears what you typed, and the cursor then moves to its *Add item* row.
 - **Delete** a section once nothing is left to tick in it: while you rename it, a cross appears. If the other phone adds an item to a section you deleted meanwhile, the section comes back with it.
@@ -94,7 +94,7 @@ A new list is a plain sheet: its items sit under its name, with no heading. *Add
 ## Reordering
 
 - **Hold an item** for about half a second: it lifts and its tick box turns into a grip. Drag it anywhere, including into another section; the grip takes the colour of the section it's over. Letting go without moving does nothing. With a mouse, dragging starts as soon as you move.
-- **Hold a section's name** to move the section. While it moves, every section folds down to its name, so long ones are easy to reorder; they unfold when you let go, and the one you moved stays where you dropped it.
+- **Hold a section's heading**, or its row when folded, to move the section. While it moves, every section folds down to its name, so long ones are easy to reorder; they unfold when you let go, and the one you moved stays where you dropped it.
 - While you drag, what's in the way glides aside. What you let go of glides into its place and settles into the page, and anything else that moves after a change glides too, without getting in the way of a tap. What you add stays where you typed it, and what you delete fades where it was.
 
 ## Undo and redo
@@ -179,7 +179,7 @@ Each takes 0.15 s to give feedback, 0.24 s to arrive or 0.32 s to move, a little
 | Space | ticks or unticks the item |
 | Enter or F2 | edits the item, or renames the section |
 | Delete | deletes the item |
-| Alt+↑, Alt+↓ | moves the item, into the next section at the ends; on a section's name, moves the section |
+| Alt+↑, Alt+↓ | moves the item, into the next section at the ends; on a section's name, or its row when folded, moves the section |
 | Ctrl+Z, Ctrl+Shift+Z | undo, redo |
 
 In suggestions, ↓ and ↑ choose one, → moves to its ×, Enter picks it and Shift+Delete removes it.
