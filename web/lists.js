@@ -1,18 +1,18 @@
 // The lists page. Each list lies on it as a sheet of its own paper, the sheets side by
 // side: its name, who else has it, the first three things to tick and how many there are,
-// as this phone last saw them. Tap one to open it; hold to drag it to another place, or
-// onto the zone at the foot to delete it. The blank strip under them starts a new list.
+// as this phone last saw them. Tap one to open it; hold to drag it to another place. A
+// list is deleted in its own settings. The blank strip under them starts a new list.
 
 import * as store from "./store.js";
-import { t, plural, q, and } from "./i18n.js";
+import { t, plural, q, and, lang } from "./i18n.js";
 import { fromMarkdown } from "./md.js";
 import { readKeep } from "./googlekeep.js";
 import { state, nav, draftsKey } from "./state.js";
 import { clean, MAX_SECTION, listColorOk, importOps, startOps, listTitle } from "./model.js";
-import { $, h, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, reduceMotion } from "./dom.js";
+import { $, h, fillText, addRow, emptyField, announce, activeFk, setRows, reduceMotion } from "./dom.js";
 import { bindPress, beginDrag } from "./press.js";
 import { float, fly, shuffle } from "./motion.js";
-import { noteUndo, paintDock } from "./bar.js";
+import { paintDock } from "./bar.js";
 import { confirmSheet, openSheet } from "./sheets.js";
 import { keepList } from "./settings.js";
 import { editName } from "./list.js";
@@ -25,7 +25,10 @@ function withOf(e) {
   const who = names.length ? [...names, ...(more ? [plural(more, "{n} other", "{n} others")] : [])] : [plural(more, "{n} other phone", "{n} other phones")];
   return t("with {x}", { x: and(who) });
 }
-const countOf = e => (e.closed ? t("Closed") : e.newer ? t("Update Panier to open it") : e.toGet ? plural(e.toGet, "{n} to tick", "{n} to tick") : t("Nothing to tick"));
+// Why a list closed, in a word: deleted for everyone, moved to a new key, or, closed by an
+// app from before phones said, either.
+const goneWord = e => t(e.why === "deleted" ? "Deleted" : e.why === "moved" ? "New key" : "Deleted or moved");
+const countOf = e => (e.closed ? goneWord(e) : e.newer ? t("Update Panier to open it") : e.toGet ? plural(e.toGet, "{n} to tick", "{n} to tick") : t("Nothing to tick"));
 // Each sheet keeps its element from one drawing to the next, and only what changed is
 // written, so a sheet held or focused stays as it is while the lists catch up.
 const cards = new Map(); // list id → { li, btn, name, who, first, count, shown }
@@ -40,7 +43,6 @@ function cardOf(e) {
     btn.addEventListener("keydown", ev => {
       const dir = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[ev.key];
       if (ev.altKey && dir) { ev.preventDefault(); moveSheet(e.lid, dir); }
-      else if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); askDelete(e.lid); }
     });
     bindPress(li, { can: () => true, start: (offY, y, offX, x) => startSheetDrag(li, e.lid, offY, y, offX, x) });
     cards.set(e.lid, (c = { li, btn, name, who, first, count, shown: "" }));
@@ -91,20 +93,9 @@ function startSheetDrag(li, lid, offY, y, offX, x) {
   li.classList.add("placeholder");
   document.documentElement.classList.add("dragging-sheet");
   const before = store.lists().map(e => e.lid).join();
-  // The page scrolls before the zone at the foot, not over it, so a sheet can go last.
-  const bottom = $("#remove-drop").getBoundingClientRect().top - 8;
-  beginDrag({ lid, li, ghost, offY, y, offX, x, toRemove: false, before, bottom, place: placeSheet, end: endSheetDrag });
+  beginDrag({ lid, li, ghost, offY, y, offX, x, before, place: placeSheet, end: endSheetDrag });
 }
 function placeSheet(y, x) {
-  const zone = $("#remove-drop"), over = y > zone.getBoundingClientRect().top - 8;
-  if (over !== state.drag.toRemove) {
-    state.drag.toRemove = over;
-    zone.classList.toggle("over", over);
-    state.drag.li.classList.toggle("away", over);
-    state.drag.ghost.classList.toggle("leaving", over);
-    if (over) buzz(8);
-  }
-  if (over) return;
   const ul = $("#sheets"), gap = 6; // half the space between sheets
   let before = null;
   for (const c of ul.children) {
@@ -115,18 +106,16 @@ function placeSheet(y, x) {
   if (state.drag.li.nextElementSibling !== before) shuffle(SHEETS, () => ul.insertBefore(state.drag.li, before)); // the others glide aside
 }
 function endSheetDrag() {
-  const { lid, li, toRemove, ghost, before } = state.drag;
+  const { li, ghost, before } = state.drag;
   const order = [...$("#sheets").children].map(c => c.dataset.lid);
   const from = ghost.getBoundingClientRect();
-  li.classList.remove("placeholder", "away"); // the same sheet stays on the page
-  $("#remove-drop").classList.remove("over");
+  li.classList.remove("placeholder"); // the same sheet stays on the page
   document.documentElement.classList.remove("dragging-sheet");
   state.drag = null;
-  if (!toRemove && order.join() !== before) store.reorder(order);
+  if (order.join() !== before) store.reorder(order);
   renderLists();
-  if (toRemove || reduceMotion.matches) ghost.remove();
+  if (reduceMotion.matches) ghost.remove();
   else fly({ li: ghost, rect: from, part: null }, li.getBoundingClientRect(), li); // it settles into its place
-  if (toRemove) askDelete(lid);
 }
 function moveSheet(lid, dir) {
   const order = store.lists().map(e => e.lid), i = order.indexOf(lid), j = i + dir;
@@ -138,56 +127,65 @@ function moveSheet(lid, dir) {
   if (el) el.focus();
 }
 
-// A list is deleted only once asked: on the lists page, dropped on the zone at the foot or
-// with the Delete key, or with Delete the list, in the list's own settings, which a
-// screen reader on a phone can reach. Each way says what brings it back: from this phone,
-// undo until the app closes, then its link, unless closed; for everyone, nothing, so it
-// asks again.
-export function askDelete(lid) {
+// A list is deleted in its own settings, and nothing brings it back, so each way asks
+// first and says exactly what happens: one question where someone else keeps it and can
+// share it again; a button held where nothing can bring it back (sheets.js).
+
+// Who else is on a list, for those words: the names they gave, then the phones without
+// one, and a phone with this phone's own name is your other phone; n, how many in all.
+// Null when nobody else is.
+export function keepers(e) {
+  const w = e.with || { names: [], nameless: 0 }, mine = store.myName();
+  const own = mine ? w.names.filter(n => n === mine).length : 0, named = w.names.filter(n => !mine || n !== mine);
+  const n = named.length + w.nameless + own;
+  if (!n) return null;
+  const who = and([...named, ...(w.nameless ? [plural(w.nameless, "{n} other phone", "{n} other phones")] : []),
+    ...(own ? [plural(own, "your other phone", "your {n} other phones")] : [])]);
+  return { who: who.charAt(0).toLocaleUpperCase(lang) + who.slice(1), n };
+}
+// everyone: Delete for everyone, rather than from this phone.
+export function askDelete(lid, everyone = false) {
   const e = store.entryOf(lid);
   if (!e) return;
-  const name = listTitle(e.name), w = e.with, others = !!(w && (w.names.length || w.nameless));
+  const name = listTitle(e.name), k = !e.closed && keepers(e);
+  const done = msg => {
+    try { localStorage.removeItem(draftsKey(lid)); } catch (_) {} // what was typed in it goes too
+    $("#confirm").close();
+    announce(msg);
+    lostFocus($("#sheets .sheet-open") || (!$("#new-list-form").hidden && $("#new-list")));
+  };
+  if (everyone) return confirmSheet({
+    title: t("Delete {x} for everyone?", { x: q(name) }),
+    text: t("It goes from the server, and nobody can change it any more. The others' phones keep what they have, to read or export, until they delete it. Nothing can bring it back."),
+    ok: t("Delete for everyone"),
+    hold: t("Hold to delete for everyone"),
+    run: async () => { await store.deleteForEveryone(lid); done(t("Deleted {x} for everyone", { x: name })); },
+  });
+  if (k) return confirmSheet({
+    title: t("Delete {x} from this phone?", { x: q(name) }),
+    text: t(k.n === 1 ? "{x} keeps it, and can share it with you again. On this phone it goes now, with no Undo."
+      : "{x} keep it, and can share it with you again. On this phone it goes now, with no Undo.", { x: k.who }),
+    ok: t("Delete from this phone"),
+    run: () => { store.deleteHere(lid, false); done(t("Deleted {x} from this phone", { x: name })); },
+  });
   confirmSheet({
     title: t("Delete {x}?", { x: q(name) }),
-    text: e.closed ? t("It's already closed. Undo brings back what's left of it until Panier closes; after that, it's gone.")
-      : others ? t("The others keep it. On this phone, Undo brings it back until Panier closes; after that, its link does.")
-      : t("Undo brings it back until Panier closes; after that, only its link does, if you kept one."),
-    ok: t("Delete from this phone"),
-    run: () => { $("#confirm").close(); removeList(lid); },
-    more: e.closed ? null : { label: t("Delete for everyone"), run: () => confirmSheet({
-      title: t("Delete {x} for everyone?", { x: q(name) }),
-      text: t("It goes from the server, and from every phone that has it as soon as they open it. Neither Undo nor its link can bring it back."),
-      ok: t("Delete for everyone"),
-      run: async () => {
-        await store.deleteForEveryone(lid);
-        try { localStorage.removeItem(draftsKey(lid)); } catch (_) {} // what was typed in it goes too
-        $("#confirm").close();
-        announce(t("Deleted {x} for everyone", { x: name }));
-        lostFocus($("#sheets .sheet-open") || $("#new-list"));
-      },
-    }) },
+    text: e.closed ? t("It's no longer on the server. What's left here goes, and nothing can bring it back.")
+      : t("Nobody else has it, so it goes from this phone and from the server. Nothing can bring it back, not even its link."),
+    ok: t("Delete"),
+    hold: t("Hold to delete"),
+    run: () => { store.deleteHere(lid, true); done(t("Deleted {x} for good", { x: name })); },
   });
 }
-// The sheet that had the cursor is gone: it goes to el.
-const lostFocus = el => { if (!document.activeElement || document.activeElement === document.body) el.focus({ preventScroll: true }); };
-function removeList(lid) {
-  const e = store.entryOf(lid);
-  if (!e) return;
-  const name = listTitle(e.name), dk = draftsKey(lid);
-  let drafts = null;
-  try { drafts = localStorage.getItem(dk); localStorage.removeItem(dk); } catch (_) {}
-  noteUndo(name);
-  shuffle(SHEETS, () => { state.removed.push({ label: t("deleting {x}", { x: q(name) }), r: store.remove(lid), drafts, dk }); renderLists(); });
-  announce(t("Deleted {x} from this phone", { x: name }));
-  lostFocus($("#undo")); // which would bring it back
-}
-export function undoRemove() {
-  const u = state.removed.pop();
-  if (!u) return;
-  try { if (u.drafts) localStorage.setItem(u.dk, u.drafts); } catch (_) {}
-  noteUndo(null);
-  shuffle(SHEETS, () => { store.restore(u.r); renderLists(); });
-  announce(t("Undid {x}", { x: u.label }));
+// What had the cursor is gone, or in a sheet now closed: it goes to el, if there's one.
+const lostFocus = el => {
+  const now = document.activeElement;
+  if (el && (!now || now === document.body || now.closest("dialog:not([open]), [hidden]"))) el.focus({ preventScroll: true });
+};
+// Deleted alone, a list someone had joined meanwhile stays on the server for them (store.js).
+export function kept({ name, who }) {
+  const named = who.filter(Boolean);
+  say(t("{x} stays on the server: {who} had joined it.", { x: q(listTitle(name)), who: named.length ? and(named) : t("someone") }));
 }
 
 // A new list starts from a name, typed on the blank strip. The server makes it on the

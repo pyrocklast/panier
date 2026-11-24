@@ -15,9 +15,10 @@ import { startOps } from "./model.js";
 
 $("#lists-open").addEventListener("click", () => turn(false, showLists));
 // From the list's settings, asked over them; once it's gone, the lists page shows.
-$("#delete-open").addEventListener("click", () => lists.askDelete(state.lid));
-// Undo is the list's on a list, and on the lists page brings back a list deleted from this phone.
-const undo = () => (state.view === "lists" ? lists.undoRemove() : list.undo());
+$("#delete-here").addEventListener("click", () => lists.askDelete(state.lid));
+$("#delete-all").addEventListener("click", () => lists.askDelete(state.lid, true));
+// Undo is a list's: a deleted list can't be brought back.
+const undo = () => { if (state.view === "list") list.undo(); };
 const redo = () => { if (state.view === "list") list.redo(); };
 $("#undo").addEventListener("click", undo);
 $("#redo").addEventListener("click", redo);
@@ -36,7 +37,8 @@ document.addEventListener("visibilitychange", () => {
   else if (state.view === "list") list.repaint();
 });
 addEventListener("online", () => { if (state.view === "lists") store.refreshAll(); });
-store.subscribe(kind => {
+store.subscribe((kind, detail) => {
+  if (kind === "kept") return lists.kept(detail);
   if (kind === "lists") {
     if (state.view === "list" && !store.current()) showLists(); // taken off this phone in another tab
     else lists.renderLists();

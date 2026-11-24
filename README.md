@@ -12,7 +12,7 @@ Private lists, shared between phones: end-to-end encrypted, with no accounts. It
 - **No accounts.** Another phone joins a list by scanning a QR code from one that has it.
 - **Offline.** It works without signal and catches up when the connection returns.
 - **An app from the browser.** It installs from Firefox, Chrome or Safari, with no app store.
-- **Made for everyday lists.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, who ticked what and when, drag to reorder, and undo for everything.
+- **Made for everyday lists.** Coloured sections, quantities such as *500 g flour*, suggestions from what you ticked before, who ticked what and when, drag to reorder, and undo for everything on a list.
 - **Markdown in and out.** A list exports as a Markdown checklist, and any Markdown checklist, a few pasted lines, or checklists from Google Keep come in.
 - **In English and French**, light and dark.
 
@@ -57,7 +57,7 @@ Then, on the phones:
 - **Sections:** a new list is a plain sheet. *Add a section*, below the items, adds a heading when it helps; tap a heading to rename it or change its colour.
 - **Getting around:** the arrow at the top left goes back up, as does the back gesture; *Settings*, at the top right, holds the settings of what's on screen.
 - **The list's settings:** its name and paper's colour, how long ticked items stay in view, who's on it, and exporting or deleting it.
-- **Lists:** the lists page shows every list: tap one to open it, *New list* to start one, hold one to move it, or drop it at the foot to delete it, which asks first.
+- **Lists:** the lists page shows every list: tap one to open it, *New list* to start one, hold one to move it. A list is deleted in its settings, from your phone or for everyone, once asked.
 - **Import:** *Bring in from a file*, in Settings, brings in a Markdown or text list, or the checklists in a Google Keep export, chosen first; several lines pasted into *Add item* become several items.
 - **Undo and redo:** the buttons at the bottom right.
 - **Settings**, on the lists page: your name, light or dark, a compact layout, exporting and bringing in lists, and setting up another phone.
@@ -81,7 +81,7 @@ Then, on the phones:
 - **One key per list.** The phone that starts a list makes a random 256-bit key. Each phone derives from it the list's id, an access token and an AES-GCM encryption key. The list's link carries the key after `#`, a part of the address browsers never send to servers. A phone keeps an index of its lists' keys, and only the list on screen listens live.
 - **Changes.** Each change is encrypted on the phone, padded to 256 bytes so its size doesn't give away a name's length, and sent to the server. The server keeps them in order and pushes new ones to the other phones over a WebSocket.
 - **Merging.** Each field, such as an item's name, section, position or tick, keeps its latest write. Every phone can edit offline and they end up with the same list. Undo only reverses what nobody else has changed since.
-- **People.** Each phone writes itself onto each list it has, with the name given in Settings, inside the encrypted list. Removing someone means a new key: the list is copied under it and the old one closed on the server.
+- **People.** Each phone writes itself onto each list it has, with the name given in Settings, inside the encrypted list. Deleting a list from a phone writes that the phone left. Removing someone means a new key: the list is copied under it and the old one closed on the server.
 - **Two servers**, with the same API and the same tests:
   - **Cloudflare Workers**: a Durable Object with its own SQLite database per list, asleep between changes.
   - **Go**: one program using only the standard library, with a file per list, and the app built in.

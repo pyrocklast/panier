@@ -97,7 +97,7 @@ function onDragMove(e) {
 }
 function dragTick() {
   if (!state.drag) return;
-  const y = state.drag.y, H = state.drag.bottom || innerHeight;
+  const y = state.drag.y, H = innerHeight;
   let dy = 0;
   if (y < 64) dy = -Math.ceil((64 - y) / 6);
   else if (y > H - 64) dy = Math.ceil((y - (H - 64)) / 6);

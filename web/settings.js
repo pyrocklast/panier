@@ -11,6 +11,7 @@ import { state, nav, readOnly, listName, listColor, tickedDays } from "./state.j
 import { openPair, people } from "./share.js";
 import { palette } from "./edit.js";
 import * as list from "./list.js";
+import { keepers } from "./lists.js";
 
 const THEME_KEY = "panier-theme", LAYOUT_KEY = "panier-layout";
 // Asks the browser to keep the lists even when the phone runs low on space. Firefox
@@ -80,6 +81,8 @@ $("#export-list").addEventListener("click", () => {
 
 // What everyone on the list shares: its name and colour, how long its ticked items stay
 // in view, who's on it; then exporting or deleting it. A closed list's can only be read.
+// Deleting says what each way does: from this phone, when someone else keeps it, beside
+// for everyone; or, when nobody else has it, or it's closed, deleting it for good.
 export function paintListSettings() {
   const ro = readOnly(), rename = $("#list-rename");
   $("#list-settings-close").setAttribute("aria-label", listName());
@@ -97,7 +100,11 @@ export function paintListSettings() {
   $("#list-people").textContent = people();
   $("#pair-open").hidden = ro; // a closed list's link opens nothing
   $("#list-size").textContent = t("{x} on this phone.", { x: size(store.storedSize(state.lid)) });
-  $("#delete-what").textContent = store.status().closed ? t("From this phone") : t("From this phone, or for everyone");
+  const e = store.entryOf(state.lid), k = e && !e.closed && keepers(e);
+  $("#delete-here-name").textContent = k ? t("Delete from this phone") : t("Delete the list");
+  $("#delete-here-what").textContent = k ? t(k.n === 1 ? "{x} keeps it, and can share it with you again" : "{x} keep it, and can share it with you again", { x: k.who })
+    : e && e.closed ? t("What's left here goes for good") : t("Nobody else has it: it goes for good, from the server too");
+  $("#delete-all").hidden = !k;
 }
 page("list-settings", paintListSettings);
 // A name left empty goes back to what it was.

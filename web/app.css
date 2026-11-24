@@ -446,7 +446,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, ::backdrop { animation: none !important; }
   .item, .box, .words, .chev, .sheet:not(.page), .sheet:not(.page)::backdrop, .dock, .status { transition: none; }
-  :is(.item, .sec, .sheet-card).lifted, .sheet-card.ghost.leaving { transform: none; } /* lifted, nothing grows */
+  :is(.item, .sec, .sheet-card).lifted { transform: none; } /* lifted, nothing grows */
+  .btn.hold .fill { display: none; } /* held, its words count down instead (sheets.js) */
 }
 
 /* The lists page: a desk a shade deeper than paper, not paper itself, with each list
@@ -502,10 +503,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sheet-card.lifted { position: relative; z-index: 2; transform: scale(1.02); box-shadow: var(--float); transition: transform var(--quick) var(--ease-arrive), box-shadow var(--quick) var(--ease-arrive); }
 .sheet-card.ghost { background: none !important; box-shadow: var(--float); transition: opacity var(--quick) var(--ease-move), transform var(--quick) var(--ease-move); }
 .sheet-card.fading { background: none !important; }
-.sheet-card.ghost.leaving { opacity: 0.5; transform: scale(0.96); } /* over the zone that deletes it */
 .sheet-card.placeholder { background-color: var(--slot); }
 .sheet-card.placeholder > * { visibility: hidden; }
-.sheet-card.placeholder.away { background-color: transparent; }
 /* New list: a blank strip across the page, under the sheets, its edge dashed, written on
    like Add a section, with room for the name as it's typed */
 .sheets:empty { display: none; }
@@ -513,16 +512,6 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .new-list:focus-within { border-style: solid; border-color: var(--ink); }
 #new-list { font-weight: 700; }
 #new-list::placeholder { font-weight: 400; }
-/* While a sheet is dragged, dropping it here asks to delete the list */
-.remove-drop {
-  display: none; position: fixed; z-index: 21; left: max(16px, (100vw - var(--page)) / 2 + 16px); right: max(16px, (100vw - var(--page)) / 2 + 16px);
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px)); min-height: 64px; place-items: center; box-sizing: border-box;
-  border: 2px dashed var(--danger); border-radius: 12px; background: var(--bg); color: var(--danger); font-weight: 700;
-  transition: background-color var(--quick) var(--ease-move);
-}
-:root.dragging-sheet .remove-drop { display: grid; animation: appear var(--arrive) var(--ease-arrive); }
-.remove-drop.over { background: color-mix(in oklab, var(--danger) 14%, var(--bg)); } /* the sheet slips under it */
-
 /* A field, under the words saying what it's for: the setup code, a name */
 :is(.setup, .field) { display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: 0.875rem; }
 :is(.setup, .field) input {
@@ -563,7 +552,21 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .people p { margin: 0 0 4px; }
 .people .field { margin-bottom: 12px; }
 .more { display: flex; margin-left: -8px; }
-#confirm-more { display: block; margin: 8px auto -12px; color: var(--danger); } /* Delete for everyone, under Delete */
+/* What nothing can bring back is held, not tapped: the button is pale in the danger
+   colour, and fills with it from its start as it's held, the filled part's words in white
+   over the pale part's (sheets.js). A long press is a hold, not a selection or a menu. */
+.btn.hold {
+  position: relative; overflow: hidden; background: color-mix(in oklab, var(--danger) 12%, var(--surface)); color: var(--danger);
+  box-shadow: inset 0 0 0 2px var(--danger); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+#confirm .btn.hold { height: auto; min-height: 48px; padding-block: 6px; } /* as tall as its words: in French, three lines */
+.btn.hold .fill {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 6px 18px; background: var(--danger); color: light-dark(#ffffff, #1b201e);
+  clip-path: inset(0 100% 0 0); transition: clip-path var(--quick) var(--ease-move);
+}
+.btn.hold.holding .fill { clip-path: inset(0); transition: clip-path 2s linear; } /* as long as the hold (sheets.js) */
+#confirm-hint { margin: 12px 0 0; }
+#confirm-more { display: block; margin: 8px auto -12px; } /* Can't hold the button?, under it */
 /* Choosing what comes in from Google Keep: a note to a line, scrolling between the title
    and the buttons, which stay in view */
 .pick { list-style: none; margin: 0 -24px; padding: 4px 24px; max-height: min(26rem, 55dvh); overflow-y: auto; overscroll-behavior: contain; border-block: 1px solid var(--line); }

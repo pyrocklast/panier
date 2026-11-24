@@ -618,7 +618,10 @@ func TestCloseList(t *testing.T) {
 	if res := do(t, "DELETE", list, base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{8}, 32)), "", nil); res.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("close with a wrong token: got %d", res.StatusCode)
 	}
-	if res := do(t, "DELETE", list, testToken, "", nil); res.StatusCode != http.StatusNoContent {
+	if res := do(t, "DELETE", list+"?why=lost", testToken, "", nil); res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("close for a reason it doesn't know: got %d", res.StatusCode)
+	}
+	if res := do(t, "DELETE", list+"?why=moved", testToken, "", nil); res.StatusCode != http.StatusNoContent {
 		t.Fatalf("close: got %d", res.StatusCode)
 	}
 	if op, msg := serverFrame(t, conn, r); op != opText || msg != "closed" {
@@ -628,11 +631,15 @@ func TestCloseList(t *testing.T) {
 		t.Fatalf("then the connection closes: got opcode %d", op)
 	}
 	for _, m := range []string{"GET", "POST"} {
-		if res := do(t, m, list+"/changes", testToken, "", map[string][]string{"changes": {"REVG"}}); res.StatusCode != http.StatusGone {
+		res := do(t, m, list+"/changes", testToken, "", map[string][]string{"changes": {"REVG"}})
+		if res.StatusCode != http.StatusGone {
 			t.Fatalf("%s after closing: got %d", m, res.StatusCode)
 		}
+		if why := whyGone(t, res); why != "moved" {
+			t.Fatalf("%s after closing says why: got %q", m, why)
+		}
 	}
-	if res := do(t, "DELETE", list, testToken, "", nil); res.StatusCode != http.StatusNoContent {
+	if res := do(t, "DELETE", list+"?why=deleted", testToken, "", nil); res.StatusCode != http.StatusNoContent {
 		t.Fatalf("closing again: got %d", res.StatusCode)
 	}
 	if res := do(t, "POST", ts.URL+"/api/lists", testToken, "", map[string]string{"id": strings.Repeat("cd", 16), "auth": testToken, "by": testID}); res.StatusCode != http.StatusForbidden {
@@ -642,9 +649,37 @@ func TestCloseList(t *testing.T) {
 		t.Fatalf("the changes are deleted, got %q", b)
 	}
 
-	// Still closed after a restart.
+	// Still closed after a restart, and why: closing again changed nothing.
 	ts2 := newTestServer(t, dir)
-	if res := do(t, "GET", ts2.URL+"/api/lists/"+testID+"/changes", testToken, "", nil); res.StatusCode != http.StatusGone {
+	res := do(t, "GET", ts2.URL+"/api/lists/"+testID+"/changes", testToken, "", nil)
+	if res.StatusCode != http.StatusGone {
 		t.Fatalf("after a restart: got %d", res.StatusCode)
+	}
+	if why := whyGone(t, res); why != "moved" {
+		t.Fatalf("why, after a restart and closing again: got %q", why)
+	}
+}
+
+// whyGone reads why a closed list closed, from its answer.
+func whyGone(t *testing.T, res *http.Response) string {
+	t.Helper()
+	var body struct{ Why string }
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("a closed list's answer: %v", err)
+	}
+	return body.Why
+}
+
+// An app from before phones said why closes a list without a reason; it's told none.
+func TestCloseListWithoutWhy(t *testing.T) {
+	ts := newTestServer(t, t.TempDir())
+	create(t, ts)
+	list := ts.URL + "/api/lists/" + testID
+	if res := do(t, "DELETE", list, testToken, "", nil); res.StatusCode != http.StatusNoContent {
+		t.Fatalf("close: got %d", res.StatusCode)
+	}
+	res := do(t, "GET", list+"/changes", testToken, "", nil)
+	if why := whyGone(t, res); res.StatusCode != http.StatusGone || why != "" {
+		t.Fatalf("after closing without why: got %d %q", res.StatusCode, why)
 	}
 }

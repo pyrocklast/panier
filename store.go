@@ -19,7 +19,7 @@ import (
 //
 //	auth  SHA-256 of the list's access token, in hex
 //	log   one encrypted change per line, in arrival order; the line number is its sequence number
-//	info  the list's family and, once closed, that it is: see listInfo
+//	info  the list's family and, once closed, that it is and why: see listInfo
 //
 // Lists are loaded on first use and kept in memory; a shopping list's log stays small,
 // and maxLogBytes caps it in case a paired phone misbehaves.
@@ -38,11 +38,14 @@ var (
 
 // listInfo is a list's place in its family: Root is the list created with the setup code
 // that it descends from, or its own id, and Made, on that list, counts the lists made
-// from it. A closed list keeps its info, and refuses everything else.
+// from it. A closed list keeps its info, and refuses everything else. Why it closed is
+// what the phone that closed it said: "deleted", "moved" to a new key, or nothing, for
+// a list closed before phones said.
 type listInfo struct {
 	Root   string `json:"root"`
 	Made   int    `json:"made,omitempty"`
 	Closed bool   `json:"closed,omitempty"`
+	Why    string `json:"why,omitempty"`
 }
 
 type store struct {
@@ -214,21 +217,23 @@ func (l *list) allows(token []byte) bool {
 	return subtle.ConstantTimeCompare(sum[:], l.auth[:]) == 1
 }
 
-func (l *list) closed() bool {
+// closed says whether the list is closed, and why.
+func (l *list) closed() (bool, string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return l.info.Closed
+	return l.info.Closed, l.info.Why
 }
 
-// close deletes the list's changes and marks it closed; phones listening are told.
-func (l *list) close() error {
+// close deletes the list's changes and marks it closed, keeping why; phones listening
+// are told. Closing it again changes nothing, not even why.
+func (l *list) close(why string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.info.Closed {
 		return nil
 	}
 	info := l.info
-	info.Closed = true
+	info.Closed, info.Why = true, why
 	if err := writeInfo(l.dir, info); err != nil {
 		return err
 	}

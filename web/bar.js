@@ -7,10 +7,9 @@ import { state, readOnly } from "./state.js";
 import { $, announce } from "./dom.js";
 import { resize } from "./motion.js";
 
-// Undo floats at the bottom right; redo joins it once something has been undone. On the
-// lists page, it brings back a list taken off this phone.
+// Undo floats at the bottom right of a list; redo joins it once something has been
+// undone. A deleted list can't be brought back, so the lists page has neither.
 let undoNote = null, noteTimer = 0;
-const top = a => (a.length ? a[a.length - 1].label : null);
 export function noteUndo(name) {
   clearTimeout(noteTimer);
   undoNote = name || null;
@@ -18,7 +17,7 @@ export function noteUndo(name) {
 }
 export function paintDock() {
   const onList = state.view === "list";
-  const u = onList ? store.undoLabel() : top(state.removed), r = onList ? store.redoLabel() : null;
+  const u = onList ? store.undoLabel() : null, r = onList ? store.redoLabel() : null;
   $("#dock").hidden = (!u && !r) || readOnly(); // undo would make a change, which a read-only list can't take
   setHist($("#undo"), u, "Undo");
   setHist($("#redo"), r, "Redo");
@@ -39,7 +38,7 @@ function setHist(btn, label, verb) {
 let statusTimer = 0, statusShown = "";
 function statusInfo() {
   const { online, full, closed, waiting } = store.status();
-  if (closed) return { text: t("List closed"), detail: t("Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone until you delete it.") };
+  if (closed) return closedInfo(store.status().why);
   if (store.newerFormat()) return { text: t("Update Panier"), detail: t("This list was changed with a newer Panier, which updates itself: close the app and open it again. Nothing is sent from here meanwhile.") };
   if (store.storageFull()) return noRoom(online && !full);
   if (online && !full) return null;
@@ -50,6 +49,12 @@ function statusInfo() {
   if (!navigator.onLine) return { text: t("Offline"), detail: t("No connection. {kept}, to be sent when you're back online.", { kept }) };
   return { text: t("Can't reach the server"), detail: t("The server isn't answering. {kept}, to be sent as soon as it answers.", { kept }) };
 }
+// Someone closed the list on the server, and why: deleted for everyone, or moved to a new
+// key; a list closed by an app from before phones said could be either.
+const closedInfo = why => (why === "deleted"
+  ? { text: t("List deleted"), detail: t("Someone deleted this list for everyone. What's here stays on this phone, to read or export, until you delete it.") }
+  : why === "moved" ? { text: t("New key"), detail: t("This list moved to a new key. Ask whoever shared it for the new link. What's here stays on this phone until you delete it.") }
+  : { text: t("Deleted or moved"), detail: t("Someone deleted this list for everyone, or moved it to a new key: if so, ask them for the new link. What's here stays on this phone until you delete it.") });
 // The phone's storage is full: changes are kept in memory only, and reach the server if sent.
 const noRoom = sent => ({ text: t("Phone storage full"), detail: sent
   ? t("This phone has no room left to save your lists. Changes still reach the server. Settings shows what takes the room; deleting a list frees it.")

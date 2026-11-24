@@ -9,7 +9,7 @@
 // which proves it with that list's token: the new list joins the first one's family,
 // which can hold MAX_FAMILY lists in all, so a leaked link can't fill the server. A
 // list can be closed by anyone who holds it: its changes are deleted, and it refuses
-// everything after.
+// everything after, saying why it closed.
 //
 // Live updates use WebSockets with Cloudflare's hibernation API: between changes the
 // object sleeps and connected phones cost nothing.
@@ -187,12 +187,15 @@ export class ListV2 extends DurableObject {
     return true;
   }
 
-  // close deletes the changes and refuses everything from now on; phones listening are told.
-  close() {
+  // close deletes the changes and refuses everything from now on, keeping why: "deleted",
+  // or "moved" to a new key, or nothing, from an app from before phones said. The server
+  // can tell a move already, from the list vouched for just before, so it learns nothing
+  // new. Phones listening are told.
+  close(why) {
     this.ctx.storage.transactionSync(() => {
       this.sql.exec("DELETE FROM changes");
       this.sql.exec("UPDATE meta SET v = 0 WHERE k = 'size'");
-      this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('closed', 1)");
+      this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES ('closed', 1), ('why', ?)", why);
     });
     for (const ws of this.ctx.getWebSockets()) {
       try {
@@ -216,8 +219,12 @@ export class ListV2 extends DurableObject {
     const sum = await sha256(fromB64url(token));
     if (!crypto.subtle.timingSafeEqual(sum, fromHex(meta.auth))) return text(401, "wrong token");
 
-    if (req.method === "DELETE") return meta.closed ? new Response(null, { status: 204, headers: HEADERS }) : this.close();
-    if (meta.closed) return text(410, "this list was closed");
+    if (req.method === "DELETE") {
+      const why = new URL(req.url).searchParams.get("why") || "";
+      if (!["", "deleted", "moved"].includes(why)) return text(400, 'why must be "deleted" or "moved"');
+      return meta.closed ? new Response(null, { status: 204, headers: HEADERS }) : this.close(why); // closing again changes nothing
+    }
+    if (meta.closed) return json(410, { why: meta.why || "" });
     if (live) return this.live(req);
     if (req.method === "GET") return this.getChanges(req);
     if (req.method === "POST") return this.postChanges(req, meta);

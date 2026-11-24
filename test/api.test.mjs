@@ -32,7 +32,7 @@ const post = (l, changes, token = l.token) =>
   fetch(l.url + "/changes", { method: "POST", headers: { ...auth(token), "Content-Type": "application/json" }, body: JSON.stringify({ changes }) });
 const get = async (l, since) => {
   const res = await fetch(l.url + "/changes" + (since === undefined ? "" : "?since=" + since), { headers: auth(l.token) });
-  return { status: res.status, body: res.ok ? await res.json() : null };
+  return { status: res.status, body: res.ok || res.status === 410 ? await res.json() : null }; // a closed list says why
 };
 
 test("the app is served with a strict content security policy", async () => {
@@ -182,13 +182,15 @@ test("a closed list loses its changes and refuses everything", async () => {
   const live = openLive(l, ["panier", l.token]);
   await live.opened;
   assert.equal(await live.next(), "2");
-  const close = token => fetch(l.url, { method: "DELETE", headers: auth(token) });
+  const close = (token, why = "moved") => fetch(l.url + "?why=" + why, { method: "DELETE", headers: auth(token) });
   assert.equal((await close(b64u(randomBytes(32)))).status, 401, "only with its token");
+  assert.equal((await close(l.token, "lost")).status, 400, "only for a reason it knows");
   assert.equal((await close(l.token)).status, 204);
   assert.equal(await live.next(), "closed", "phones listening are told");
-  assert.equal((await get(l)).status, 410);
+  assert.deepEqual(await get(l), { status: 410, body: { why: "moved" } }, "and says why it closed");
   assert.equal((await post(l, ["R0hJ"])).status, 410);
-  assert.equal((await close(l.token)).status, 204, "closing again changes nothing");
+  assert.equal((await close(l.token, "deleted")).status, 204, "closing again changes nothing");
+  assert.deepEqual((await get(l)).body, { why: "moved" }, "not even why");
   await assert.rejects(openLive(l, ["panier", l.token]).opened, "no more live updates");
   const res = await fetch(BASE + "/api/lists", {
     method: "POST", headers: { ...auth(l.token), "Content-Type": "application/json" },
@@ -197,6 +199,12 @@ test("a closed list loses its changes and refuses everything", async () => {
   assert.equal(res.status, 403, "a closed list can't vouch");
   const create = await fetch(BASE + "/api/lists", { method: "POST", headers: { "X-Setup-Code": SETUP }, body: JSON.stringify({ id: l.id, auth: b64u(randomBytes(32)) }) });
   assert.equal(create.status, 409, "and its id stays taken");
+});
+
+test("a list closed by an app from before says no reason", async () => {
+  const l = await newList();
+  assert.equal((await fetch(l.url, { method: "DELETE", headers: auth(l.token) })).status, 204);
+  assert.deepEqual(await get(l), { status: 410, body: { why: "" } });
 });
 
 test("a full list refuses more changes", { skip: !process.env.FULL }, async () => {

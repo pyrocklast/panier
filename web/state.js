@@ -12,7 +12,6 @@ export const state = {
   lifted: false, // held long enough to drag
   suppressClick: false, // the click that ends a hold or a drag does nothing
   pointerDown: false,
-  removed: [], // lists deleted from this phone since the app opened, for undo
 };
 // app.js fills these in: showList(lid), showLists(), and turn(into, update, at), which
 // turns the page quietly between the lists page, a list and their settings as update

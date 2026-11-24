@@ -12,7 +12,8 @@
 // looked like last time (its name, colour and what's left to tick), so the lists page
 // draws without opening them; and one storage entry per list. Only the list on screen
 // listens live. The others catch up when the lists page shows, and send what they have
-// waiting whenever the connection returns.
+// waiting whenever the connection returns. The index also keeps, out of sight, what
+// lists deleted from this phone still have to tell the server (see depart).
 
 const INDEX = "panier2"; // this phone's id and name, and its lists
 const ENTRY = "panier2:"; // one list, by its id on this phone
@@ -29,10 +30,12 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export const newId = () => b64u(crypto.getRandomValues(new Uint8Array(9)));
 const KEY = /^[A-Za-z0-9_-]{43}$/; // a list key: 32 bytes, in base64url
 
-/* Listeners: kind is "local", "remote" or "status" for the list on screen, "lists" for the index */
+/* Listeners: kind is "local", "remote" or "status" for the list on screen, "lists" for
+   the index, "kept" for a list deleted alone that someone had joined meanwhile, with
+   { name, who }: the list's name and theirs */
 const listeners = new Set();
 export const subscribe = fn => { listeners.add(fn); };
-const emit = kind => listeners.forEach(fn => fn(kind));
+const emit = (kind, detail) => listeners.forEach(fn => fn(kind, detail));
 
 // Writes to the phone's storage. When it has no room, what couldn't be written stays only
 // in memory, and the status says so (bar.js) rather than claim it's saved; each later
@@ -50,9 +53,9 @@ export const storageFull = () => unkept.size > 0;
 function loadIndex() {
   try {
     const ix = JSON.parse(localStorage.getItem(INDEX));
-    if (ix && ix.dev && Array.isArray(ix.lists)) return ix;
+    if (ix && ix.dev && Array.isArray(ix.lists)) return { ...ix, leaving: Array.isArray(ix.leaving) ? ix.leaving : [] };
   } catch (_) {}
-  return { dev: newId(), name: "", open: null, lists: [] };
+  return { dev: newId(), name: "", open: null, lists: [], leaving: [] };
 }
 let index = loadIndex();
 let indexTimer = 0;
@@ -63,8 +66,8 @@ function saveIndexNow() {
 }
 const saveIndex = () => { if (!indexTimer) indexTimer = setTimeout(saveIndexNow, 400); };
 
-// The lists, in order: { lid, key, name, color, toGet, first, with, closed, newer, folded,
-// foldedSections }, as last seen; and one of them, by its id.
+// The lists, in order: { lid, key, name, color, toGet, first, with, closed, why, newer,
+// folded, foldedSections }, as last seen; and one of them, by its id.
 export const lists = () => index.lists;
 export const entryOf = lid => index.lists.find(e => e.lid === lid);
 export const openId = () => index.open;
@@ -91,6 +94,31 @@ const fits = op => Array.isArray(op) && typeof op[0] === "string" && typeof op[1
 // holding more than CHUNK bytes, such as an import, is sent as several, each well
 // under the server's 16 KiB once encrypted and in base64; it is still one step to undo.
 const PAD = 256, CHUNK = 6000, BATCH = 192 * 1024;
+
+// A change is sealed with a list's session, { id, key }: padded, then encrypted, bound to
+// the list's id; and opened the same way.
+async function seal(session, obj) {
+  const plain = text.encode(JSON.stringify(obj));
+  const padded = new Uint8Array(Math.ceil((plain.length + 1) / PAD) * PAD).fill(0x20);
+  padded.set(plain);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const params = { name: "AES-GCM", iv, additionalData: text.encode(session.id) };
+  const ct = new Uint8Array(await crypto.subtle.encrypt(params, session.key, padded));
+  const out = new Uint8Array(iv.length + ct.length);
+  out.set(iv);
+  out.set(ct, iv.length);
+  return b64(out);
+}
+async function unseal(session, data) {
+  const bytes = fromB64(data);
+  const params = { name: "AES-GCM", iv: bytes.subarray(0, 12), additionalData: text.encode(session.id) };
+  return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt(params, session.key, bytes.subarray(12))));
+}
+
+// Why a closed list closed, from the server's answer.
+async function whyGone(res) {
+  try { const { why } = await res.json(); return why === "deleted" || why === "moved" ? why : ""; } catch (_) { return ""; }
+}
 
 async function derive(raw) {
   const base = await crypto.subtle.importKey("raw", raw, "HKDF", false, ["deriveBits", "deriveKey"]);
@@ -253,7 +281,7 @@ class List {
       name: this.valueOf("@list", "name") || null, color: this.valueOf("@list", "color") || "",
       toGet: toGet.length, first: toGet.slice(0, 3).map(i => i.text),
       with: { names: others.filter(m => m.name).map(m => m.name), nameless: others.filter(m => !m.name).length },
-      closed: !!this.s.closed, newer: this.newerFormat(),
+      closed: !!this.s.closed, why: this.s.why || "", newer: this.newerFormat(),
     };
     if (Object.keys(next).every(k => same(next[k], e[k]))) return;
     Object.assign(e, next);
@@ -346,28 +374,11 @@ class List {
   ready() {
     return (this.deriving ||= derive(fromB64u(this.s.key)).then(d => (this.session = d)));
   }
-  async seal(obj) {
-    const plain = text.encode(JSON.stringify(obj));
-    const padded = new Uint8Array(Math.ceil((plain.length + 1) / PAD) * PAD).fill(0x20);
-    padded.set(plain);
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const params = { name: "AES-GCM", iv, additionalData: text.encode(this.session.id) };
-    const ct = new Uint8Array(await crypto.subtle.encrypt(params, this.session.key, padded));
-    const out = new Uint8Array(iv.length + ct.length);
-    out.set(iv);
-    out.set(ct, iv.length);
-    return b64(out);
-  }
-  async open(data) {
-    const bytes = fromB64(data);
-    const params = { name: "AES-GCM", iv: bytes.subarray(0, 12), additionalData: text.encode(this.session.id) };
-    return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt(params, this.session.key, bytes.subarray(12))));
-  }
 
   /* Sync */
 
   status() {
-    return { online: this.state === "online", full: this.state === "full", closed: this.state === "closed", waiting: this.s.outbox.length };
+    return { online: this.state === "online", full: this.state === "full", closed: this.state === "closed", why: this.s.why || "", waiting: this.s.outbox.length };
   }
   setState(next) {
     if (this.state === next || this.state === "closed") return;
@@ -379,15 +390,17 @@ class List {
       ...opts,
       headers: { ...opts.headers, Authorization: "Bearer " + this.session.auth },
     });
-    if (res.status === 410) { this.closed(); throw new Error("closed"); }
+    if (res.status === 410) { this.closed(await whyGone(res)); throw new Error("closed"); }
     if (!res.ok) throw new Error(res.status === 507 ? "full" : "HTTP " + res.status);
     return res;
   }
   // Someone closed this list on the server: it keeps what this phone has, sends nothing
-  // more, and says so.
-  closed() {
+  // more, and says so, and why: "deleted", "moved" to a new key, or "" when the server
+  // wasn't told.
+  closed(why) {
     if (this.s.closed || this.gone) return;
     this.s.closed = true;
+    this.s.why = why;
     this.state = "closed";
     this.saveNow();
     this.stopLive();
@@ -412,7 +425,7 @@ class List {
       const changes = [];
       let bytes = 0;
       for (const c of st.outbox.slice(0, 100)) {
-        const sealed = await this.seal(c);
+        const sealed = await seal(session, c);
         if (changes.length && bytes + sealed.length > BATCH) break;
         changes.push(sealed);
         bytes += sealed.length + 3;
@@ -453,7 +466,7 @@ class List {
           if (!this.still(st, session)) return;
           for (const c of changes) {
             let ch = null;
-            try { ch = await this.open(c.data); } catch (_) { /* unreadable change: written with another key, skip it */ }
+            try { ch = await unseal(session, c.data); } catch (_) { /* unreadable change: written with another key, skip it */ }
             if (!this.still(st, session)) return;
             if (ch && typeof ch.d === "string" && Array.isArray(ch.o)) for (const op of ch.o) {
               if (!fits(op)) continue;
@@ -671,6 +684,9 @@ export function addKeys(keys) {
   for (const key of keys) {
     const had = index.lists.find(e => e.key === key);
     if (had) { out.push(had.lid); continue; }
+    // Deleted here and not yet closed on the server: it isn't closed after all. A phone
+    // only leaving can carry on, as it comes back on the list after.
+    index.leaving = index.leaving.filter(d => d.key !== key || !d.close);
     const l = add(key);
     l.hello();
     l.refresh();
@@ -722,33 +738,21 @@ export async function createList({ code = null, ops = [] } = {}) {
   return l.lid;
 }
 
-// remove takes a list off this phone; it stays on the server for the others. Returns
-// what restore needs to put it back as it was, for undo.
-export function remove(lid) {
+// drop takes a list off this phone, with nothing more said to the server.
+function drop(lid) {
   const at = index.lists.findIndex(e => e.lid === lid);
-  if (at < 0) return null;
+  if (at < 0) return;
   const l = get(lid);
-  l.saveNow();
   l.stopLive();
   l.gone = true;
-  let raw = null;
-  try { raw = localStorage.getItem(ENTRY + lid); localStorage.removeItem(ENTRY + lid); } catch (_) {}
+  try { localStorage.removeItem(ENTRY + lid); } catch (_) {}
   unkept.delete(ENTRY + lid);
-  const [entry] = index.lists.splice(at, 1);
+  index.lists.splice(at, 1);
   if (index.open === lid) index.open = null;
   if (cur === l) cur = null;
   loaded.delete(lid);
   saveIndexNow();
   for (const o of loaded.values()) if (unkept.has(ENTRY + o.lid)) o.saveNow(); // the room it took
-  emit("lists");
-  return { entry, at, raw };
-}
-export function restore(r) {
-  if (!r || entryOf(r.entry.lid)) return;
-  index.lists.splice(Math.min(r.at, index.lists.length), 0, r.entry);
-  if (r.raw) keep(ENTRY + r.entry.lid, r.raw);
-  saveIndexNow();
-  get(r.entry.lid).refresh();
   emit("lists");
 }
 export function reorder(lids) {
@@ -796,7 +800,7 @@ export async function changeKey() {
   if (copy.s.outbox.length) throw new Error("server"); // not all sent: the old list stays as it was
   old.stopLive();
   try {
-    await closeOnServer(old);
+    await closeOnServer(old, "moved");
   } catch (err) {
     old.startLive();
     throw err;
@@ -812,19 +816,120 @@ export async function changeKey() {
   copy.startLive();
   emit("remote");
 }
-async function closeOnServer(l) {
+// closeOnServer closes a list for everyone who has it, saying why: "deleted", or "moved"
+// to a new key; their phones say so.
+async function closeOnServer(l, why) {
   await l.ready();
   try {
-    await l.api("", { method: "DELETE" });
+    await l.api("?why=" + why, { method: "DELETE" });
   } catch (err) {
     if (err.message !== "closed") throw new Error("server");
   }
 }
-// deleteForEveryone closes the list on the server, for everyone who has it, and takes
-// it off this phone. It can't be undone.
+
+/* ---------- Deleting a list ---------- */
+
+// Nothing brings a deleted list back, so each way is asked first (lists.js).
+
+// deleteForEveryone closes the list on the server, for everyone who has it, and takes it
+// off this phone. It needs the server, so the person sees it done: unreachable, nothing
+// changes, and it throws.
 export async function deleteForEveryone(lid) {
-  await closeOnServer(get(lid));
-  remove(lid);
+  await closeOnServer(get(lid), "deleted");
+  drop(lid);
+}
+// deleteHere takes a list off this phone at once. A closed list has nothing more to say.
+// Otherwise, if anyone else is on it, they keep it: this phone sends what it hadn't yet,
+// then that it has left, so their phones stop counting it. If nobody else is, and alone
+// says the question said so, it's closed on the server too, so its link opens nothing.
+// What has to reach the server waits for it, out of sight (depart).
+export function deleteHere(lid, alone) {
+  const l = get(lid);
+  if (!entryOf(lid)) return;
+  if (!l.s.closed && l.s.key) {
+    l.change(null, [[MEMBER + index.dev, "on", false]]);
+    const close = !!alone && !l.members().some(m => !m.me);
+    index.leaving.push({ key: l.s.key, seq: l.s.seq, outbox: [...l.s.outbox], close, name: l.valueOf("@list", "name") || "" });
+  }
+  drop(lid);
+  depart();
+}
+
+// Lists deleted from this phone, on their way out: index.leaving, [{ key, seq, outbox,
+// close, name }]. Each keeps only its key, the last change this phone heard of, what it
+// has to send, and its name, to say it was kept. They go when the app starts, comes back
+// on screen or online, and as a list is deleted; a server that can't be reached is tried
+// again then, even after Panier closes.
+let departing = null;
+export function depart() {
+  if (!departing && index.leaving.length) {
+    departing = (async () => {
+      for (const d of index.leaving.slice()) {
+        let done = false;
+        try { done = await goes(d); } catch (_) { /* unreachable: next time */ }
+        if (done) { index.leaving = index.leaving.filter(x => x.key !== d.key); saveIndexNow(); }
+      }
+    })().finally(() => { departing = null; });
+  }
+  return departing;
+}
+// goes tells the server what one list deleted here still has to: that it's closed, if
+// nobody else had it and nobody has joined since; otherwise what this phone hadn't sent,
+// then that it left. True once nothing is left to tell.
+async function goes(d) {
+  const session = await derive(fromB64u(d.key));
+  const call = (path, opts = {}) => fetch("/api/lists/" + session.id + path, { ...opts, headers: { ...opts.headers, Authorization: "Bearer " + session.auth } });
+  if (d.close) {
+    const who = await joined(d, session, call);
+    if (!who) return true; // closed meanwhile
+    if (!who.length) {
+      const res = await call("?why=deleted", { method: "DELETE" });
+      if (!res.ok) throw new Error("server");
+      return true;
+    }
+    d.close = false; // they keep it, and this phone only leaves
+    saveIndexNow();
+    emit("kept", { name: d.name, who });
+  }
+  while (d.outbox.length) {
+    const changes = [];
+    let bytes = 0;
+    for (const c of d.outbox.slice(0, 100)) {
+      const sealed = await seal(session, c);
+      if (changes.length && bytes + sealed.length > BATCH) break;
+      changes.push(sealed);
+      bytes += sealed.length + 3;
+    }
+    const res = await call("/changes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes }) });
+    if (res.status === 410 || res.status === 507) return true; // closed, or full: it can take nothing
+    if (!res.ok) throw new Error("server");
+    d.outbox.splice(0, changes.length);
+    saveIndexNow();
+  }
+  return true;
+}
+// joined returns the names of the phones that came onto a list since this phone last
+// heard from it, "" for one without a name; or null if it's closed.
+async function joined(d, session, call) {
+  const me = MEMBER + index.dev, on = new Map();
+  let seq = d.seq;
+  for (;;) {
+    const res = await call("/changes?since=" + seq);
+    if (res.status === 410) return null;
+    if (!res.ok) throw new Error("server");
+    const { changes, latest } = await res.json();
+    for (const c of changes) {
+      let ch = null;
+      try { ch = await unseal(session, c.data); } catch (_) {}
+      if (ch && Array.isArray(ch.o)) for (const op of ch.o) {
+        if (!fits(op) || !op[0].startsWith(MEMBER) || op[0] === me) continue;
+        if (op[1] === "on") { if (op[2]) on.set(op[0], on.get(op[0]) || ""); else on.delete(op[0]); }
+        else if (op[1] === "name" && on.has(op[0])) on.set(op[0], op[2]);
+      }
+      seq = c.seq;
+    }
+    if (!changes.length || seq >= latest) return [...on.values()];
+  }
 }
 
 /* ---------- Coming and going ---------- */
@@ -837,12 +942,14 @@ const saveAll = () => {
 };
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) saveAll();
+  else depart();
   if (!cur) return;
   if (!document.hidden) cur.resume();
   else if (cur.socket) { cur.reconnectNow = true; cur.socket.close(); }
 });
 addEventListener("pagehide", saveAll);
 addEventListener("online", () => {
+  depart();
   if (cur) cur.resume();
   for (const l of loaded.values()) if (l !== cur || !l.live) l.flush();
 });
@@ -852,6 +959,16 @@ addEventListener("storage", e => {
     clearTimeout(indexTimer);
     indexTimer = 0;
     index = loadIndex();
+    // A list no longer in the index was deleted there: here too, even one this tab had
+    // just read again from what it last knew, and anything it wrote of it meanwhile.
+    for (const l of loaded.values()) {
+      if (entryOf(l.lid)) continue;
+      l.stopLive();
+      l.gone = true;
+      loaded.delete(l.lid);
+      if (l === cur) cur = null;
+      try { localStorage.removeItem(ENTRY + l.lid); } catch (_) {}
+    }
     emit("lists");
     return;
   }
@@ -872,3 +989,4 @@ addEventListener("storage", e => {
   l.reset();
   if (l === cur) emit("remote");
 });
+depart(); // what lists deleted before still have to tell the server

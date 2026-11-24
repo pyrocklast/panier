@@ -67,6 +67,11 @@ func fail(w http.ResponseWriter, code int, msg string) {
 	http.Error(w, msg, code)
 }
 
+// gone answers for a closed list, with why it closed, so phones can say so.
+func gone(w http.ResponseWriter, why string) {
+	writeJSON(w, http.StatusGone, map[string]string{"why": why})
+}
+
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
@@ -161,8 +166,8 @@ func (sv *server) withList(h func(http.ResponseWriter, *http.Request, *list), li
 			fail(w, http.StatusUnauthorized, "wrong token")
 			return
 		}
-		if r.Method != http.MethodDelete && l.closed() {
-			fail(w, http.StatusGone, "this list was closed")
+		if closed, why := l.closed(); closed && r.Method != http.MethodDelete {
+			gone(w, why)
 			return
 		}
 		h(w, r, l)
@@ -170,9 +175,17 @@ func (sv *server) withList(h func(http.ResponseWriter, *http.Request, *list), li
 }
 
 // closeList deletes a list's changes for good; it then refuses everything. Anyone who
-// holds the list can close it, as anyone who holds it can empty it.
+// holds the list can close it, as anyone who holds it can empty it. "why" says what
+// the others' phones are told: "deleted", or "moved" to a new key; an app from before
+// says nothing. The server can tell a move already, from the list vouched for just
+// before, so it learns nothing new.
 func (sv *server) closeList(w http.ResponseWriter, r *http.Request, l *list) {
-	if err := l.close(); err != nil {
+	why := r.URL.Query().Get("why")
+	if why != "" && why != "deleted" && why != "moved" {
+		fail(w, http.StatusBadRequest, `why must be "deleted" or "moved"`)
+		return
+	}
+	if err := l.close(why); err != nil {
 		log.Printf("close list: %v", err)
 		fail(w, http.StatusInternalServerError, "could not close the list")
 		return
@@ -218,7 +231,8 @@ func (sv *server) postChanges(w http.ResponseWriter, r *http.Request, l *list) {
 		fail(w, http.StatusInsufficientStorage, "this list is full")
 		return
 	case errors.Is(err, errClosed):
-		fail(w, http.StatusGone, "this list was closed")
+		_, why := l.closed()
+		gone(w, why)
 		return
 	case errors.Is(err, errBroken):
 		fail(w, http.StatusServiceUnavailable, "the server needs a restart")

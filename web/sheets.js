@@ -3,7 +3,7 @@
 
 import { t } from "./i18n.js";
 import { state, nav } from "./state.js";
-import { $ } from "./dom.js";
+import { $, buzz, reduceMotion } from "./dom.js";
 
 // A list opened from the lists page is a step in the browser's history, and so is each
 // sheet on top (sharing, either page of settings, and what those open over themselves),
@@ -71,16 +71,18 @@ function showHistory() {
   follow();
 }
 
-// Deleting a list and changing its key ask first. more is a second, quieter answer, as
-// Delete for everyone is to Delete; a sheet already open asks its next question in place.
-export function confirmSheet({ title, text, ok, run, more = null }) {
+// Deleting a list and changing its key ask first; a sheet already open asks its next
+// question in place. What nothing can bring back is held, not tapped: hold is then the
+// button's words, and ok those of the plain button that Can't hold the button?, under it,
+// asks with instead, a second time, for a screen reader, voice control, a switch, or
+// hands that can't hold.
+export function confirmSheet({ title, text, ok, run, hold = null }) {
   const dlg = $("#confirm"), btn = $("#confirm-ok"), alt = $("#confirm-more");
   $("#confirm-title").textContent = title;
   $("#confirm-text").textContent = text;
   $("#confirm-error").hidden = true;
-  btn.textContent = ok;
-  btn.disabled = false;
-  btn.onclick = async () => {
+  $("#confirm-hint").hidden = true;
+  const go = async () => {
     btn.disabled = true;
     try {
       await run();
@@ -90,10 +92,69 @@ export function confirmSheet({ title, text, ok, run, more = null }) {
       btn.disabled = false;
     }
   };
-  alt.hidden = !more;
-  alt.textContent = more ? more.label : "";
-  alt.onclick = more && more.run;
+  holding(btn, hold ? { label: hold, done: go } : null);
+  if (!hold) btn.textContent = ok;
+  btn.disabled = false;
+  btn.onclick = hold ? () => { if (phase === "done") phase = ""; else if (!phase) hint(); } : go; // tapped, or a screen reader's click: hold it
+  alt.hidden = !hold;
+  alt.onclick = hold && (() => confirmSheet({ title, text: t("Asked twice instead of holding the button: nothing can bring it back."), ok, run }));
   if (dlg.open) dlg.focus();
   else openSheet(dlg);
 }
 $("#confirm-cancel").addEventListener("click", () => $("#confirm").close());
+const hint = () => { $("#confirm-hint").hidden = false; };
+
+// A held button fills with its colour from its start in HOLD_MS, then does what it says;
+// let go before, it empties and nothing happens, and a line under it says to keep holding.
+// Held by Space or Enter too. With reduced motion, its words count down instead of the fill.
+const HOLD_MS = 2000;
+let phase = "", holdTimer = 0, tickTimer = 0, holdOf = null; // phase: "", "holding", or "done" until the click that ends it
+function holding(btn, h) {
+  holdOf = h;
+  phase = "";
+  btn.classList.toggle("hold", !!h);
+  if (!h) return;
+  const fill = document.createElement("span");
+  fill.className = "fill";
+  fill.setAttribute("aria-hidden", "true");
+  fill.textContent = h.label;
+  btn.replaceChildren(h.label, fill);
+}
+function press(e) {
+  const btn = e.currentTarget;
+  if (!holdOf || btn.disabled || phase === "holding" || (e.type === "pointerdown" && e.button !== 0)) return;
+  if (e.type === "keydown") { if ((e.key !== " " && e.key !== "Enter") || e.repeat) return; e.preventDefault(); }
+  phase = "holding";
+  btn.classList.add("holding");
+  if (reduceMotion.matches) { // nothing moves: the words count down
+    let left = HOLD_MS / 1000;
+    const count = () => { btn.firstChild.textContent = t("Keep holding: {n}", { n: left-- }); };
+    count();
+    tickTimer = setInterval(count, 1000);
+  }
+  holdTimer = setTimeout(() => {
+    stop(btn);
+    phase = "done";
+    buzz(20);
+    holdOf.done();
+  }, HOLD_MS);
+}
+function stop(btn) {
+  clearTimeout(holdTimer);
+  clearInterval(tickTimer);
+  btn.classList.remove("holding");
+  btn.firstChild.textContent = holdOf.label;
+}
+function letGo(e) {
+  if (e.type === "keyup") { if (e.key !== " " && e.key !== "Enter") return; e.preventDefault(); }
+  if (phase !== "holding") return;
+  stop(e.currentTarget);
+  phase = "";
+  hint();
+}
+const ok = $("#confirm-ok");
+ok.addEventListener("pointerdown", press);
+ok.addEventListener("keydown", press);
+for (const type of ["pointerup", "pointercancel", "pointerleave", "keyup", "blur"]) ok.addEventListener(type, letGo);
+ok.addEventListener("contextmenu", e => { if (holdOf) e.preventDefault(); }); // a long press is a hold, not a menu
+

@@ -547,7 +547,8 @@ test("the list has a name, at the top, between the way back and its settings, wh
   await listSettings(a);
   assert.equal(await a.getAttribute("#list-settings-close", "aria-label"), "Courses", "back to the list, by its name");
   assert.match(await a.locator("#list-size").innerText(), /^\d+ (bytes|KB) on this phone\.$/, "the room it takes here");
-  assert.equal(await a.locator("#delete-what").innerText(), "From this phone, or for everyone");
+  assert.equal(await a.locator("#delete-here-name").innerText(), "Delete from this phone", "someone else has it: from this phone,");
+  assert.equal(await a.locator("#delete-all").isVisible(), true, "or for everyone");
   await a.fill("#list-rename", "");
   await a.press("#list-rename", "Enter");
   assert.equal(await a.inputValue("#list-rename"), "Courses", "an emptied name goes back to the old one");
@@ -1792,6 +1793,26 @@ async function newList(pg, name) {
   await pg.locator("#app").waitFor();
 }
 const live = pg => pg.locator("#live").innerText();
+// Holds the question's button until it fills, as deleting what nothing brings back asks.
+async function holdOk(pg, ms = 2300) {
+  const box = await pg.locator("#confirm-ok").boundingBox();
+  await pg.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await pg.mouse.down();
+  await sleep(ms);
+  await pg.mouse.up();
+}
+// What the server answers for a list, by its key: 200, or 410 once closed, with why.
+const onServer = (pg, key) => pg.evaluate(async key => {
+  const raw = Uint8Array.from(atob(key.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+  const base = await crypto.subtle.importKey("raw", raw, "HKDF", false, ["deriveBits"]);
+  const bits = async (info, n) => new Uint8Array(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: new TextEncoder().encode(info) }, base, n));
+  const id = [...await bits("panier list id", 128)].map(b => b.toString(16).padStart(2, "0")).join("");
+  const auth = btoa(String.fromCharCode(...await bits("panier auth", 256))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const res = await fetch("/api/lists/" + id + "/changes", { headers: { Authorization: "Bearer " + auth } });
+  return res.status === 410 ? "gone: " + (await res.json()).why : String(res.status);
+}, key);
+// The phones on the list on screen, by name ("" for one without).
+const members = pg => pg.evaluate(async () => (await import("/store.js")).members().map(m => (m.me ? "me" : m.name)));
 async function paste(pg, text) {
   await pg.evaluate(text => {
     const dt = new DataTransfer();
@@ -1866,9 +1887,7 @@ test("several lists: each a sheet on the lists page, made from a name, each sync
   await toLists(tab);
   await a.locator("#sheets .sheet-open").nth(1).click(); await turned(a);
   await a.locator("#app").waitFor();
-  await tab.locator("#sheets .sheet-open").nth(1).focus();
-  await tab.keyboard.press("Delete");
-  await tab.click("#confirm-ok");
+  await tab.evaluate(async lid => (await import("/store.js")).deleteHere(lid, true), (await index(a)).open);
   await a.locator("#lists").waitFor();
   assert.deepEqual(await sheets(a), ["Shopping list"], "deleted in another tab, the list on screen gives way to the lists page");
   assert.equal(await a.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith("panier2:")).length), 1, "and isn't written back");
@@ -1975,7 +1994,7 @@ test("on a phone on its side, what's ticked lies beside the list, and an item dr
   await p.close();
 });
 
-test("lists are reordered by dragging, and deleted once asked, on the lists page or in the list's settings; undo brings them back", async () => {
+test("lists are reordered by dragging; deleted only in their own settings, and, as nothing brings them back, held to delete for good", async () => {
   const p = await alone();
   const a = p.page;
   await toLists(a);
@@ -1992,47 +2011,69 @@ test("lists are reordered by dragging, and deleted once asked, on the lists page
   assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "dragged to the top");
   assert.deepEqual((await index(a)).lists.map(e => e.name || "Shopping list"), ["Hardware store", "Shopping list", "Market"], "and kept in that order");
 
-  const toZone = async () => (await a.locator("#remove-drop").boundingBox()).y + 20;
-  await dragTo(a, a.locator("#sheets .sheet-card").nth(1), toZone);
-  await a.locator("#confirm").waitFor();
-  assert.equal(await a.locator("#confirm-title").innerText(), "Delete “Shopping list”?", "dropped at the foot, it asks first");
-  assert.equal(await a.locator("#confirm-text").innerText(), "Undo brings it back until Panier closes; after that, only its link does, if you kept one.");
-  assert.equal(await a.locator("#confirm-ok").innerText(), "Delete from this phone", "each answer says which deletion it is");
-  await a.click("#confirm-cancel");
-  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "and nothing goes until it's answered");
-  await dragTo(a, a.locator("#sheets .sheet-card").nth(1), toZone);
-  await a.click("#confirm-ok");
-  assert.deepEqual(await sheets(a), ["Hardware store", "Market"], "deleted from this phone");
-  assert.equal(await a.locator("#undo-what").innerText(), "Shopping list", "undo names what it would bring back");
-  await a.click("#undo");
-  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"], "back where it was");
+  assert.equal(await a.locator("#remove-drop").count(), 0, "a list is deleted in its own settings, not here");
+  await a.locator("#sheets .sheet-open").nth(1).focus();
+  await a.keyboard.press("Delete");
+  assert.equal(await a.locator("#confirm").evaluate(d => d.open), false, "nor by the Delete key");
 
   await a.locator("#sheets .sheet-open").nth(2).click(); await turned(a);
+  const market = await openKey(a);
   await share(a);
   assert.equal(await a.locator("#members").innerText(), "Only you, so far.");
   assert.equal(await a.locator("#rekey-open").isVisible(), false, "no one to remove");
   assert.equal(await a.locator("#pair button").filter({ hasText: /Delete/ }).count(), 0, "the share sheet deletes nothing");
   await a.click("#pair-close");
-  // In the list's own settings, where a screen reader on a phone reaches it: it asks the same.
   assert.equal(await a.locator("#list-settings").evaluate(d => d.open), true, "closing the share sheet goes back to the list's settings");
   assert.equal(await a.locator("#list-people").innerText(), "Only you, so far.", "who's on it shows there too");
-  await a.click("#delete-open");
+  assert.equal(await a.locator("#delete-here-name").innerText(), "Delete the list", "nobody else has it: one way to delete it");
+  assert.equal(await a.locator("#delete-here-what").innerText(), "Nobody else has it: it goes for good, from the server too");
+  assert.equal(await a.locator("#delete-all").isVisible(), false, "and no one to delete it for");
+  await a.click("#delete-here");
+  assert.equal(await a.locator("#confirm-title").innerText(), "Delete “Market”?");
+  assert.equal(await a.locator("#confirm-text").innerText(), "Nobody else has it, so it goes from this phone and from the server. Nothing can bring it back, not even its link.");
+  assert.equal(await a.getByRole("button", { name: "Hold to delete", exact: true }).count(), 1, "nothing can bring it back: the button is held");
   await a.click("#confirm-cancel");
   assert.equal(await a.locator("#list-settings").evaluate(d => d.open), true, "the question asked over them, Cancel goes back to them");
-  await a.click("#delete-open");
-  assert.equal(await a.locator("#confirm-title").innerText(), "Delete “Market”?", "the list's own settings ask too");
+  await a.click("#delete-here");
+  await a.click("#confirm-ok");
+  assert.equal(await a.locator("#confirm-hint").innerText(), "Keep holding until it fills.", "a tap says to hold");
+  await holdOk(a, 900);
+  assert.equal(await a.locator("#confirm").evaluate(d => d.open), true, "let go too soon, nothing happens");
+  assert.equal(await onServer(a, market), "200");
+  await holdOk(a);
+  await a.locator("#lists").waitFor();
+  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list"], "held until it fills, it goes, and the lists page shows");
+  assert.match(await a.evaluate(() => document.activeElement.dataset.fk || ""), /^sheet-/, "the cursor on a sheet");
+  assert.equal(await a.locator("#dock").isVisible(), false, "with nothing to undo");
+  assert.ok(await eventually(async () => (await onServer(a, market)) === "gone: deleted"), "it's closed on the server too");
+  assert.equal((await index(a)).leaving.length, 0, "with nothing left to send");
+
+  // For those who can't hold the button, it asks twice.
+  await a.locator("#sheets .sheet-open").first().click(); await turned(a);
+  await listSettings(a);
+  await a.click("#delete-here");
+  assert.equal(await a.locator("#confirm-more").innerText(), "Can't hold the button?");
+  await a.click("#confirm-more");
+  assert.equal(await a.locator("#confirm-title").innerText(), "Delete “Hardware store”?", "the same question, asked once more");
+  assert.equal(await a.locator("#confirm-text").innerText(), "Asked twice instead of holding the button: nothing can bring it back.");
+  assert.equal(await a.locator("#confirm-ok").innerText(), "Delete", "with a plain button");
+  assert.equal(await a.locator("#confirm-more").isVisible(), false);
   await a.click("#confirm-ok");
   await a.locator("#lists").waitFor();
-  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list"], "and the lists page shows, without it");
-  await a.click("#undo");
-  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"]);
-  await a.locator("#sheets .sheet-open").nth(2).focus();
-  await a.keyboard.press("Delete");
-  assert.equal(await a.locator("#confirm-title").innerText(), "Delete “Market”?", "the Delete key asks too");
-  await a.click("#confirm-ok");
-  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list"]);
-  await a.click("#undo");
-  assert.deepEqual(await sheets(a), ["Hardware store", "Shopping list", "Market"]);
+  assert.deepEqual(await sheets(a), ["Shopping list"]);
+
+  // From a keyboard, Space held does the same.
+  await a.locator("#sheets .sheet-open").first().click(); await turned(a);
+  await listSettings(a);
+  await a.focus("#delete-here");
+  await a.keyboard.press("Enter");
+  await a.locator("#confirm").waitFor();
+  await a.focus("#confirm-ok");
+  await a.keyboard.down(" ");
+  await sleep(2300);
+  await a.keyboard.up(" ");
+  await a.locator("#lists").waitFor();
+  assert.deepEqual(await sheets(a), [], "Space held deletes it too");
   await p.close();
 });
 
@@ -2199,7 +2240,7 @@ test("the people on a list: names on the share sheet, undo says who; three phone
   await t.close();
 });
 
-test("changing a list's key leaves everyone else with it closed, until they open the new link; deleting closes it for all", async () => {
+test("changing a list's key leaves everyone else with it closed, saying so, until they open the new link; deleting it for everyone closes it for all", async () => {
   const t = await pair();
   const { a, b } = t;
   await add(a, "ess", "Milk");
@@ -2215,7 +2256,10 @@ test("changing a list's key leaves everyone else with it closed, until they open
   assert.notEqual(fresh, t.key);
   await unshare(a);
   assert.deepEqual(await texts(a, "Essentials"), ["Milk"], "this phone carries on with the list");
-  assert.ok(await eventually(async () => (await b.locator("#status").isVisible()) && (await b.locator("#status-text").innerText()) === "List closed", 8000), "the other phone is told");
+  assert.ok(await eventually(async () => (await b.locator("#status").isVisible()) && (await b.locator("#status-text").innerText()) === "New key", 8000), "the other phone is told");
+  await b.click("#status-pill");
+  assert.equal(await b.locator("#status-detail").innerText(), "This list moved to a new key. Ask whoever shared it for the new link. What's here stays on this phone until you delete it.", "what happened, and what to do");
+  await b.click("#status-pill");
   await add(a, "ess", "Bread");
   await blur(a);
   await sleep(800);
@@ -2236,36 +2280,106 @@ test("changing a list's key leaves everyone else with it closed, until they open
   await b.locator("#app").waitFor();
   assert.ok(await eventually(async () => (await texts(b, "Essentials")).join() === "Milk,Bread"), "the new link brings the list back");
   await toLists(b);
-  assert.ok(await eventually(async () => (await counts(b)).join() === "Closed,2 to tick"), "beside the closed one");
+  assert.ok(await eventually(async () => (await counts(b)).join() === "New key,2 to tick"), "beside the old one");
 
   assert.ok(await eventually(async () => (await b.locator("#sheets .sheet-card").nth(1).locator(".sheet-with").innerText()) === "with 1 other phone"));
-  await dragTo(b, b.locator("#sheets .sheet-card").nth(1), async () => (await b.locator("#remove-drop").boundingBox()).y + 20);
-  await b.locator("#confirm").waitFor();
-  assert.equal(await b.locator("#confirm-text").innerText(), "The others keep it. On this phone, Undo brings it back until Panier closes; after that, its link does.");
-  assert.equal(await b.locator("#confirm-more").innerText(), "Delete for everyone");
-  await b.click("#confirm-more");
-  assert.equal(await b.locator("#confirm-title").innerText(), "Delete “Shopping list” for everyone?", "for everyone, it asks again");
-  assert.equal(await b.locator("#confirm-text").innerText(), "It goes from the server, and from every phone that has it as soon as they open it. Neither Undo nor its link can bring it back.", "saying nothing brings it back");
+  await b.locator("#sheets .sheet-open").nth(1).click(); await turned(b);
+  await listSettings(b);
+  assert.equal(await b.locator("#delete-here-what").innerText(), "1 other phone keeps it, and can share it with you again");
+  await b.click("#delete-all");
+  assert.equal(await b.locator("#confirm-title").innerText(), "Delete “Shopping list” for everyone?");
+  assert.equal(await b.locator("#confirm-text").innerText(), "It goes from the server, and nobody can change it any more. The others' phones keep what they have, to read or export, until they delete it. Nothing can bring it back.", "saying what the others keep, and that nothing brings it back");
   await b.click("#confirm-ok");
-  assert.ok(await eventually(async () => (await counts(b)).join() === "Closed"), "deleting it takes it off this phone");
-  assert.ok(await eventually(async () => (await a.locator("#status-text").innerText()) === "List closed", 8000), "and closes it for everyone");
+  assert.equal(await b.locator("#confirm").evaluate(d => d.open), true, "a tap isn't enough");
+  await offline(t.B, b);
+  await holdOk(b);
+  assert.equal(await b.locator("#confirm-error").innerText(), "Couldn't reach the server. Check your connection and try again.", "for everyone, it needs the server");
+  assert.equal(await onServer(a, fresh), "200", "and nothing changed");
+  await online(t.B, b);
+  await holdOk(b);
+  await b.locator("#lists").waitFor();
+  assert.ok(await eventually(async () => (await counts(b)).join() === "New key"), "held, it goes from this phone");
+  assert.ok(await eventually(async () => (await a.locator("#status-text").innerText()) === "List deleted", 8000), "and is deleted for everyone");
+  await a.click("#status-pill");
+  assert.equal(await a.locator("#status-detail").innerText(), "Someone deleted this list for everyone. What's here stays on this phone, to read or export, until you delete it.");
   await listSettings(a);
   assert.equal(await a.locator("#pair-open").isVisible(), false, "a closed list isn't offered for sharing");
   assert.ok(await a.locator("#list-rename").isDisabled(), "nor renamed");
   assert.equal(await a.locator("#list-colours .swatch").count(), 0, "nor recoloured");
   assert.ok(await a.locator('input[name="ticked"]').first().isDisabled(), "nor its ticked items kept longer");
   assert.equal(await a.locator("#export-list").isVisible(), true, "but it can still be exported");
-  assert.equal(await a.locator("#delete-what").innerText(), "From this phone", "and deleted from this phone");
-  await backToList(a);
-  await a.click("#status-pill");
-  assert.equal(await a.locator("#status-detail button").count(), 0, "nor deleted from the list itself");
-  await toLists(a);
-  await a.locator("#sheets .sheet-open").focus();
-  await a.keyboard.press("Delete");
-  assert.equal(await a.locator("#confirm-text").innerText(), "It's already closed. Undo brings back what's left of it until Panier closes; after that, it's gone.");
-  assert.equal(await a.locator("#confirm-more").isVisible(), false, "there's no one left to delete it for");
-  await a.click("#confirm-ok");
-  assert.ok(await eventually(async () => (await sheets(a)).length === 0), "the closed list is deleted from this phone");
+  assert.equal(await a.locator("#delete-here-name").innerText(), "Delete the list", "and deleted");
+  assert.equal(await a.locator("#delete-here-what").innerText(), "What's left here goes for good");
+  assert.equal(await a.locator("#delete-all").isVisible(), false, "with no one left to delete it for");
+  await a.click("#delete-here");
+  assert.equal(await a.locator("#confirm-text").innerText(), "It's no longer on the server. What's left here goes, and nothing can bring it back.");
+  await holdOk(a);
+  await a.locator("#lists").waitFor();
+  assert.ok(await eventually(async () => (await sheets(a)).length === 0), "the deleted list goes from this phone");
+  await t.close();
+});
+
+test("deleting a list from one phone takes that phone off it for the others, after what it hadn't sent; offline, once back", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  await a.evaluate(async () => (await import("/store.js")).setMyName("Isabelle"));
+  assert.ok(await eventually(async () => (await members(b)).join() === "me,Isabelle"));
+  await listSettings(b);
+  assert.equal(await b.locator("#delete-here-name").innerText(), "Delete from this phone");
+  assert.equal(await b.locator("#delete-here-what").innerText(), "Isabelle keeps it, and can share it with you again");
+  await b.click("#delete-here");
+  assert.equal(await b.locator("#confirm-title").innerText(), "Delete “Shopping list” from this phone?");
+  assert.equal(await b.locator("#confirm-text").innerText(), "Isabelle keeps it, and can share it with you again. On this phone it goes now, with no Undo.");
+  await b.click("#confirm-ok");
+  await b.locator("#lists").waitFor();
+  assert.deepEqual(await sheets(b), [], "someone else keeps it: one tap takes it off this phone");
+  assert.ok(await eventually(async () => (await members(a)).join() === "me"), "and the other phone stops counting it");
+  assert.equal(await onServer(a, t.key), "200", "it stays on the server, for them");
+
+  // Back with the link, then offline: what it adds, and that it leaves, wait until it's back.
+  await b.goto(BASE + "/#k=" + t.key);
+  await b.locator("#app").waitFor();
+  assert.ok(await eventually(async () => (await members(a)).length === 2), "its link puts the phone back on the list");
+  await offline(t.B, b);
+  await add(b, "ess", "Eggs");
+  await blur(b);
+  await listSettings(b);
+  await b.click("#delete-here");
+  await b.click("#confirm-ok");
+  await b.locator("#lists").waitFor();
+  assert.equal((await index(b)).leaving.length, 1, "what it has to send waits, out of sight");
+  await t.B.setOffline(false);
+  await b.reload(); // closed meanwhile: it goes as the app opens again
+  await b.locator("#lists").waitFor();
+  assert.ok(await eventually(async () => (await index(b)).leaving.length === 0), "then goes");
+  assert.ok(await eventually(async () => (await texts(a, "Essentials")).includes("Eggs")), "what it added offline reaches the others first");
+  assert.ok(await eventually(async () => (await members(a)).join() === "me"), "then that it left");
+  await t.close();
+});
+
+test("deleting a list nobody else has closes it on the server, unless someone joined meanwhile", async () => {
+  const t = await pair();
+  const { a, b } = t;
+  // b leaves, so a is alone on it; then a, offline, deletes it, as b comes back.
+  await listSettings(b);
+  await b.click("#delete-here");
+  await b.click("#confirm-ok");
+  assert.ok(await eventually(async () => (await members(a)).join() === "me"));
+  await offline(t.A, a);
+  await listSettings(a);
+  assert.equal(await a.locator("#delete-here-what").innerText(), "Nobody else has it: it goes for good, from the server too");
+  await a.click("#delete-here");
+  await holdOk(a);
+  await a.locator("#lists").waitFor();
+  assert.equal((await index(a)).leaving.length, 1, "offline, its closing waits");
+  await b.goto(BASE + "/#k=" + t.key);
+  await b.locator("#app").waitFor();
+  assert.ok(await eventually(async () => (await members(b)).length === 2), "someone joins meanwhile");
+  await online(t.A, a);
+  assert.ok(await eventually(async () => (await index(a)).leaving.length === 0), "back online, it goes");
+  assert.equal(await a.locator("#lists-msg").innerText(), "“Shopping list” stays on the server: someone had joined it.", "and says the list was kept");
+  assert.equal(await onServer(a, t.key), "200", "for them");
+  assert.ok(await eventually(async () => (await members(b)).join() === "me"), "this phone only left it");
   await t.close();
 });
 
@@ -2352,11 +2466,6 @@ test("opening a list leaves it still, and from the keyboard the cursor follows b
   await a.focus("#lists-open");
   await a.keyboard.press("Enter");
   await a.locator("#lists").waitFor();
-  await a.keyboard.press("Delete");
-  await a.locator("#confirm").waitFor();
-  await a.focus("#confirm-ok");
-  await a.keyboard.press("Enter");
-  assert.ok(await eventually(() => a.evaluate(() => document.activeElement.id === "undo")), "a list deleted from the phone leaves the cursor on undo");
   await p.close();
 });
 

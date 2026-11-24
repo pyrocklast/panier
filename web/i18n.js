@@ -32,8 +32,6 @@ const FR = {
   "A code to scan, or a link to send": "Un code à scanner, ou un lien à envoyer",
   "{x} on this phone.": "{x} sur ce téléphone.",
   "A Markdown file": "Un fichier Markdown",
-  "From this phone, or for everyone": "De ce téléphone, ou pour tout le monde",
-  "From this phone": "De ce téléphone",
   "at {x}": "à {x}",
   "Settings": "Paramètres",
   "Lists": "Listes",
@@ -87,19 +85,37 @@ const FR = {
   "No connection. Your lists show as this phone last saw them.": "Pas de connexion. Vos listes s’affichent telles que ce téléphone les a vues la dernière fois.",
   "{x} has a new key": "{x} a une nouvelle clé",
   "Delete {x} for everyone?": "Supprimer {x} pour tout le monde" + nb + "?",
-  "It goes from the server, and from every phone that has it as soon as they open it. Neither Undo nor its link can bring it back.":
-    "Elle disparaît du serveur, et de chaque téléphone qui l’a dès qu’il l’ouvre. Ni Annuler ni son lien ne pourront la faire revenir.",
   "Delete": "Supprimer",
   "Delete from this phone": "Supprimer de ce téléphone",
   "Deleted {x} for everyone": "{x} supprimée pour tout le monde",
   "Delete {x}?": "Supprimer {x}" + nb + "?",
-  "The others keep it. On this phone, Undo brings it back until Panier closes; after that, its link does.":
-    "Les autres la gardent. Sur ce téléphone, Annuler la fait revenir tant que Panier reste ouvert" + nb + "; ensuite, son lien.",
-  "Undo brings it back until Panier closes; after that, only its link does, if you kept one.":
-    "Annuler la fait revenir tant que Panier reste ouvert" + nb + "; ensuite, seul son lien le peut, si vous l’avez gardé.",
-  "It's already closed. Undo brings back what's left of it until Panier closes; after that, it's gone.":
-    "Elle est déjà fermée. Annuler fait revenir ce qu’il en reste tant que Panier reste ouvert" + nb + "; ensuite, elle est perdue.",
   "Deleted {x} from this phone": "{x} supprimée de ce téléphone",
+  "Deleted {x} for good": "{x} supprimée pour de bon",
+  "Nobody can change it any more, or bring it back": "Plus personne ne pourra la modifier ni la faire revenir",
+  "Nobody else has it: it goes for good, from the server too": "Personne d’autre ne l’a" + nb + ": elle disparaît pour de bon, du serveur aussi",
+  "What's left here goes for good": "Ce qui en reste ici disparaît pour de bon",
+  "{x} keeps it, and can share it with you again": "{x} la garde, et peut vous la repartager",
+  "{x} keep it, and can share it with you again": "{x} la gardent, et peuvent vous la repartager",
+  "your {n} other phones": ["votre autre téléphone", "vos {n} autres téléphones"],
+  "Delete {x} from this phone?": "Supprimer {x} de ce téléphone" + nb + "?",
+  "{x} keeps it, and can share it with you again. On this phone it goes now, with no Undo.":
+    "{x} la garde, et peut vous la repartager. Sur ce téléphone, elle disparaît tout de suite, sans retour possible.",
+  "{x} keep it, and can share it with you again. On this phone it goes now, with no Undo.":
+    "{x} la gardent, et peuvent vous la repartager. Sur ce téléphone, elle disparaît tout de suite, sans retour possible.",
+  "It goes from the server, and nobody can change it any more. The others' phones keep what they have, to read or export, until they delete it. Nothing can bring it back.":
+    "Elle disparaît du serveur, et plus personne ne pourra la modifier. Les téléphones des autres gardent ce qu’ils ont, à lire ou exporter, jusqu’à ce qu’ils la suppriment. Rien ne pourra la faire revenir.",
+  "Nobody else has it, so it goes from this phone and from the server. Nothing can bring it back, not even its link.":
+    "Personne d’autre ne l’a, alors elle disparaît de ce téléphone et du serveur. Rien ne pourra la faire revenir, pas même son lien.",
+  "It's no longer on the server. What's left here goes, and nothing can bring it back.":
+    "Elle n’est plus sur le serveur. Ce qui en reste ici disparaît, et rien ne pourra la faire revenir.",
+  "Hold to delete": "Maintenir pour supprimer",
+  "Hold to delete for everyone": "Maintenir pour supprimer pour tous",
+  "Keep holding until it fills.": "Maintenez jusqu’à ce que le bouton soit rempli.",
+  "Keep holding: {n}": "Maintenez" + nb + ": {n}",
+  "Can't hold the button?": "Impossible de maintenir le bouton" + nb + "?",
+  "Asked twice instead of holding the button: nothing can bring it back.": "Demandé deux fois au lieu de maintenir le bouton" + nb + ": rien ne pourra la faire revenir.",
+  "{x} stays on the server: {who} had joined it.": "{x} reste sur le serveur" + nb + ": {who} l’avait rejointe.",
+  "someone": "quelqu’un",
   "This server can't make another list from this one.": "Ce serveur ne peut pas créer d’autre liste à partir de celle-ci.",
   "someone else": "quelqu’un d’autre",
   "with {x}": "avec {x}",
@@ -112,7 +128,9 @@ const FR = {
   "{x} moved later": "{x} recule",
   "{n} to tick": ["{n} à cocher", "{n} à cocher"],
   "Nothing to tick": "Rien à cocher",
-  "Closed": "Fermée",
+  "Deleted": "Supprimée",
+  "New key": "Nouvelle clé",
+  "Deleted or moved": "Supprimée ou déplacée",
   "Update Panier to open it": "Mettez Panier à jour pour l’ouvrir",
   "Open the link from a phone that already has a list, or start one with your server's setup code.":
     "Ouvrez le lien depuis un téléphone qui a déjà une liste, ou commencez-en une avec le code d’installation de votre serveur.",
@@ -204,9 +222,13 @@ const FR = {
   "The server has no room left for this list. {kept}.": "Le serveur n’a plus de place pour cette liste. {kept}.",
   "No connection. {kept}, to be sent when you're back online.": "Pas de connexion. {kept}, à envoyer dès votre retour en ligne.",
   "The server isn't answering. {kept}, to be sent as soon as it answers.": "Le serveur ne répond pas. {kept}, à envoyer dès qu’il répondra.",
-  "List closed": "Liste fermée",
-  "Someone closed this list, for everyone. If they gave it a new key, ask them for the new link. What's here stays on this phone until you delete it.":
-    "Quelqu’un a fermé cette liste, pour tout le monde. Si elle a une nouvelle clé, demandez le nouveau lien. Ce qui est ici reste sur ce téléphone jusqu’à ce que vous la supprimiez.",
+  "List deleted": "Liste supprimée",
+  "Someone deleted this list for everyone. What's here stays on this phone, to read or export, until you delete it.":
+    "Quelqu’un a supprimé cette liste pour tout le monde. Ce qui est ici reste sur ce téléphone, à lire ou exporter, jusqu’à ce que vous la supprimiez.",
+  "This list moved to a new key. Ask whoever shared it for the new link. What's here stays on this phone until you delete it.":
+    "Cette liste a changé de clé. Demandez le nouveau lien à qui vous l’a partagée. Ce qui est ici reste sur ce téléphone jusqu’à ce que vous la supprimiez.",
+  "Someone deleted this list for everyone, or moved it to a new key: if so, ask them for the new link. What's here stays on this phone until you delete it.":
+    "Quelqu’un a supprimé cette liste pour tout le monde, ou l’a passée à une nouvelle clé" + nb + ": dans ce cas, demandez-lui le nouveau lien. Ce qui est ici reste sur ce téléphone jusqu’à ce que vous la supprimiez.",
   "Update Panier": "Mettez Panier à jour",
   "This list was changed with a newer Panier, which updates itself: close the app and open it again. Nothing is sent from here meanwhile.":
     "Cette liste a été modifiée avec une version plus récente de Panier, qui se met à jour toute seule" + nb + ": fermez l’application et rouvrez-la. Rien n’est envoyé d’ici en attendant.",

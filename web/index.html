@@ -89,7 +89,6 @@
       <button type="submit" class="btn primary">Start</button>
     </div>
   </form>
-  <div class="drop remove-drop" id="remove-drop" aria-hidden="true"><span>Delete</span></div>
 </main>
 
 <div class="status" id="status" hidden>
@@ -189,7 +188,8 @@
       <p class="sum" id="list-size"></p>
       <ul class="rows">
         <li><button type="button" class="row" id="export-list"><span>Export the list</span><span class="row-d">A Markdown file</span></button></li>
-        <li><button type="button" class="row danger" id="delete-open"><span>Delete the list</span><span class="row-d" id="delete-what">From this phone, or for everyone</span></button></li>
+        <li><button type="button" class="row danger" id="delete-here"><span id="delete-here-name">Delete from this phone</span><span class="row-d" id="delete-here-what"></span></button></li>
+        <li><button type="button" class="row danger" id="delete-all"><span>Delete for everyone</span><span class="row-d">Nobody can change it any more, or bring it back</span></button></li>
       </ul>
     </section>
   </div>
@@ -235,9 +235,10 @@
   <p class="note" id="confirm-error" role="alert" hidden></p>
   <div class="actions">
     <button type="button" class="btn" id="confirm-cancel">Cancel</button>
-    <button type="button" class="btn danger" id="confirm-ok"></button>
+    <button type="button" class="btn danger" id="confirm-ok" aria-describedby="confirm-hint"></button>
   </div>
-  <button type="button" class="linkbtn" id="confirm-more" hidden></button>
+  <p class="note" id="confirm-hint" role="status" hidden>Keep holding until it fills.</p>
+  <button type="button" class="linkbtn" id="confirm-more" hidden>Can't hold the button?</button>
 </dialog>
 
 <div class="sr" id="live" aria-live="polite"></div>

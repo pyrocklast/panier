@@ -19,7 +19,12 @@ A phone holds any number of lists, each shared with its own people. The app open
 - **Open** a list with a tap. The page turns quietly into it: the desk takes the list's colour as the list's words open out of its sheet. Going back, with the arrow or the back gesture, they draw back into it.
 - **New list:** type a name on the blank strip under the sheets; the new list opens ready to write on. The server makes it on the strength of a list this phone already has; if it won't, it asks for the setup code.
 - **Move** a list: hold it, then drag it to its new place; the others glide aside. From a keyboard, Alt and an arrow move it one place earlier or later.
-- **Delete** a list: drag it onto the zone that appears at the foot, press Delete on it from a keyboard, or use *Delete the list*, in the list's settings. It always asks first, and says what brings it back. *Delete from this phone* leaves it with the others: Undo, at the bottom right, brings it back until Panier closes, and its link after that. *Delete for everyone*, under it, asks again, then closes the list on the server: other phones say *List closed*, and neither Undo nor its link brings it back.
+- **Delete** a list in its own settings, under *Data*. Nothing brings a deleted list back, so it always asks first, and says exactly what happens:
+  - **Someone else has it:** *Delete from this phone* takes it off this phone, with one tap. They keep it, and can share it with you again; their phones stop counting yours. *Delete for everyone*, under it, deletes it from the server: nobody can change it any more, and the others' phones keep what they have, to read or export, saying *List deleted*, until they delete it too. It needs a connection.
+  - **Nobody else has it:** *Delete the list* deletes it from this phone and from the server, so even its link opens nothing. If someone joined it meanwhile, it stays on the server for them, and the lists page says so.
+  - **Deleted for everyone, or moved to a new key:** *Delete the list* deletes what's left of it on this phone.
+  - **What nothing can bring back is held, not tapped:** hold the button until it fills, about 2 seconds, or hold Space or Enter on it. Let go before, and nothing happens. *Can't hold the button?*, under it, asks a second time instead.
+  - **Offline,** a list goes from the phone at once. What the server has to hear, what you changed and that you left, or that it's deleted, waits on the phone, out of sight, and goes when the server answers, even after Panier closes.
 - **Settings**, at the top right of the lists page, are the app's, for this phone.
 
 ## The page
@@ -38,9 +43,9 @@ The list is written on the page itself, like paper: one left edge, ruled lines b
 - **Name and colour.** Emptying the name puts the old one back.
 - **Ticked items stay in view** a day, a week, a month, or always: a week to start with. Nothing is deleted: older ticked items leave the ticked group but are still suggested as you type, and still exported.
 - **People:** who's on the list, and *Add someone*.
-- **Data:** the room the list takes on this phone, *Export the list* and *Delete the list*.
+- **Data:** the room the list takes on this phone, *Export the list*, and the ways to delete it, each saying what it does: *Delete from this phone* and *Delete for everyone* when someone else has it, or *Delete the list*.
 
-The share sheet and the question before deleting open over the settings, and close back onto them. A closed list's settings can only be read, but it can still be exported or deleted.
+The share sheet and the question before deleting open over the settings, and close back onto them. The settings of a list deleted for everyone, or moved to a new key, can only be read, but it can still be exported or deleted.
 
 ## Sections
 
@@ -94,8 +99,8 @@ A new list is a plain sheet: its items sit under its name, with no heading. *Add
 
 ## Undo and redo
 
-- Every change to a list's items and sections can be undone, and so can a list taken off the phone; the list's other settings and your name can't. The undo button appears at the bottom right after the first change, and hides while you type. Redo joins it once something has been undone.
-- For a few seconds after deleting an item, a section or a suggestion, or taking a list off the phone, the undo button shows its name, so you know what a tap brings back.
+- Every change to a list's items and sections can be undone; the list's other settings, your name and deleting a list can't. The undo button appears at the bottom right after the first change, and hides while you type. Redo joins it once something has been undone.
+- For a few seconds after deleting an item, a section or a suggestion, the undo button shows its name, so you know what a tap brings back.
 - Each person undoes only their own changes. If someone else has changed something since, their change stands, and undo says who, by the name they gave.
 
 ## Import and export
@@ -122,8 +127,9 @@ Lists go out and come in as Markdown checklists, readable in any notes app:
 
 - **Your name** shows to the people you share lists with. It's optional, and the server never sees it. The share sheet asks for it until you've given one; Settings changes it.
 - **Who's on a list** shows in its settings and on the share sheet: you, the names people gave, and how many phones gave none. On the lists page, a few quiet words under a list's name say who else has it. Everyone on a list sees who ticked what.
-- **Remove someone**, on the share sheet once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *List closed* and keep what they had, until they delete it. Share the new link with those who should keep the list.
-- **A closed list is only read**: nothing can be added, edited, moved or ticked, since none of it could be sent, and its boxes show faint. *Export the list* still saves a copy. So does a list changed with a newer Panier, until this one updates.
+- **Remove someone**, on the share sheet once someone else is on the list, gives the list a new key and closes the old one, for everyone: other phones say *New key* and keep what they had, until they delete it. Share the new link with those who should keep the list.
+- **A list deleted for everyone, or moved to a new key, is only read**: nothing can be added, edited, moved or ticked, since none of it could be sent, and its boxes show faint. On the lists page, its sheet says *Deleted* or *New key*. *Export the list* still saves a copy. So does a list changed with a newer Panier, until this one updates.
+- **Deleting a list from your phone** takes your phone off it: the others stop counting it. Opening its link again puts it back.
 - **Set up another phone**, in Settings, shows one QR code that brings every list on this phone to another; closing it goes back to Settings.
 
 ## Sync and offline
@@ -178,7 +184,7 @@ Each takes 0.15 s to give feedback, 0.24 s to arrive or 0.32 s to move, a little
 
 In suggestions, ↓ and ↑ choose one, → moves to its ×, Enter picks it and Shift+Delete removes it.
 
-On the lists page, Alt and an arrow move a list, and Delete deletes it, once asked.
+On the lists page, Alt and an arrow move a list. Where deleting is held, Space or Enter held does it.
 
 Changes are announced to screen readers. Text keeps WCAG AAA contrast, 7:1, and tick boxes and buttons at least AA, on every list and section colour, in both themes, on every screen.
 
