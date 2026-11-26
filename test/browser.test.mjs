@@ -1376,6 +1376,9 @@ test("a section folds on this phone only, to one row saying what's left, which o
   assert.equal(await ess.locator(".fold-name").innerText(), "Essentials", "under its name");
   const row = await fold.boundingBox(), sec = await ess.boundingBox();
   assert.ok(row.height >= (LAYOUT ? 52 : 60) && row.width >= sec.width, "the whole heading is the row, to tap");
+  const [top, rule, left] = [await ess.locator(".fold-name").boundingBox(), await ess.locator(".fold-rule").boundingBox(), await ess.locator(".fold-left").boundingBox()];
+  assert.ok(top.y + top.height <= rule.y && rule.y + rule.height <= left.y, "its rule lies between its name and what's left, as between an open section's name and items");
+  assert.ok(Math.abs(rule.x - sec.x) < 1 && Math.abs(rule.x + rule.width - (sec.x + sec.width)) < 1, "across the heading, as when open");
   await add(b, "ess", "Eggs");
   assert.ok(await eventually(async () => (await ess.locator(".fold-left").innerText()) === "Milk, Bread, Eggs"), "what another phone adds shows in it");
   assert.equal(await ess.locator(".fold-count").innerText(), "3 to tick");

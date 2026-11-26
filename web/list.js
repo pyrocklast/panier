@@ -528,15 +528,16 @@ function buildShell(id) {
     else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); moveSection(id, e.key === "ArrowUp" ? -1 : 1); }
   });
   // The chevron comes first, where the tick boxes are, and folds the section on this
-  // phone. Folded, it grows into the whole heading, one row: the name, under it what's
-  // left, and how many, so a tap anywhere on it opens the section, and the cursor stays
-  // on it either way. The name renames only once it's open (app.css).
+  // phone. Folded, it grows into the whole heading, one row: the name and how many, the
+  // rule in the section's colour, and under it what's left, as an open section has its
+  // items; so a tap anywhere on it opens the section, and the cursor stays on it either
+  // way. The name renames only once it's open (app.css).
   const chev = icon("chev");
   chev.classList.add("chev");
   const foldName = h("span", { class: "fold-name", "aria-hidden": "true" }), left = h("span", { class: "fold-left", id: "left-" + id });
   const count = h("span", { class: "fold-count", id: "count-" + id });
   const fold = h("button", { type: "button", class: "fold-sec", "aria-controls": "items-" + id, dataset: { fk: "fold-" + id } },
-    chev, h("span", { class: "fold-text" }, foldName, count, left));
+    chev, h("span", { class: "fold-top" }, foldName, count), h("span", { class: "fold-rule", "aria-hidden": "true" }), left);
   fold.addEventListener("click", () => {
     if (state.suppressClick) { state.suppressClick = false; return; }
     foldSection(id, !ui.folded.has(id));

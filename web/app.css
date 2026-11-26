@@ -149,8 +149,9 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .sec[data-color]:not([data-color="ess"]) :is(.sec-name, .fold-name) { color: light-dark(oklch(0.32 0.090 var(--h)), oklch(0.91 0.070 var(--h))); }
 .sec-head .bin { width: 44px; height: 44px; margin-right: -12px; }
 /* The chevron comes first, where the tick boxes are, in the section's colour, and folds
-   it on this phone. Folded, it grows into the whole heading, one row to tap open: the
-   name, under it what's left, and how many at the end (list.js). */
+   it on this phone. Folded, it grows into the whole heading, one row to tap open, laid
+   out as an open section is: the name and how many where the heading is, the rule in its
+   colour under them, and what's left where its items would be (list.js). */
 .fold-sec {
   flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: 0 -4px 0 -12px; padding: 0;
   border: 0; border-radius: 12px; background: none; color: var(--sec); font: inherit; text-align: left; cursor: pointer;
@@ -158,18 +159,22 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 .fold-sec:focus-visible { outline-offset: -6px; }
 .fold-sec > :not(.chev) { display: none; }
 .sec.folded:not(.folding) > :is(.items, .sug, .add), .sec.folded:not(.folding) .sec-head > .sec-name { display: none; }
+.sec.folded:not(.folding) .sec-head { background: none; } /* the row draws the rule, between its name and what's left */
 .sec.folded:not(.folding) .fold-sec {
-  flex: 1; display: flex; align-items: center; width: auto; min-width: 0; height: auto; min-height: 60px;
-  margin: 0 -12px; padding: 6px 12px 6px 0; animation: appear var(--arrive) var(--ease-arrive);
+  flex: 1; grid-template-columns: 44px minmax(0, 1fr); column-gap: 4px; place-items: stretch; width: auto; min-width: 0; height: auto;
+  margin: 0 -12px; padding: 0 12px 0 0; font-weight: 400; animation: appear var(--arrive) var(--ease-arrive);
 }
-.sec.folded:not(.folding) .fold-sec > .chev { margin: 0 15px; } /* centred in 44 px, where it was */
-/* The name, how many at the end of its line, and under them what's left; with large
-   text, how many takes a line of its own rather than squeeze the name */
-.sec.folded:not(.folding) .fold-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; font-weight: 400; }
+.sec.folded:not(.folding) .fold-sec > .chev { align-self: center; justify-self: center; } /* over the tick boxes, as when open */
+.sec.folded:not(.folding) .fold-sec > .fold-top { display: flex; }
+.sec.folded:not(.folding) .fold-sec > :is(.fold-rule, .fold-left) { display: block; }
+/* The name, and how many at the end of its line, as tall as a heading; with large text,
+   how many takes a line of its own rather than squeeze the name */
+.fold-top { flex-wrap: wrap; align-items: baseline; align-content: center; column-gap: 12px; min-height: 48px; }
 .fold-name { font-weight: 700; overflow-wrap: anywhere; }
 .fold-count { margin-left: auto; color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.fold-left { flex-basis: 100%; min-width: 0; color: var(--muted); font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fold-left:empty { display: none; }
+.fold-rule { grid-column: 1 / -1; height: 1px; margin-left: 12px; background: var(--sec); }
+.fold-left { grid-column: 2; min-width: 0; padding: 8px 0 10px 2px; color: var(--muted); font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fold-left:empty { display: none !important; }
 /* A section without a name has no heading: its items sit under the list's name, first */
 .sec.plain > .sec-head { display: none; }
 /* A name not given says so, quietly, where it goes: a list's, and a section's beside
@@ -683,7 +688,8 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 [data-layout="compact"] .add-input { height: 44px; }
 [data-layout="compact"] .sugopt { min-height: 44px; }
 [data-layout="compact"] .basket { gap: 6px; margin-top: 8px; padding-top: 12px; }
-[data-layout="compact"] .sec.folded:not(.folding) .fold-sec { min-height: 52px; padding-block: 4px; }
+[data-layout="compact"] .fold-top { min-height: 44px; }
+[data-layout="compact"] .fold-left { padding-block: 4px 6px; }
 [data-layout="compact"] .page-head { margin-bottom: 4px; }
 [data-layout="compact"] .set { padding-block: 12px; }
 [data-layout="compact"] :is(.set h3, .set p:not(:last-child)) { margin-bottom: 8px; }
