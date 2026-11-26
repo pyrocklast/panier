@@ -7,7 +7,7 @@ import { state, readOnly, listName, listColor, tickedDays, draftsKey } from "./s
 import { implied, COLORS, PALETTE, LIST_COLORS, MAX_ITEM, MAX_SECTION, LIST, BEFORE_MS, fold, splitQty, nameKey, bare, retext, fromHint, clean, between, layout } from "./model.js";
 import { $, h, icon, fillText, addRow, emptyField, announce, activeFk, buzz, setRows, reduceMotion } from "./dom.js";
 import { whenTapEnds, bindPress, beginDrag } from "./press.js";
-import { float, landAll, snapshot, glide, fly, shift, shuffle, foldAway, foldOver, dye, MOTION } from "./motion.js";
+import { float, landAll, snapshot, glide, fly, shift, shuffle, foldAway, foldOver, foldOpen, dye, MOTION } from "./motion.js";
 import { editInPlace, palette } from "./edit.js";
 import { noteUndo, paintDock, paintStatus } from "./bar.js";
 
@@ -912,14 +912,14 @@ $("#basket-toggle").addEventListener("click", () => {
   else foldAway(bl, () => paint(null, false));
 });
 
-// A section folds as the ticked group does: closing over its rows, then its line of
-// what's left fades in (app.css); unfolding, it opens as the list glides.
+// A section folds and opens like a drawer, over its rows, its heading staying put
+// (motion.js); whatever it was doing a moment ago, it turns from where it is.
 function foldSection(id, folded) {
-  const sh = shells[id];
-  for (const a of sh.el.getAnimations()) a.cancel(); // folding or opening a moment ago: it turns from where it is
+  const sh = shells[id], rows = [sh.ul, sh.form];
+  for (const n of [sh.el, ...rows]) for (const a of n.getAnimations()) a.cancel();
   setFold(id, folded);
-  if (folded) foldOver(sh.el, [sh.ul, sh.form], () => paint(null, false));
-  else paint(null);
+  if (folded) foldOver(sh.el, rows, () => paint(null, false));
+  else foldOpen(sh.el, rows, [sh.count, sh.left], () => paint(null, false));
 }
 // A section folded or not, kept with the list on this phone; sections since deleted are
 // left out.

@@ -158,15 +158,21 @@ main.wrap { padding-block: 16px 104px; display: flex; flex-direction: column; ga
 }
 .fold-sec:focus-visible { outline-offset: -6px; }
 .fold-sec > :not(.chev) { display: none; }
-.sec.folded:not(.folding) > :is(.items, .sug, .add), .sec.folded:not(.folding) .sec-head > .sec-name { display: none; }
-.sec.folded:not(.folding) .sec-head { background: none; } /* the row draws the rule, between its name and what's left */
-.sec.folded:not(.folding) .fold-sec {
+.sec.folded:not(.folding) > :is(.items, .sug, .add), .sec.folded .sec-head > .sec-name { display: none; }
+.sec.folded .sec-head { background: none; } /* the row draws the rule, between its name and what's left */
+.sec.folded .fold-sec {
   flex: 1; grid-template-columns: 44px minmax(0, 1fr); column-gap: 4px; place-items: stretch; width: auto; min-width: 0; height: auto;
-  margin: 0 -12px; padding: 0 12px 0 0; font-weight: 400; animation: appear var(--arrive) var(--ease-arrive);
+  margin: 0 -12px; padding: 0 12px 0 0; font-weight: 400;
 }
-.sec.folded:not(.folding) .fold-sec > .chev { align-self: center; justify-self: center; } /* over the tick boxes, as when open */
-.sec.folded:not(.folding) .fold-sec > .fold-top { display: flex; }
-.sec.folded:not(.folding) .fold-sec > :is(.fold-rule, .fold-left) { display: block; }
+.sec.folded .fold-sec > .chev { align-self: center; justify-self: center; } /* over the tick boxes, as when open */
+.sec.folded .fold-sec > .fold-top { display: flex; }
+.sec.folded .fold-sec > :is(.fold-rule, .fold-left) { display: block; }
+/* Folding and opening, a drawer: what's in it is clipped to it as its height glides. Folding,
+   its rows stay where they were, out of the flow, as they fade (motion.js); how many and
+   what's left arrive once they've gone, where they are, and the name stays put. */
+.sec:is(.folding, .opening) { position: relative; overflow: clip; }
+.sec.folding > :is(.items, .add) { position: absolute; left: 0; right: 0; }
+.sec.folded :is(.fold-count, .fold-left) { animation: appear var(--arrive) var(--ease-arrive) var(--quick) backwards; } /* once the rows have gone */
 /* The name, and how many at the end of its line, as tall as a heading; with large text,
    how many takes a line of its own rather than squeeze the name */
 .fold-top { flex-wrap: wrap; align-items: baseline; align-content: center; column-gap: 12px; min-height: 48px; }

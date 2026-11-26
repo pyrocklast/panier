@@ -1369,6 +1369,8 @@ test("a section folds on this phone only, to one row saying what's left, which o
   assert.ok(chev.x + chev.width <= name.x + 1 && chev.x < 20, "the chevron comes first, where the tick boxes are");
   assert.equal(await ess.locator(".fold-left").isVisible(), false, "open, it says nothing more");
   await fold.click();
+  assert.ok(await ess.evaluate(s => getComputedStyle(s).overflow === "clip" && !s.querySelector(".fold-sec").getAnimations().length && !s.querySelector(".fold-name").getAnimations().length),
+    "it closes like a drawer, over its rows, its heading staying as it is");
   assert.ok(await eventually(async () => !(await ess.locator(".items").isVisible()) && !(await ess.locator(".add").isVisible())), "its items and Add item row fold away");
   assert.equal(await fold.getAttribute("aria-expanded"), "false");
   assert.ok(await eventually(async () => (await ess.locator(".fold-left").innerText()) === "Milk, Bread"), "one row says what's left");

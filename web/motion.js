@@ -164,16 +164,40 @@ export function foldAway(el, done) {
   const end = () => { el.style.overflow = ""; done(); };
   a.finished.then(end, end);
 }
-// A section folding closes over its rows as they fade, and what follows moves up with it:
-// change folds it, and its rows show while it closes (app.css: .folding).
+// A section folds and opens like a drawer, its height gliding as what follows moves with
+// it, and what's in it clipped to it, so nothing passes over what follows. Its heading
+// stays where it is: the name, the chevron turning, the rule.
+// Folding, change folds it; its rows stay where they were, out of the flow, and fade as it
+// closes over them; then how many and what's left arrive under the rule (app.css).
 export function foldOver(el, rows, change) {
   if (reduceMotion.matches) return change();
-  const was = el.getBoundingClientRect().height;
+  const was = el.getBoundingClientRect().height, at = rows.map(r => r.offsetTop - el.offsetTop);
   change();
   const now = el.getBoundingClientRect().height;
   el.classList.add("folding");
+  rows.forEach((r, i) => { r.style.top = at[i] + "px"; });
   const fading = rows.map(r => r.animate([{ opacity: 1 }, { opacity: 0 }], { ...LEAVING, fill: "forwards" }));
-  const end = () => { el.classList.remove("folding"); for (const f of fading) f.cancel(); };
+  const end = () => { el.classList.remove("folding"); for (const r of rows) r.style.top = ""; for (const f of fading) f.cancel(); };
+  el.animate([{ height: was + "px" }, { height: now + "px" }], { ...MOTION, id: "glide" }).finished.then(end, end);
+}
+// Opening, how many and what's left fade where they were, as copies, while change opens
+// it; once they've gone, its rows arrive where they are, the drawer opening over them.
+export function foldOpen(el, rows, said, change) {
+  if (reduceMotion.matches) return change();
+  const box = el.getBoundingClientRect(), was = box.height;
+  const copies = said.filter(n => n.getClientRects().length).map(n => {
+    const r = n.getBoundingClientRect(), c = n.cloneNode(true);
+    c.removeAttribute("id");
+    c.setAttribute("aria-hidden", "true");
+    Object.assign(c.style, { position: "absolute", left: r.left - box.left + "px", top: r.top - box.top + "px", width: r.width + "px", margin: "0", pointerEvents: "none" });
+    return c;
+  });
+  change();
+  const now = el.getBoundingClientRect().height;
+  el.classList.add("opening");
+  for (const c of copies) { el.append(c); c.animate([{ opacity: 1 }, { opacity: 0 }], { ...LEAVING, fill: "forwards" }).finished.then(() => c.remove(), () => c.remove()); }
+  for (const r of rows) r.animate([{ opacity: 0 }, { opacity: 1 }], { ...ARRIVING, delay: copies.length ? LEAVING.duration : 0, fill: "backwards" });
+  const end = () => el.classList.remove("opening");
   el.animate([{ height: was + "px" }, { height: now + "px" }], { ...MOTION, id: "glide" }).finished.then(end, end);
 }
 // Something that grows or shrinks in place, such as undo naming what it brings back: its

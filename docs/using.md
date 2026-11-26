@@ -165,7 +165,7 @@ On a phone turned on its side, or a tablet or computer, the page uses the width:
 Panier is paper, and what moves says where it happens:
 
 - **On the page**, what's written fades in or out where it is: an item added or deleted, a box filling, the pen stroke, suggestions, colours under a name, what others change, tinted a moment.
-- **Along the page**, rows and sections glide to their new places, the ticked group folds and unfolds, and what's in the way glides aside during a drag.
+- **Along the page**, rows and sections glide to their new places, the ticked group folds and unfolds, a section folds and opens like a drawer over what it holds, its heading staying put, and what's in the way glides aside during a drag.
 - **Off the page**, what you hold lifts, with a shadow; a ticked item travels to the ticked group and settles there, who ticked it fading in on the way.
 - **On top**, the sheets, undo and the connection's status rise into place, and sink or fade away, quicker, as they go.
 - **The page itself** turns, between the lists page, a list and their settings, out of what you tapped and back into it, and takes a new colour.
